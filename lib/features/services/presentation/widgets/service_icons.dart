@@ -1,0 +1,48 @@
+import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+
+/// Icon resolver for Services module.
+abstract final class ServiceIcons {
+  static IconData resolve(String name) => switch (name) {
+        'home' => LucideIcons.home,
+        'building' => LucideIcons.building2,
+        'trending_up' => LucideIcons.trendingUp,
+        'map' => LucideIcons.map,
+        'megaphone' => LucideIcons.megaphone,
+        'search' => LucideIcons.search,
+        'hard_hat' => LucideIcons.hardHat,
+        'key' => LucideIcons.key,
+        'hammer' => LucideIcons.hammer,
+        'ruler' => LucideIcons.ruler,
+        'road' => LucideIcons.milestone,
+        'pen_tool' => LucideIcons.penTool,
+        'sofa' => LucideIcons.armchair,
+        'tree' => LucideIcons.trees,
+        'layers' => LucideIcons.layers,
+        'settings' => LucideIcons.settings,
+        'shield' => LucideIcons.shieldCheck,
+        'wrench' => LucideIcons.wrench,
+        'users' => LucideIcons.users,
+        'wallet' => LucideIcons.wallet,
+        'calculator' => LucideIcons.calculator,
+        'compass' => LucideIcons.compass,
+        'file' => LucideIcons.fileText,
+        'scale' => LucideIcons.scale,
+        'clipboard' => LucideIcons.clipboard,
+        'briefcase' => LucideIcons.briefcase,
+        'cpu' => LucideIcons.cpu,
+        'sparkles' => LucideIcons.sparkles,
+        'message' => LucideIcons.messageSquare,
+        'headphones' => LucideIcons.headphones,
+        'clock' => LucideIcons.clock,
+        'box' => LucideIcons.box,
+        'plane' => LucideIcons.plane,
+        'activity' => LucideIcons.activity,
+        'bed' => LucideIcons.bedDouble,
+        'heart' => LucideIcons.heart,
+        'graduation' => LucideIcons.graduationCap,
+        'factory' => LucideIcons.factory,
+        'landmark' => LucideIcons.landmark,
+        _ => LucideIcons.circle,
+      };
+}

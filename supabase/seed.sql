@@ -1,0 +1,3 @@
+-- Local seed (mirrors migration 20260710110004_seed_roles_permissions.sql)
+-- Roles and permissions are seeded via migrations on remote.
+-- Use `supabase db reset` locally to apply migrations + this seed.
