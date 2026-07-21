@@ -21,7 +21,34 @@ import 'package:hdhomesproject/features/properties/presentation/routes/property_
 import 'package:hdhomesproject/features/services/presentation/routes/service_routes.dart';
 import 'package:hdhomesproject/features/investment/presentation/routes/investment_routes.dart';
 import 'package:hdhomesproject/features/careers/presentation/routes/careers_routes.dart';
+import 'package:hdhomesproject/features/authentication/presentation/pages/admin_communication_page.dart';
+import 'package:hdhomesproject/features/eaih/presentation/pages/ai_command_center_page.dart';
+import 'package:hdhomesproject/features/eip/presentation/pages/integration_command_center_page.dart';
+import 'package:hdhomesproject/features/authentication/presentation/pages/kyc_compliance_page.dart';
+import 'package:hdhomesproject/features/authentication/presentation/pages/notification_center_page.dart';
+import 'package:hdhomesproject/features/authentication/presentation/pages/observability_command_center_page.dart';
+import 'package:hdhomesproject/features/authentication/presentation/pages/organization_hub_page.dart';
+import 'package:hdhomesproject/features/authentication/presentation/pages/personalization_analytics_page.dart';
+import 'package:hdhomesproject/features/authentication/presentation/pages/profile_center_page.dart';
+import 'package:hdhomesproject/features/authentication/presentation/pages/rbac_console_page.dart';
+import 'package:hdhomesproject/features/authentication/presentation/pages/search_insights_page.dart';
+import 'package:hdhomesproject/features/dashboard/presentation/pages/executive_dashboard_page.dart';
 import 'package:hdhomesproject/features/investor/presentation/pages/investor_portal_stub_page.dart';
+import 'package:hdhomesproject/features/crm/presentation/pages/crm_command_center_page.dart';
+import 'package:hdhomesproject/features/imp/presentation/pages/investor_command_center_page.dart';
+import 'package:hdhomesproject/features/pms/presentation/pages/property_command_center_page.dart';
+import 'package:hdhomesproject/features/sbms/presentation/pages/sales_command_center_page.dart';
+import 'package:hdhomesproject/features/cpms/presentation/pages/construction_command_center_page.dart';
+import 'package:hdhomesproject/features/fapms/presentation/pages/finance_command_center_page.dart';
+import 'package:hdhomesproject/features/dxp/presentation/pages/marketing_command_center_page.dart';
+import 'package:hdhomesproject/features/hcm/presentation/pages/hr_command_center_page.dart';
+import 'package:hdhomesproject/features/eoc/presentation/pages/eoc_mission_control_page.dart';
+import 'package:hdhomesproject/features/cshop/presentation/pages/support_command_center_page.dart';
+import 'package:hdhomesproject/features/ddcms/presentation/pages/document_command_center_page.dart';
+import 'package:hdhomesproject/features/eafms/presentation/pages/asset_command_center_page.dart';
+import 'package:hdhomesproject/features/grca/presentation/pages/grc_command_center_page.dart';
+import 'package:hdhomesproject/features/biadw/presentation/pages/bi_command_center_page.dart';
+import 'package:hdhomesproject/features/pviscm/presentation/pages/procurement_command_center_page.dart';
 
 Widget _placeholder(String title, {String? subtitle}) =>
     PlaceholderPage(title: title, subtitle: subtitle);
@@ -151,6 +178,7 @@ ShellRoute get adminShellRoute => ShellRoute(
         prefix: RoutePaths.dashboard,
         routes: {
           '': 'Dashboard',
+          'eoc': 'Ops Center',
           'website': 'Website Pages',
           'banners': 'Banners',
           'seo': 'SEO Settings',
@@ -159,19 +187,33 @@ ShellRoute get adminShellRoute => ShellRoute(
           'clients': 'Clients',
           'investors': 'Investors',
           'crm': 'CRM',
+          'support': 'Customer Support',
+          'documents': 'Documents',
+          'procurement': 'Procurement',
+          'assets': 'Assets',
+          'grc': 'GRC',
+          'sales': 'Sales',
           'construction': 'Construction',
           'finance': 'Finance',
           'marketing': 'Marketing',
+          'hr': 'Human Resources',
           'blog': 'Blog',
           'media': 'Media Library',
           'reports': 'Reports',
           'analytics': 'Analytics',
+          'ai': 'AI Hub',
+          'integrations': 'Integrations',
           'notifications': 'Notifications',
           'users': 'Users',
+          'organization': 'Organization',
           'roles': 'Roles & Permissions',
           'settings': 'Settings',
           'activity-logs': 'Activity Logs',
+          'personalization': 'Personalization Analytics',
+          'search': 'Search Insights',
           'profile': 'Profile',
+          'compliance': 'Compliance',
+          'communications': 'Communications',
         },
       ),
     );
@@ -183,10 +225,82 @@ List<RouteBase> _portalRoutes({
 }) {
   return routes.entries.map((entry) {
     final path = entry.key.isEmpty ? prefix : '$prefix/${entry.key}';
+    final isProfileSurface =
+        entry.key == 'settings' || entry.key == 'profile';
+    final isCompliance = entry.key == 'compliance';
+    final isNotifications = entry.key == 'notifications';
+    final isCommunications = entry.key == 'communications';
+    final isActivityLogs = entry.key == 'activity-logs';
+    final isOrganization =
+        entry.key == 'organization' || entry.key == 'users';
+    final isRoles = entry.key == 'roles';
+    final isPersonalization = entry.key == 'personalization';
+    final isSearchInsights = entry.key == 'search';
+    final isAiGovernance = entry.key == 'ai';
+    final isIntegrationsAdmin =
+        entry.key == 'integrations' && prefix == RoutePaths.dashboard;
+    final isExecutiveHome = entry.key.isEmpty && prefix == RoutePaths.dashboard;
+    final isPmsProperties =
+        entry.key == 'properties' && prefix == RoutePaths.dashboard;
+    final isCrm =
+        entry.key == 'crm' && prefix == RoutePaths.dashboard;
+    final isSupportAdmin =
+        entry.key == 'support' && prefix == RoutePaths.dashboard;
+    final isDocumentsAdmin =
+        entry.key == 'documents' && prefix == RoutePaths.dashboard;
+    final isProcurementAdmin =
+        entry.key == 'procurement' && prefix == RoutePaths.dashboard;
+    final isAssetsAdmin =
+        entry.key == 'assets' && prefix == RoutePaths.dashboard;
+    final isGrcAdmin =
+        entry.key == 'grc' && prefix == RoutePaths.dashboard;
+    final isAnalyticsAdmin =
+        entry.key == 'analytics' && prefix == RoutePaths.dashboard;
+    final isSales =
+        entry.key == 'sales' && prefix == RoutePaths.dashboard;
+    final isInvestors =
+        entry.key == 'investors' && prefix == RoutePaths.dashboard;
+    final isConstructionAdmin =
+        entry.key == 'construction' && prefix == RoutePaths.dashboard;
+    final isFinanceAdmin =
+        entry.key == 'finance' && prefix == RoutePaths.dashboard;
+    final isMarketingAdmin =
+        entry.key == 'marketing' && prefix == RoutePaths.dashboard;
+    final isHrAdmin = entry.key == 'hr' && prefix == RoutePaths.dashboard;
+    final isEocAdmin = entry.key == 'eoc' && prefix == RoutePaths.dashboard;
     return GoRoute(
       path: path,
       name: path.replaceAll('/', '-').replaceFirst('-', ''),
-      builder: (_, __) => pageBuilder?.call(entry.value) ?? _placeholder(entry.value),
+      builder: (_, _) {
+        if (isExecutiveHome) return const ExecutiveDashboardPage();
+        if (isEocAdmin) return const EocMissionControlPage();
+        if (isPmsProperties) return const PropertyCommandCenterPage();
+        if (isCrm) return const CrmCommandCenterPage();
+        if (isSupportAdmin) return const SupportCommandCenterPage();
+        if (isDocumentsAdmin) return const DocumentCommandCenterPage();
+        if (isProcurementAdmin) return const ProcurementCommandCenterPage();
+        if (isAssetsAdmin) return const AssetCommandCenterPage();
+        if (isGrcAdmin) return const GrcCommandCenterPage();
+        if (isAnalyticsAdmin) return const BiCommandCenterPage();
+        if (isSales) return const SalesCommandCenterPage();
+        if (isInvestors) return const InvestorCommandCenterPage();
+        if (isConstructionAdmin) return const ConstructionCommandCenterPage();
+        if (isFinanceAdmin) return const FinanceCommandCenterPage();
+        if (isMarketingAdmin) return const MarketingCommandCenterPage();
+        if (isHrAdmin) return const HrCommandCenterPage();
+        if (isCompliance) return const KycCompliancePage();
+        if (isCommunications) return const AdminCommunicationPage();
+        if (isActivityLogs) return const ObservabilityCommandCenterPage();
+        if (isOrganization) return const OrganizationHubPage();
+        if (isRoles) return const RbacConsolePage();
+        if (isPersonalization) return const PersonalizationAnalyticsPage();
+        if (isSearchInsights) return const SearchInsightsPage();
+        if (isAiGovernance) return const AiCommandCenterPage();
+        if (isIntegrationsAdmin) return const IntegrationCommandCenterPage();
+        if (isNotifications) return const NotificationCenterPage();
+        if (isProfileSurface) return const ProfileCenterPage();
+        return pageBuilder?.call(entry.value) ?? _placeholder(entry.value);
+      },
     );
   }).toList();
 }

@@ -41,7 +41,7 @@ class AnimatedSectionTitle extends StatelessWidget {
         Text(
           title,
           textAlign: alignment,
-          style: theme.displaySmall,
+          style: theme.headlineMedium,
         ),
         if (subtitle != null) ...[
           const SizedBox(height: AppSpacing.base),

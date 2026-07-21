@@ -2,45 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/layout/portal_shell.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/features/authentication/domain/entities/enterprise_search_models.dart';
+import 'package:hdhomesproject/features/authentication/presentation/providers/enterprise_search_controller.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
-class CommandAction {
-  const CommandAction({
-    required this.label,
-    required this.path,
-    this.icon,
-    this.keywords = const [],
-    this.section = 'Navigation',
-  });
-
-  final String label;
-  final String path;
-  final IconData? icon;
-  final List<String> keywords;
-  final String section;
-}
-
-final commandActionsProvider = Provider<List<CommandAction>>((ref) {
-  return const [
-    CommandAction(label: 'Home', path: RoutePaths.home, icon: Icons.home_rounded),
-    CommandAction(label: 'Properties', path: RoutePaths.properties, icon: Icons.apartment_rounded, keywords: ['search', 'listings']),
-    CommandAction(label: 'Estates', path: RoutePaths.estates, icon: Icons.location_city_rounded),
-    CommandAction(label: 'Blog', path: RoutePaths.blog, icon: Icons.article_rounded),
-    CommandAction(label: 'Contact', path: RoutePaths.contact, icon: Icons.mail_rounded),
-    CommandAction(label: 'Login', path: RoutePaths.login, icon: Icons.login_rounded, section: 'Account'),
-    CommandAction(label: 'Admin Dashboard', path: RoutePaths.dashboard, icon: Icons.dashboard_rounded, section: 'Portals'),
-    CommandAction(label: 'Client Portal', path: RoutePaths.client, icon: Icons.person_rounded, section: 'Portals'),
-    CommandAction(label: 'Investor Portal', path: RoutePaths.investor, icon: Icons.account_balance_rounded, section: 'Portals'),
-    CommandAction(label: 'Create Property', path: RoutePaths.dashboardProperties, icon: Icons.add_home_rounded, section: 'Quick Actions', keywords: ['add', 'new']),
-    CommandAction(label: 'CRM', path: RoutePaths.dashboardCrm, icon: Icons.contact_phone_rounded, section: 'Quick Actions'),
-    CommandAction(label: 'Reports', path: RoutePaths.dashboardReports, icon: Icons.assessment_rounded, section: 'Quick Actions'),
-    CommandAction(label: 'Settings', path: RoutePaths.dashboardSettings, icon: Icons.settings_rounded, section: 'Quick Actions'),
-  ];
-});
-
-/// Global command palette — Ctrl+K / Cmd+K.
+/// Global Command Center — Ctrl+K / Cmd+K (Enterprise Search Part 14).
 class CommandPalette extends ConsumerStatefulWidget {
   const CommandPalette({super.key, required this.child});
 
@@ -52,29 +20,34 @@ class CommandPalette extends ConsumerStatefulWidget {
 
 class _CommandPaletteState extends ConsumerState<CommandPalette> {
   final _searchController = TextEditingController();
-  bool _visible = false;
-
-  void _open() => setState(() => _visible = true);
-  void _close() {
-    setState(() => _visible = false);
-    _searchController.clear();
-  }
+  final _focusNode = FocusNode();
 
   @override
   void dispose() {
     _searchController.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _open() {
+    ref.read(commandCenterControllerProvider.notifier).setOpen(true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+  }
+
+  void _close() {
+    ref.read(commandCenterControllerProvider.notifier).setOpen(false);
+    _searchController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
-    final actions = ref.watch(commandActionsProvider);
-    final query = _searchController.text.toLowerCase();
-    final filtered = actions.where((a) {
-      if (query.isEmpty) return true;
-      return a.label.toLowerCase().contains(query) ||
-          a.keywords.any((k) => k.contains(query));
-    }).toList();
+    // Only watch open/closed at the root so typing/search results don't
+    // rebuild the entire MaterialApp child tree.
+    final isOpen = ref.watch(
+      commandCenterControllerProvider.select((s) => s.isOpen),
+    );
 
     return CommandPaletteScope(
       open: _open,
@@ -84,77 +57,37 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
               const _OpenCommandPaletteIntent(),
           LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.keyK):
               const _OpenCommandPaletteIntent(),
+          LogicalKeySet(LogicalKeyboardKey.escape):
+              const _CloseCommandPaletteIntent(),
         },
         child: Actions(
           actions: {
-            _OpenCommandPaletteIntent: CallbackAction<_OpenCommandPaletteIntent>(
+            _OpenCommandPaletteIntent:
+                CallbackAction<_OpenCommandPaletteIntent>(
               onInvoke: (_) {
                 _open();
                 return null;
               },
             ),
-          },
-          child: Focus(
-            autofocus: true,
-            child: Stack(
-              children: [
-                widget.child,
-                if (_visible) ...[
-                  ModalBarrier(
-                    color: AppColors.deepBlack.withValues(alpha: 0.6),
-                    onDismiss: _close,
-                  ),
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 560),
-                      child: Material(
-                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        borderRadius: AppRadius.dialogBorder,
-                        elevation: 16,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(AppSpacing.base),
-                              child: TextField(
-                                controller: _searchController,
-                                autofocus: true,
-                                onChanged: (_) => setState(() {}),
-                                decoration: const InputDecoration(
-                                  hintText: 'Search properties, clients, settings...',
-                                  prefixIcon: Icon(Icons.search_rounded),
-                                  border: InputBorder.none,
-                                ),
-                                onSubmitted: (_) {
-                                  if (filtered.isNotEmpty) {
-                                    _navigate(filtered.first.path);
-                                  }
-                                },
-                              ),
-                            ),
-                            const Divider(height: 1),
-                            Flexible(
-                              child: ListView(
-                                shrinkWrap: true,
-                                children: [
-                                  for (final action in filtered)
-                                    ListTile(
-                                      leading: Icon(action.icon ?? Icons.arrow_forward_rounded),
-                                      title: Text(action.label),
-                                      subtitle: Text(action.section),
-                                      onTap: () => _navigate(action.path),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+            _CloseCommandPaletteIntent:
+                CallbackAction<_CloseCommandPaletteIntent>(
+              onInvoke: (_) {
+                if (isOpen) _close();
+                return null;
+              },
             ),
+          },
+          child: Stack(
+            children: [
+              widget.child,
+              if (isOpen)
+                _CommandPaletteOverlay(
+                  searchController: _searchController,
+                  focusNode: _focusNode,
+                  onClose: _close,
+                  onNavigate: _navigate,
+                ),
+            ],
           ),
         ),
       ),
@@ -167,6 +100,368 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
   }
 }
 
+class _CommandPaletteOverlay extends ConsumerWidget {
+  const _CommandPaletteOverlay({
+    required this.searchController,
+    required this.focusNode,
+    required this.onClose,
+    required this.onNavigate,
+  });
+
+  final TextEditingController searchController;
+  final FocusNode focusNode;
+  final VoidCallback onClose;
+  final void Function(String path) onNavigate;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ui = ref.watch(commandCenterControllerProvider);
+    final controller = ref.read(commandCenterControllerProvider.notifier);
+    final snap = ref.watch(enterpriseSearchSnapshotProvider).valueOrNull;
+    final result = ui.result;
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+
+    return Stack(
+      children: [
+        ModalBarrier(
+          color: AppColors.deepBlack.withValues(alpha: 0.65),
+          onDismiss: onClose,
+        ),
+        Align(
+          alignment: isMobile ? Alignment.topCenter : Alignment.center,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: isMobile ? 24 : 0,
+              left: 12,
+              right: 12,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? double.infinity : 720,
+                maxHeight:
+                    MediaQuery.sizeOf(context).height * (isMobile ? 0.92 : 0.78),
+              ),
+              child: Material(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: AppRadius.dialogBorder,
+                elevation: 20,
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                      child: Row(
+                        children: [
+                          const Icon(LucideIcons.search, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: searchController,
+                              focusNode: focusNode,
+                              autofocus: true,
+                              onChanged: controller.setQuery,
+                              decoration: const InputDecoration(
+                                hintText:
+                                    'Search everything or run a command…',
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (v) async {
+                                await controller.commitHistory(v);
+                                final items = result?.groups
+                                        .expand((g) => g.items)
+                                        .toList() ??
+                                    const [];
+                                final cmds = result?.commands ?? const [];
+                                if (items.isNotEmpty) {
+                                  onNavigate(items.first.path);
+                                } else if (cmds.isNotEmpty) {
+                                  onNavigate(cmds.first.routeOrKey);
+                                }
+                              },
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Close',
+                            onPressed: onClose,
+                            icon: const Icon(LucideIcons.x),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: [
+                          for (final mode in SearchMode.values)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ChoiceChip(
+                                label: Text(mode.label),
+                                selected: ui.mode == mode,
+                                onSelected: (_) => controller.setMode(mode),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: _CommandCenterBody(
+                        ui: ui,
+                        snap: snap,
+                        onToggle: controller.toggleModule,
+                        onNavigate: onNavigate,
+                        onSuggestion: (q) {
+                          searchController.text = q;
+                          controller.setQuery(q);
+                        },
+                        onClearHistory: controller.clearHistory,
+                      ),
+                    ),
+                    if (result != null)
+                      Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Text(
+                          result.zeroResults
+                              ? 'No authorized results · ${result.latencyMs}ms'
+                              : '${result.totalCount} results · ${result.latencyMs}ms'
+                                  '${result.intent?.location != null ? ' · intent: ${result.intent!.location}' : ''}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CommandCenterBody extends StatelessWidget {
+  const _CommandCenterBody({
+    required this.ui,
+    required this.snap,
+    required this.onToggle,
+    required this.onNavigate,
+    required this.onSuggestion,
+    required this.onClearHistory,
+  });
+
+  final CommandCenterUiState ui;
+  final EnterpriseSearchSnapshot? snap;
+  final void Function(SearchResultModule) onToggle;
+  final void Function(String path) onNavigate;
+  final void Function(String query) onSuggestion;
+  final VoidCallback onClearHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = ui.result;
+    final queryEmpty = ui.query.trim().isEmpty;
+
+    if (queryEmpty) {
+      return ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          if (snap?.favoriteCommands.isNotEmpty == true) ...[
+            Text('Pinned commands',
+                style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final f in snap!.favoriteCommands)
+                  ActionChip(
+                    avatar: const Icon(LucideIcons.pin, size: 14),
+                    label: Text(f.label),
+                    onPressed: () => onNavigate(f.path),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (snap?.pinnedWorkspaces.isNotEmpty == true) ...[
+            Text('Intelligent Workspace Launcher',
+                style: Theme.of(context).textTheme.titleSmall),
+            ...snap!.pinnedWorkspaces.map(
+              (w) => ListTile(
+                dense: true,
+                leading: const Icon(LucideIcons.layoutDashboard, size: 18),
+                title: Text(w.title),
+                subtitle: Text(w.subtitle ?? 'Workspace'),
+                onTap: () => onNavigate(w.path),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            children: [
+              Text('Recent searches',
+                  style: Theme.of(context).textTheme.titleSmall),
+              const Spacer(),
+              TextButton(onPressed: onClearHistory, child: const Text('Clear')),
+            ],
+          ),
+          ...(snap?.history ?? const <SearchHistoryItem>[]).map(
+            (h) => ListTile(
+              dense: true,
+              leading: const Icon(LucideIcons.history, size: 18),
+              title: Text(h.query),
+              onTap: () => onSuggestion(h.query),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text('Suggestions', style: Theme.of(context).textTheme.titleSmall),
+          ...EnterpriseSearchCatalog.suggest('').map(
+            (s) => ListTile(
+              dense: true,
+              leading: Icon(
+                s.kind == 'command'
+                    ? LucideIcons.zap
+                    : s.kind == 'saved'
+                        ? LucideIcons.bookmark
+                        : LucideIcons.sparkles,
+                size: 18,
+              ),
+              title: Text(s.label),
+              onTap: () => onSuggestion(s.query),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (result == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        if (result.suggestions.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Wrap(
+              spacing: 6,
+              children: [
+                for (final s in result.suggestions.take(4))
+                  ActionChip(
+                    label: Text(s.label),
+                    onPressed: () => onSuggestion(s.query),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+        if (result.commands.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Text('Commands',
+                style: Theme.of(context).textTheme.titleSmall),
+          ),
+          for (final c in result.commands.take(8))
+            ListTile(
+              leading: const Icon(LucideIcons.terminal, size: 18),
+              title: Text(c.label),
+              subtitle: Text(c.category),
+              trailing: const Text('↵'),
+              onTap: () => onNavigate(c.routeOrKey),
+            ),
+        ],
+        for (final group in result.groups) ...[
+          ListTile(
+            dense: true,
+            title: Text(
+              group.label,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            trailing: Icon(
+              ui.expandedModules.contains(group.module)
+                  ? LucideIcons.chevronDown
+                  : LucideIcons.chevronRight,
+              size: 16,
+            ),
+            onTap: () => onToggle(group.module),
+          ),
+          if (ui.expandedModules.contains(group.module))
+            for (final item in group.items)
+              ListTile(
+                leading: Icon(_iconFor(item.module), size: 18),
+                title: Text(item.title),
+                subtitle: Text(
+                  [
+                    if (item.entry.subtitle != null) item.entry.subtitle!,
+                    if (item.entry.preview.isNotEmpty)
+                      item.entry.preview.entries
+                          .take(2)
+                          .map((e) => '${e.key}: ${e.value}')
+                          .join(' · '),
+                  ].where((e) => e.isNotEmpty).join(' · '),
+                ),
+                onTap: () => onNavigate(item.path),
+              ),
+        ],
+        if (result.related.isNotEmpty) ...[
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Text(
+              'Cross-module smart links',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          for (final r in result.related)
+            ListTile(
+              dense: true,
+              leading: const Icon(LucideIcons.link, size: 16),
+              title: Text(r.title),
+              subtitle: Text(r.module.label),
+              onTap: () => onNavigate(r.path),
+            ),
+        ],
+        if (result.zeroResults)
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'No matching results for your permissions. Try another term or mode.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+      ],
+    );
+  }
+
+  IconData _iconFor(SearchResultModule m) => switch (m) {
+        SearchResultModule.property || SearchResultModule.estate =>
+          LucideIcons.building2,
+        SearchResultModule.client ||
+        SearchResultModule.investor ||
+        SearchResultModule.staff ||
+        SearchResultModule.user ||
+        SearchResultModule.lead =>
+          LucideIcons.user,
+        SearchResultModule.document => LucideIcons.fileText,
+        SearchResultModule.report => LucideIcons.barChart3,
+        SearchResultModule.command => LucideIcons.zap,
+        SearchResultModule.ticket => LucideIcons.lifeBuoy,
+        SearchResultModule.blog => LucideIcons.newspaper,
+        SearchResultModule.workspace => LucideIcons.layoutDashboard,
+        _ => LucideIcons.search,
+      };
+}
+
 class _OpenCommandPaletteIntent extends Intent {
   const _OpenCommandPaletteIntent();
+}
+
+class _CloseCommandPaletteIntent extends Intent {
+  const _CloseCommandPaletteIntent();
 }

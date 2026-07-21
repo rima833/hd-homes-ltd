@@ -42,6 +42,14 @@ REVOKE ALL ON FUNCTION public.has_permission(TEXT, UUID) FROM PUBLIC, anon, auth
 REVOKE ALL ON FUNCTION public.is_staff(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 
+-- Re-grant EXECUTE so RLS policy expressions can evaluate for authenticated/anon.
+-- (Revoking without this breaks registration/login with 42501 on has_permission.)
+GRANT EXECUTE ON FUNCTION public.get_user_role_slugs(UUID) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.has_role(TEXT, UUID) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.has_permission(TEXT, UUID) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.is_staff(UUID) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO postgres, service_role, supabase_auth_admin;
+
 -- Missing RLS policies
 CREATE POLICY client_preferences_own ON public.client_preferences
   FOR ALL USING (

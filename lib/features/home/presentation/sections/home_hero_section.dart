@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -122,7 +123,11 @@ class _HeroBackgroundState extends State<_HeroBackground>
       duration: const Duration(seconds: 8),
       lowerBound: 0,
       upperBound: 1,
-    )..repeat(reverse: true);
+    );
+    // Skip continuous ken-burns on web — it burns CPU while the page is open.
+    if (!kIsWeb) {
+      _controller.repeat(reverse: true);
+    }
   }
 
   @override
@@ -133,6 +138,23 @@ class _HeroBackgroundState extends State<_HeroBackground>
 
   @override
   Widget build(BuildContext context) {
+    Widget background = Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1A1510),
+            AppColors.charcoal,
+            AppColors.deepBlack,
+          ],
+        ),
+      ),
+      child: CustomPaint(painter: _HeroPatternPainter()),
+    );
+
+    if (kIsWeb) return background;
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -141,20 +163,7 @@ class _HeroBackgroundState extends State<_HeroBackground>
           child: child,
         );
       },
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1A1510),
-              AppColors.charcoal,
-              AppColors.deepBlack,
-            ],
-          ),
-        ),
-        child: CustomPaint(painter: _HeroPatternPainter()),
-      ),
+      child: background,
     );
   }
 }

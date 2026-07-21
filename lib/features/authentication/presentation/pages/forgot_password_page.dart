@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
-import 'package:hdhomesproject/core/errors/app_exception.dart';
+import 'package:hdhomesproject/core/theme/app_theme.dart';
+import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/validators/email_validator.dart';
-import 'package:hdhomesproject/core/widgets/primary_button.dart';
-import 'package:hdhomesproject/features/authentication/presentation/providers/auth_controller.dart';
+import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
+import 'package:hdhomesproject/features/authentication/presentation/providers/account_security_controller.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
+/// Premium password recovery request screen.
 class ForgotPasswordPage extends HookConsumerWidget {
   const ForgotPasswordPage({super.key});
 
@@ -16,90 +19,97 @@ class ForgotPasswordPage extends HookConsumerWidget {
     final emailController = useTextEditingController();
     final formKey = useMemoized(GlobalKey<FormState>.new);
     final sent = useState(false);
-    final authState = ref.watch(authControllerProvider);
+    final ui = ref.watch(accountSecurityControllerProvider);
+    final controller = ref.read(accountSecurityControllerProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Forgot Password')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: sent.value
-                ? Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.mark_email_read_outlined, size: 64),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Check your email',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'We sent a password reset link to your email address.',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      PrimaryButton(
-                        label: 'Back to Sign In',
-                        onPressed: () => context.go(RoutePaths.login),
-                      ),
-                    ],
-                  )
-                : Form(
-                    key: formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Reset your password',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Enter your email and we will send you a reset link.',
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 32),
-                        TextFormField(
-                          controller: emailController,
-                          decoration: const InputDecoration(labelText: 'Email'),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: EmailValidator.validate,
-                        ),
-                        const SizedBox(height: 24),
-                        PrimaryButton(
-                          label: 'Send Reset Link',
-                          expand: true,
-                          isLoading: authState.isLoading,
-                          onPressed: authState.isLoading
-                              ? null
-                              : () async {
-                                  if (!formKey.currentState!.validate()) return;
-                                  try {
-                                    await ref
-                                        .read(authControllerProvider.notifier)
-                                        .resetPassword(
-                                          emailController.text.trim(),
-                                        );
-                                    sent.value = true;
-                                  } catch (e) {
-                                    final message = e is AppException
-                                        ? friendlyErrorMessage(e)
-                                        : 'Failed to send reset link.';
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(content: Text(message)),
-                                      );
-                                    }
-                                  }
-                                },
-                        ),
-                      ],
-                    ),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                children: [
+                  Image.asset(AppTheme.logoAsset, height: 48),
+                  const SizedBox(height: AppSpacing.xl),
+                  Icon(
+                    sent.value ? LucideIcons.mailCheck : LucideIcons.keyRound,
+                    size: 56,
+                    color: AppColors.gold,
                   ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    sent.value ? 'Check your email' : 'Forgot your password?',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    sent.value
+                        ? (ui.message ??
+                            'If an account exists for that email, we sent a secure reset link.')
+                        : 'Enter the email associated with your HD Homes account and we will send a secure reset link.',
+                    textAlign: TextAlign.center,
+                  ),
+                  if (ui.error != null && !sent.value) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Text(ui.error!, style: const TextStyle(color: AppColors.error)),
+                  ],
+                  const SizedBox(height: AppSpacing.xl),
+                  if (!sent.value)
+                    Form(
+                      key: formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: emailController,
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                              prefixIcon: Icon(LucideIcons.mail),
+                            ),
+                            keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [AutofillHints.email],
+                            validator: EmailValidator.validate,
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          PrimaryButton(
+                            label: 'Send reset link',
+                            expand: true,
+                            icon: LucideIcons.send,
+                            isLoading: ui.isSubmitting,
+                            onPressed: ui.isSubmitting
+                                ? null
+                                : () async {
+                                    if (!formKey.currentState!.validate()) return;
+                                    final ok = await controller.requestReset(
+                                      emailController.text.trim(),
+                                    );
+                                    if (ok) sent.value = true;
+                                  },
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    PrimaryButton(
+                      label: 'Back to Sign in',
+                      expand: true,
+                      onPressed: () => context.go(RoutePaths.login),
+                    ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextButton(
+                    onPressed: () => context.go(RoutePaths.login),
+                    child: const Text('Back to Login'),
+                  ),
+                  TextButton(
+                    onPressed: () => context.go(RoutePaths.contact),
+                    child: const Text('Contact Support'),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

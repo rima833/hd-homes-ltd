@@ -26,7 +26,7 @@ class HdHomesApp extends ConsumerWidget {
       routerConfig: router,
       builder: (context, child) => CommandPalette(
         child: ResponsiveBreakpoints.builder(
-          child: child!,
+          child: child ?? const SizedBox.shrink(),
           breakpoints: const [
             Breakpoint(start: 0, end: AppBreakpoints.mobileMax, name: MOBILE),
             Breakpoint(

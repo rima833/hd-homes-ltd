@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
@@ -25,7 +26,8 @@ class SectionWrapper extends StatelessWidget {
       child: child,
     );
 
-    if (animate) {
+    // Entrance animations are costly on Flutter web when many sections mount.
+    if (animate && !kIsWeb) {
       content = content
           .animate()
           .fadeIn(duration: AppDurations.normal, curve: Curves.easeOut)

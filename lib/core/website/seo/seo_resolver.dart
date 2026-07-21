@@ -25,6 +25,12 @@ abstract final class SeoResolver {
       RoutePaths.trust => SeoMetadata.trustHub,
       RoutePaths.investment => SeoMetadata.investmentHub,
       RoutePaths.careers => SeoMetadata.careersHub,
+      RoutePaths.register => SeoMetadata.register,
+      RoutePaths.login => SeoMetadata.login,
+      RoutePaths.verifyEmail => SeoMetadata.verifyEmail,
+      RoutePaths.welcome => SeoMetadata.welcome,
+      RoutePaths.forgotPassword => SeoMetadata.forgotPassword,
+      RoutePaths.resetPassword => SeoMetadata.resetPassword,
       _ when _isDynamicDetail(path) => null,
       _ => null,
     };

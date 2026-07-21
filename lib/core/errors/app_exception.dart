@@ -29,6 +29,11 @@ final class ValidationException extends AppException {
   const ValidationException(super.message, {super.cause});
 }
 
+/// Registration / onboarding failures.
+final class RegistrationException extends AppException {
+  const RegistrationException(super.message, {super.cause});
+}
+
 /// Maps [AppException] to user-friendly display messages.
 String friendlyErrorMessage(AppException exception) {
   return switch (exception) {
@@ -38,5 +43,6 @@ String friendlyErrorMessage(AppException exception) {
     DatabaseException() =>
       'Something went wrong while saving your data. Please try again.',
     ValidationException() => exception.message,
+    RegistrationException() => exception.message,
   };
 }

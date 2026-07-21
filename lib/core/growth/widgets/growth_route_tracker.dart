@@ -34,7 +34,11 @@ class _GrowthRouteTrackerState extends ConsumerState<GrowthRouteTracker> {
   void didUpdateWidget(GrowthRouteTracker oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.location != widget.location) {
-      _track(widget.location);
+      // Defer provider writes — modifying Riverpod during didUpdateWidget throws.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _track(widget.location);
+      });
     }
   }
 

@@ -12,9 +12,17 @@ class UserProfileModel extends UserProfile {
     super.accountStatus,
     super.roles = const [],
     super.primaryRole,
+    super.company,
+    super.address,
+    super.preferredLanguage,
+    super.lastLoginAt,
+    super.emailConfirmed = true,
   });
 
-  factory UserProfileModel.fromJson(Map<String, dynamic> json) {
+  factory UserProfileModel.fromJson(
+    Map<String, dynamic> json, {
+    bool emailConfirmed = true,
+  }) {
     final rolesData = json['user_roles'] as List<dynamic>? ?? [];
     final roles = <AppRole>[];
     AppRole? primaryRole;
@@ -29,6 +37,12 @@ class UserProfileModel extends UserProfile {
       }
     }
 
+    DateTime? lastLogin;
+    final rawLastLogin = json['last_login_at'];
+    if (rawLastLogin is String) {
+      lastLogin = DateTime.tryParse(rawLastLogin);
+    }
+
     return UserProfileModel(
       id: json['id'] as String,
       email: json['email'] as String,
@@ -37,8 +51,12 @@ class UserProfileModel extends UserProfile {
       phone: json['phone'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       accountStatus: json['account_status'] as String?,
+      address: json['address'] as String?,
+      preferredLanguage: json['preferred_language'] as String?,
+      lastLoginAt: lastLogin,
       roles: roles,
       primaryRole: primaryRole ?? (roles.isNotEmpty ? roles.first : null),
+      emailConfirmed: emailConfirmed,
     );
   }
 }

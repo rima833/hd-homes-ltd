@@ -17,17 +17,25 @@ class PageContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontal = context.pagePadding;
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        child: Padding(
-          padding: padding ??
-              EdgeInsets.symmetric(
-                horizontal: context.pagePadding,
-                vertical: AppSpacing.xxl,
-              ),
-          child: child,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final pad = padding ??
+                EdgeInsets.symmetric(
+                  horizontal: constraints.maxWidth < horizontal * 2
+                      ? AppSpacing.base
+                      : horizontal,
+                  vertical: AppSpacing.xl,
+                );
+            return Padding(
+              padding: pad,
+              child: child,
+            );
+          },
         ),
       ),
     );

@@ -26,10 +26,10 @@ typedef WebsiteAppShell = PublicShell;
 class _PublicShellState extends State<PublicShell> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _scrollController = ScrollController();
+  final _scrollProgress = ValueNotifier<double>(0);
 
   bool _scrolled = false;
   bool _showScrollTop = false;
-  double _scrollProgress = 0;
 
   @override
   void initState() {
@@ -42,6 +42,7 @@ class _PublicShellState extends State<PublicShell> {
     _scrollController
       ..removeListener(_onScroll)
       ..dispose();
+    _scrollProgress.dispose();
     super.dispose();
   }
 
@@ -50,15 +51,18 @@ class _PublicShellState extends State<PublicShell> {
     final max = _scrollController.position.maxScrollExtent;
     final scrolled = offset > 48;
     final showTop = offset > 400;
-    final progress = max > 0 ? offset / max : 0.0;
+    final progress = max > 0 ? (offset / max).clamp(0.0, 1.0) : 0.0;
 
-    if (scrolled != _scrolled ||
-        showTop != _showScrollTop ||
-        progress != _scrollProgress) {
+    // Progress bar updates without rebuilding the whole page tree.
+    if (progress != _scrollProgress.value) {
+      _scrollProgress.value = progress;
+    }
+
+    // Only rebuild chrome when boolean chrome state flips.
+    if (scrolled != _scrolled || showTop != _showScrollTop) {
       setState(() {
         _scrolled = scrolled;
         _showScrollTop = showTop;
-        _scrollProgress = progress;
       });
     }
   }
@@ -95,7 +99,11 @@ class _PublicShellState extends State<PublicShell> {
                     onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
                     onSearchTap: () => WebsiteSearchOverlay.show(context),
                   ),
-                  ScrollProgressBar(progress: _scrollProgress),
+                  ValueListenableBuilder<double>(
+                    valueListenable: _scrollProgress,
+                    builder: (context, progress, _) =>
+                        ScrollProgressBar(progress: progress),
+                  ),
                 ],
               ),
             ),

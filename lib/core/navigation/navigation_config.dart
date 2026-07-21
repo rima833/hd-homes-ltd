@@ -58,6 +58,11 @@ abstract final class NavigationConfig {
   static const adminNav = [
     NavItem(label: 'Dashboard', path: RoutePaths.dashboard, icon: Icons.dashboard_rounded),
     NavItem(
+      label: 'Ops Center',
+      path: RoutePaths.dashboardEoc,
+      icon: Icons.radar_rounded,
+    ),
+    NavItem(
       label: 'Website',
       path: RoutePaths.dashboard,
       icon: Icons.language_rounded,
@@ -72,6 +77,32 @@ abstract final class NavigationConfig {
     NavItem(label: 'Clients', path: RoutePaths.dashboardClients, icon: Icons.people_rounded),
     NavItem(label: 'Investors', path: RoutePaths.dashboardInvestors, icon: Icons.account_balance_rounded),
     NavItem(label: 'CRM', path: RoutePaths.dashboardCrm, icon: Icons.contact_phone_rounded),
+    NavItem(
+      label: 'Support',
+      path: RoutePaths.dashboardSupport,
+      icon: Icons.support_agent_rounded,
+    ),
+    NavItem(
+      label: 'Documents',
+      path: RoutePaths.dashboardDocuments,
+      icon: Icons.folder_shared_rounded,
+    ),
+    NavItem(
+      label: 'Procurement',
+      path: RoutePaths.dashboardProcurement,
+      icon: Icons.local_shipping_rounded,
+    ),
+    NavItem(
+      label: 'Assets',
+      path: RoutePaths.dashboardAssets,
+      icon: Icons.inventory_2_rounded,
+    ),
+    NavItem(
+      label: 'GRC',
+      path: RoutePaths.dashboardGrc,
+      icon: Icons.account_balance,
+    ),
+    NavItem(label: 'Sales', path: RoutePaths.dashboardSales, icon: Icons.point_of_sale_rounded),
     NavItem(label: 'Construction', path: RoutePaths.dashboardConstruction, icon: Icons.construction_rounded),
     NavItem(label: 'Finance', path: RoutePaths.dashboardFinance, icon: AppIcons.payment),
     NavItem(label: 'Marketing', path: RoutePaths.dashboardMarketing, icon: Icons.campaign_rounded),
@@ -79,8 +110,28 @@ abstract final class NavigationConfig {
     NavItem(label: 'Media Library', path: RoutePaths.dashboardMedia, icon: Icons.perm_media_rounded),
     NavItem(label: 'Reports', path: RoutePaths.dashboardReports, icon: Icons.assessment_rounded),
     NavItem(label: 'Analytics', path: RoutePaths.dashboardAnalytics, icon: Icons.analytics_rounded),
+    NavItem(
+      label: 'AI Hub',
+      path: RoutePaths.aiGovernance,
+      icon: Icons.smart_toy_outlined,
+    ),
+    NavItem(
+      label: 'Integrations',
+      path: RoutePaths.dashboardIntegrations,
+      icon: Icons.hub_outlined,
+    ),
     NavItem(label: 'Notifications', path: RoutePaths.dashboardNotifications, icon: AppIcons.notification),
     NavItem(label: 'Users', path: RoutePaths.dashboardUsers, icon: Icons.group_rounded),
+    NavItem(
+      label: 'Organization',
+      path: RoutePaths.dashboardOrganization,
+      icon: Icons.account_tree_rounded,
+    ),
+    NavItem(
+      label: 'HR',
+      path: RoutePaths.dashboardHr,
+      icon: Icons.badge_outlined,
+    ),
     NavItem(label: 'Roles & Permissions', path: RoutePaths.dashboardRoles, icon: Icons.admin_panel_settings_rounded),
     NavItem(label: 'Settings', path: RoutePaths.dashboardSettings, icon: AppIcons.settings),
     NavItem(label: 'Activity Logs', path: RoutePaths.dashboardActivityLogs, icon: Icons.history_rounded),

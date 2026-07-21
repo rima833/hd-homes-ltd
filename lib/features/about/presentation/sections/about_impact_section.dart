@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
@@ -183,6 +184,7 @@ class _PartnerCarouselState extends State<_PartnerCarousel> {
   }
 
   void _startAutoScroll() {
+    if (kIsWeb) return; // Continuous jumpTo at 25Hz freezes Flutter web.
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(milliseconds: 40), (_) {
       if (!mounted || !_controller.hasClients) return;
@@ -225,16 +227,33 @@ class _PartnerLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 160,
-      padding: const EdgeInsets.all(AppSpacing.base),
+      height: 72,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.neutral200),
         borderRadius: AppRadius.cardBorder,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(name, style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center),
-          Text(category, style: Theme.of(context).textTheme.labelSmall),
+          Text(
+            name,
+            style: Theme.of(context).textTheme.labelLarge,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            category,
+            style: Theme.of(context).textTheme.labelSmall,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

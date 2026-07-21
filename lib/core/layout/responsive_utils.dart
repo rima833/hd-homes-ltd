@@ -25,9 +25,9 @@ abstract final class ResponsiveUtils {
   static double pagePadding(double width) => switch (deviceType(width)) {
         DeviceType.mobile => AppSpacing.base,
         DeviceType.tablet => AppSpacing.xl,
-        DeviceType.laptop => AppSpacing.xxl,
-        DeviceType.desktop => AppSpacing.xxxl,
-        DeviceType.ultraWide => AppSpacing.massive,
+        DeviceType.laptop => AppSpacing.xl,
+        DeviceType.desktop => AppSpacing.xxl,
+        DeviceType.ultraWide => AppSpacing.xxxl,
       };
 
   static double sidebarWidth(double width) =>

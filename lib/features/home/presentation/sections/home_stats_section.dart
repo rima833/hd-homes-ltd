@@ -19,8 +19,12 @@ class HomeStatsSection extends StatelessWidget {
       backgroundColor: AppColors.charcoal,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final itemWidth =
-              (constraints.maxWidth - (columns - 1) * AppSpacing.lg) / columns;
+          final maxW = constraints.maxWidth.isFinite && constraints.maxWidth > 0
+              ? constraints.maxWidth
+              : MediaQuery.sizeOf(context).width;
+          final gaps = (columns - 1) * AppSpacing.lg;
+          final raw = (maxW - gaps) / columns;
+          final itemWidth = raw.isFinite ? raw.clamp(96.0, maxW) : 160.0;
 
           return Wrap(
             spacing: AppSpacing.lg,

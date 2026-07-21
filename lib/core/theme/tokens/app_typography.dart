@@ -7,14 +7,14 @@ abstract final class AppTypography {
   static const String fontFamily = 'Manrope';
   static const String fallbackFamily = 'Inter';
 
-  // Scale (px)
-  static const double hero = 64;
-  static const double pageTitle = 48;
-  static const double sectionTitle = 36;
-  static const double cardTitle = 24;
-  static const double subtitle = 20;
-  static const double body = 16;
-  static const double caption = 14;
+  // Scale (px) — denser ~20% vs original marketing scale
+  static const double hero = 52;
+  static const double pageTitle = 40;
+  static const double sectionTitle = 28;
+  static const double cardTitle = 20;
+  static const double subtitle = 18;
+  static const double body = 15;
+  static const double caption = 13;
   static const double smallLabel = 12;
 
   static TextStyle _manrope({
@@ -111,8 +111,8 @@ abstract final class AppTypography {
 
   /// Responsive hero size based on screen width.
   static double responsiveHero(double width) {
-    if (width < 600) return 36;
-    if (width < 1024) return 48;
+    if (width < 600) return 30;
+    if (width < 1024) return 40;
     return hero;
   }
 }

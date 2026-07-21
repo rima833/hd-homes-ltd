@@ -7,6 +7,10 @@ import 'package:hdhomesproject/core/navigation/nav_item.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 
 /// Shared portal shell for client, investor, and admin applications.
+///
+/// Child pages may include their own [Scaffold]. Do not wrap [child] in an
+/// unbounded [SingleChildScrollView] — that causes infinite-height layout
+/// failures and InheritedWidget dispose crashes (`_dependents.isEmpty`).
 class PortalShell extends StatefulWidget {
   const PortalShell({
     super.key,
@@ -35,8 +39,10 @@ class _PortalShellState extends State<PortalShell> {
 
   @override
   Widget build(BuildContext context) {
-    final showSidebar = ResponsiveUtils.showPermanentSidebar(context.screenWidth);
-    final useBottomNav = ResponsiveUtils.useBottomNavigation(context.screenWidth);
+    final showSidebar =
+        ResponsiveUtils.showPermanentSidebar(context.screenWidth);
+    final useBottomNav =
+        ResponsiveUtils.useBottomNavigation(context.screenWidth);
 
     return Scaffold(
       key: _scaffoldKey,
@@ -52,7 +58,8 @@ class _PortalShellState extends State<PortalShell> {
             AppSidebar(
               items: widget.navItems,
               collapsed: _sidebarCollapsed,
-              onToggle: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+              onToggle: () =>
+                  setState(() => _sidebarCollapsed = !_sidebarCollapsed),
               header: Padding(
                 padding: const EdgeInsets.all(AppSpacing.base),
                 child: Text(
@@ -65,6 +72,7 @@ class _PortalShellState extends State<PortalShell> {
             ),
           Expanded(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _PortalHeader(
                   title: widget.title,
@@ -72,17 +80,20 @@ class _PortalShellState extends State<PortalShell> {
                   onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
                   actions: widget.actions,
                 ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.all(context.pagePadding),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (widget.breadcrumbs.isNotEmpty)
-                          AppBreadcrumbs(items: widget.breadcrumbs),
-                        widget.child,
-                      ],
+                if (widget.breadcrumbs.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      context.pagePadding,
+                      AppSpacing.sm,
+                      context.pagePadding,
+                      0,
                     ),
+                    child: AppBreadcrumbs(items: widget.breadcrumbs),
+                  ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.all(context.pagePadding),
+                    child: widget.child,
                   ),
                 ),
               ],
@@ -132,18 +143,20 @@ class _PortalHeader extends StatelessWidget {
                 icon: const Icon(Icons.menu_rounded, color: AppColors.white),
                 onPressed: onMenuTap,
               ),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.white,
-                  ),
+            Expanded(
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppColors.white,
+                    ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            const Spacer(),
             if (actions != null) ...actions!,
             IconButton(
               icon: const Icon(Icons.search_rounded, color: AppColors.white),
               tooltip: 'Search (Ctrl+K)',
-              onPressed: () => CommandPaletteScope.of(context).open(),
+              onPressed: () => CommandPaletteScope.maybeOf(context)?.open(),
             ),
           ],
         ),
@@ -162,8 +175,18 @@ class CommandPaletteScope extends InheritedWidget {
 
   final VoidCallback open;
 
+  static CommandPaletteScope? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<CommandPaletteScope>();
+  }
+
   static CommandPaletteScope of(BuildContext context) {
-    return context.dependOnInheritedWidgetOfExactType<CommandPaletteScope>()!;
+    final scope = maybeOf(context);
+    assert(
+      scope != null,
+      'CommandPaletteScope.of() called with no CommandPalette ancestor.',
+    );
+    return scope!;
   }
 
   @override

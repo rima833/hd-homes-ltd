@@ -8,12 +8,12 @@ abstract final class AppSpacing {
   static const double xl = 24;
   static const double xxl = 32;
   static const double xxxl = 40;
-  static const double huge = 48;
-  static const double massive = 64;
-  static const double giant = 80;
-  static const double colossal = 96;
-  static const double section = 120;
-  static const double page = 160;
+  static const double huge = 40;
+  static const double massive = 48;
+  static const double giant = 64;
+  static const double colossal = 72;
+  static const double section = 72;
+  static const double page = 96;
 
   // Aliases matching 8pt grid spec
   static const double s4 = xs;
@@ -27,9 +27,9 @@ abstract final class AppSpacing {
   static const double s48 = huge;
   static const double s56 = 56;
   static const double s64 = massive;
-  static const double s72 = 72;
+  static const double s72 = section;
   static const double s80 = giant;
-  static const double s96 = colossal;
+  static const double s96 = page;
   static const double s120 = section;
   static const double s160 = page;
 }

@@ -314,4 +314,49 @@ class SeoMetadata {
       'name': 'HD Homes Property Search Intelligence',
     },
   );
+
+  // Auth surfaces — indexable register; transactional handoffs stay noindex.
+  static const register = SeoMetadata(
+    title: 'Create Your HD Homes Account | Client & Investor Registration',
+    description:
+        'Register as a client or investor with HD Homes. Progressive onboarding, '
+        'secure credentials, and access to portals after email verification.',
+    keywords: [
+      'HD Homes register',
+      'create account',
+      'investor registration Nigeria',
+      'property client signup',
+    ],
+    robots: 'index, follow',
+  );
+
+  static const login = SeoMetadata(
+    title: 'Sign In | HD Homes',
+    description: 'Secure sign-in to your HD Homes client, investor, or staff account.',
+    robots: 'noindex, nofollow',
+  );
+
+  static const verifyEmail = SeoMetadata(
+    title: 'Verify Your Email | HD Homes',
+    description: 'Confirm your email address to activate your HD Homes account.',
+    robots: 'noindex, nofollow',
+  );
+
+  static const welcome = SeoMetadata(
+    title: 'Welcome to HD Homes',
+    description: 'Your account is ready — continue to your personalized portal.',
+    robots: 'noindex, nofollow',
+  );
+
+  static const forgotPassword = SeoMetadata(
+    title: 'Reset Password | HD Homes',
+    description: 'Request a secure password reset link for your HD Homes account.',
+    robots: 'noindex, nofollow',
+  );
+
+  static const resetPassword = SeoMetadata(
+    title: 'Create New Password | HD Homes',
+    description: 'Set a new secure password for your HD Homes account.',
+    robots: 'noindex, nofollow',
+  );
 }

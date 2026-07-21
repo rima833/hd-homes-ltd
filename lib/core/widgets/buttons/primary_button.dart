@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hdhomesproject/core/theme/app_theme_extension.dart';
@@ -88,6 +89,8 @@ class PrimaryButton extends StatelessWidget {
     };
 
     final wrapped = expand ? SizedBox(width: double.infinity, child: button) : button;
+
+    if (kIsWeb) return wrapped;
 
     return wrapped
         .animate(target: enabled ? 1 : 0)

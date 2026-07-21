@@ -29,85 +29,87 @@ class PublicNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final bar = AnimatedContainer(
+      duration: AppDurations.fast,
+      decoration: BoxDecoration(
+        color: scrolled
+            ? (isDark
+                ? AppColors.deepBlack.withValues(alpha: 0.85)
+                : AppColors.white.withValues(alpha: 0.9))
+            : Colors.transparent,
+        border: scrolled
+            ? Border(
+                bottom: BorderSide(
+                  color: AppColors.gray.withValues(alpha: 0.2),
+                ),
+              )
+            : null,
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: context.pagePadding,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => context.go(RoutePaths.home),
+                child: Image.asset(AppTheme.logoAsset, height: 40),
+              ),
+              const Spacer(),
+              if (context.isLaptop || context.isDesktop) ...[
+                Flexible(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final item in NavigationConfig.publicNav.take(6))
+                          _NavLink(item: item),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+              ],
+              IconButton(
+                tooltip: AppStrings.navSearch,
+                onPressed: onSearchTap,
+                icon: const Icon(LucideIcons.search),
+              ),
+              TextButton(
+                onPressed: () => context.go(RoutePaths.login),
+                child: const Text(AppStrings.navLogin),
+              ),
+              if (!context.isMobile) ...[
+                TextButton(
+                  onPressed: () => context.go(RoutePaths.investment),
+                  child: const Text(AppStrings.navInvest),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                PrimaryButton(
+                  label: AppStrings.navBookInspection,
+                  onPressed: () => context.go(RoutePaths.bookInspection),
+                ),
+              ] else
+                IconButton(
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: onMenuTap,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // BackdropFilter is expensive on Flutter web — only when scrolled.
+    if (!scrolled) return bar;
+
     return ClipRRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: scrolled ? 16 : 0,
-          sigmaY: scrolled ? 16 : 0,
-        ),
-        child: AnimatedContainer(
-          duration: AppDurations.fast,
-          decoration: BoxDecoration(
-            color: scrolled
-                ? (isDark
-                    ? AppColors.deepBlack.withValues(alpha: 0.85)
-                    : AppColors.white.withValues(alpha: 0.9))
-                : Colors.transparent,
-            border: scrolled
-                ? Border(
-                    bottom: BorderSide(
-                      color: AppColors.gray.withValues(alpha: 0.2),
-                    ),
-                  )
-                : null,
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: context.pagePadding,
-                vertical: AppSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => context.go(RoutePaths.home),
-                    child: Image.asset(AppTheme.logoAsset, height: 40),
-                  ),
-                  const Spacer(),
-                  if (context.isLaptop || context.isDesktop) ...[
-                    Flexible(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (final item in NavigationConfig.publicNav.take(6))
-                              _NavLink(item: item),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                  ],
-                  IconButton(
-                    tooltip: AppStrings.navSearch,
-                    onPressed: onSearchTap,
-                    icon: const Icon(LucideIcons.search),
-                  ),
-                  TextButton(
-                    onPressed: () => context.go(RoutePaths.login),
-                    child: const Text(AppStrings.navLogin),
-                  ),
-                  if (!context.isMobile) ...[
-                    TextButton(
-                      onPressed: () => context.go(RoutePaths.investment),
-                      child: const Text(AppStrings.navInvest),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    PrimaryButton(
-                      label: AppStrings.navBookInspection,
-                      onPressed: () => context.go(RoutePaths.bookInspection),
-                    ),
-                  ] else
-                    IconButton(
-                      icon: const Icon(Icons.menu_rounded),
-                      onPressed: onMenuTap,
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: bar,
       ),
     );
   }
