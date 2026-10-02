@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hdhomesproject/features/client/presentation/pages/reserve_property_page.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/website/components/animated_section_title.dart';
 import 'package:hdhomesproject/core/website/components/cta_banner.dart';
-import 'package:hdhomesproject/core/website/components/page_container.dart';
+import 'package:hdhomesproject/core/website/components/published_faq_section.dart';
 import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/features/estates/data/models/estate_detail_content.dart';
@@ -28,11 +29,10 @@ class EstateClosingSections extends ConsumerWidget {
       children: [
         SectionWrapper(
           backgroundColor: AppColors.charcoal,
-          child: PageContainer(child: _LiveDashboard(dashboard: detail.liveDashboard)),
+          child: _LiveDashboard(dashboard: detail.liveDashboard),
         ),
         SectionWrapper(
-          child: PageContainer(
-            child: Column(
+          child: Column(
               children: [
                 const AnimatedSectionTitle(
                   overline: 'VIRTUAL TOUR',
@@ -47,30 +47,26 @@ class EstateClosingSections extends ConsumerWidget {
                       _TourTile(icon: LucideIcons.rotate3d, label: '360° Walkthrough'),
                     if (detail.virtualTour.hasDroneTour)
                       _TourTile(icon: LucideIcons.plane, label: 'Drone Tour'),
-                    if (detail.virtualTour.hasInteractiveMap)
-                      _TourTile(icon: LucideIcons.map, label: 'Interactive Map'),
                     if (detail.virtualTour.hasVideoNarration)
                       _TourTile(icon: LucideIcons.video, label: 'Video Narration'),
                   ],
                 ),
               ],
             ),
-          ),
         ),
         SectionWrapper(
           backgroundColor: Theme.of(context).colorScheme.surface,
-          child: PageContainer(child: _Nearby(attractions: detail.nearbyAttractions)),
+          child: _Nearby(attractions: detail.nearbyAttractions),
         ),
         SectionWrapper(
-          child: PageContainer(child: _Lifestyle(lifestyle: detail.lifestyle)),
+          child: _Lifestyle(lifestyle: detail.lifestyle),
         ),
         SectionWrapper(
           backgroundColor: AppColors.charcoal,
-          child: PageContainer(child: _CommunitySimulator(simulator: detail.communitySimulator)),
+          child: _CommunitySimulator(simulator: detail.communitySimulator),
         ),
         SectionWrapper(
-          child: PageContainer(
-            child: Container(
+          child: Container(
               padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: BoxDecoration(
                 borderRadius: AppRadius.cardBorder,
@@ -108,33 +104,11 @@ class EstateClosingSections extends ConsumerWidget {
                 ],
               ),
             ),
-          ),
         ),
-        SectionWrapper(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          child: PageContainer(
-            child: Column(
-              children: [
-                const AnimatedSectionTitle(
-                  overline: 'FAQ',
-                  title: 'Frequently asked questions',
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                for (final faq in detail.faqs)
-                  ExpansionTile(
-                    title: Text(faq.question),
-                    children: [
-                      Align(alignment: Alignment.centerLeft, child: Text(faq.answer)),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        ),
+        const PublishedFaqSection(),
         if (related.isNotEmpty)
           SectionWrapper(
-            child: PageContainer(
-              child: Column(
+            child: Column(
                 children: [
                   const AnimatedSectionTitle(
                     overline: 'DISCOVER MORE',
@@ -156,7 +130,6 @@ class EstateClosingSections extends ConsumerWidget {
                   ),
                 ],
               ),
-            ),
           ),
         Padding(
           padding: EdgeInsets.symmetric(
@@ -251,7 +224,7 @@ class _LiveDashboard extends StatelessWidget {
         const AnimatedSectionTitle(
           overline: 'LIVE DASHBOARD',
           title: 'Estate availability & progress',
-          subtitle: 'Realtime updates via Supabase (placeholder).',
+          subtitle: 'Available, reserved, and sold units from the live estate.',
           alignment: TextAlign.start,
         ),
         const SizedBox(height: AppSpacing.lg),

@@ -1,427 +1,112 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
-import 'package:hdhomesproject/features/biadw/domain/entities/biadw_models.dart';
-import 'package:hdhomesproject/features/biadw/domain/services/biadw_service.dart';
-import 'package:hdhomesproject/features/biadw/presentation/providers/biadw_controller.dart';
+import 'package:hdhomesproject/features/admin/presentation/widgets/admin_analytics_header.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:hdhomesproject/features/biadw/domain/entities/biadw_models.dart';
+import 'package:hdhomesproject/features/biadw/presentation/providers/biadw_controller.dart';
+import 'package:intl/intl.dart';
 
-/// Volume 4 Part 16 — BI Command Center (BIADW).
+/// Live, permission-scoped operational overview for administrators.
 class BiCommandCenterPage extends ConsumerWidget {
   const BiCommandCenterPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncSnap = ref.watch(biadwSnapshotProvider);
-    final ui = ref.watch(biadwControllerProvider);
-    final controller = ref.read(biadwControllerProvider.notifier);
+    ref.watch(biadwControllerProvider);
+    final snapshot = ref.watch(biadwSnapshotProvider);
+    final connected = ref.watch(biadwRealtimeConnectedProvider);
 
     return Scaffold(
-      body: asyncSnap.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Text('Failed to load BI Command Center: $e'),
+      backgroundColor: Colors.transparent,
+      body: snapshot.when(
+        loading: () => _LoadingState(connected: connected),
+        error: (error, _) => _ErrorState(
+          error: error,
+          connected: connected,
+          onRetry: () => ref.invalidate(biadwSnapshotProvider),
         ),
-        data: (snap) {
-          final tickerKpis = snap.kpis;
-          final ticker = tickerKpis.isEmpty
-              ? 'BI Command Center live'
-              : '${tickerKpis[ui.tickerIndex % tickerKpis.length].label}: '
-                  '${tickerKpis[ui.tickerIndex % tickerKpis.length].displayValue}';
-
-          return RefreshIndicator(
-            onRefresh: controller.refresh,
-            child: CustomScrollView(
-              slivers: [
-                ContainedPadding(
-                  child: _BiadwHeader(
-                    ticker: ticker,
-                    fromRemote: snap.fromRemote,
-                    onRefresh: controller.refresh,
-                    onOpenAi: () => controller.setTab(BiadwCommandTab.ai),
-                    onOpenEtl: () => controller.setTab(BiadwCommandTab.etl),
-                  ),
-                ),
-                if (ui.lastMessage != null)
-                  ContainedPadding(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: Material(
-                        color: AppColors.gold.withValues(alpha: 0.15),
-                        borderRadius: AppRadius.cardBorder,
-                        child: ListTile(
-                          leading: const Icon(
-                            LucideIcons.info,
-                            color: AppColors.gold,
-                          ),
-                          title: Text(ui.lastMessage!),
-                          dense: true,
-                          trailing: IconButton(
-                            icon: const Icon(LucideIcons.x, size: 16),
-                            onPressed: controller.clearMessage,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ContainedPadding(child: _KpiStrip(kpis: snap.kpis)),
-                ContainedPadding(
-                  child: _EnterpriseFeatureStrip(onSelect: controller.setTab),
-                ),
-                ContainedPadding(
-                  child: _SearchAndFilters(
-                    ui: ui,
-                    onSearch: controller.setSearch,
-                    onStatus: controller.setStatusFilter,
-                  ),
-                ),
-                ContainedPadding(
-                  child: _TabBar(
-                    selected: ui.selectedTab,
-                    onSelect: controller.setTab,
-                  ),
-                ),
-                ..._tabSlivers(context, ref, snap, ui, controller),
-                const ContainedPadding(child: SizedBox(height: 32)),
-              ],
-            ),
+        data: (data) {
+          if (data.isEmpty) {
+            return _EmptyState(
+              connected: connected,
+              onRefresh: () => ref.invalidate(biadwSnapshotProvider),
+            );
+          }
+          return _Overview(
+            snapshot: data,
+            connected: connected,
+            onRefresh: () => ref.invalidate(biadwSnapshotProvider),
           );
         },
       ),
     );
   }
-
-  List<Widget> _tabSlivers(
-    BuildContext context,
-    WidgetRef ref,
-    BiadwCommandCenterSnapshot snap,
-    BiadwUiState ui,
-    BiadwController controller,
-  ) {
-    switch (ui.selectedTab) {
-      case BiadwCommandTab.overview:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Enterprise Intelligence Hub™',
-              icon: LucideIcons.layoutDashboard,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Warehouse · ETL · KPIs · Dashboards · Forecasts · Quality',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const Divider(height: 24),
-                  _ActivityList(activities: snap.activities),
-                ],
-              ),
-            ),
-          ),
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Watch items',
-              icon: LucideIcons.alertTriangle,
-              child: _QualityList(
-                items: snap.qualityIssues.where((q) => q.isOpen).toList(),
-              ),
-            ),
-          ),
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Recent ETL',
-              icon: LucideIcons.workflow,
-              child: _EtlList(items: snap.etlJobs),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.warehouse:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Data sources',
-              icon: LucideIcons.database,
-              child: _SourceList(items: snap.dataSources),
-            ),
-          ),
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Datasets & marts',
-              icon: LucideIcons.table,
-              child: _DatasetList(items: snap.datasets),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.etl:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'ETL pipelines',
-              icon: LucideIcons.workflow,
-              child: _EtlList(items: controller.filteredEtlJobs(snap)),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.kpis:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Analytics KPIs',
-              icon: LucideIcons.gauge,
-              child: _KpiDetailList(items: snap.kpis),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.dashboards:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Analytics dashboards',
-              icon: LucideIcons.barChart3,
-              child: _DashboardList(
-                items: controller.filteredDashboards(snap),
-              ),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.reports:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Analytics reports',
-              icon: LucideIcons.fileText,
-              child: _ReportList(items: controller.filteredReports(snap)),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.forecasts:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Enterprise Forecast Engine™',
-              icon: LucideIcons.trendingUp,
-              child: _ForecastList(items: snap.forecasts),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.scorecards:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Board & Executive Intelligence Center™',
-              icon: LucideIcons.award,
-              child: _ScorecardList(items: snap.scorecards),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.quality:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Data Quality & Governance Center™',
-              icon: LucideIcons.shieldCheck,
-              child: _QualityList(items: controller.filteredQuality(snap)),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.governance:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Data catalog',
-              icon: LucideIcons.bookOpen,
-              child: _CatalogList(items: snap.catalog),
-            ),
-          ),
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Lineage',
-              icon: LucideIcons.gitBranch,
-              child: _LineageList(items: snap.lineage),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.analytics:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Live BI signals',
-              icon: LucideIcons.radar,
-              child: _SignalList(signals: BiadwService.detectBiSignals(snap)),
-            ),
-          ),
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Published reports',
-              icon: LucideIcons.fileBarChart,
-              child: _ReportList(items: snap.reports),
-            ),
-          ),
-        ];
-      case BiadwCommandTab.ai:
-        final service = ref.read(biadwServiceProvider);
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'AI Executive Briefing™',
-              icon: LucideIcons.sparkles,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    service.generateExecutiveBriefing(snap),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    snap.aiDisclaimer,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.gold,
-                        ),
-                  ),
-                  const Divider(height: 24),
-                  _AiList(items: snap.aiInsights),
-                ],
-              ),
-            ),
-          ),
-        ];
-    }
-  }
 }
 
-class ContainedPadding extends StatelessWidget {
-  const ContainedPadding({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => SliverToBoxAdapter(child: child);
-}
-
-class _BiadwHeader extends StatelessWidget {
-  const _BiadwHeader({
-    required this.ticker,
-    required this.fromRemote,
+class _Overview extends StatelessWidget {
+  const _Overview({
+    required this.snapshot,
+    required this.connected,
     required this.onRefresh,
-    required this.onOpenAi,
-    required this.onOpenEtl,
   });
 
-  final String ticker;
-  final bool fromRemote;
+  final BiadwCommandCenterSnapshot snapshot;
+  final bool connected;
   final VoidCallback onRefresh;
-  final VoidCallback onOpenAi;
-  final VoidCallback onOpenEtl;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.deepBlack,
-            AppColors.charcoal.withValues(alpha: 0.95),
-          ],
-        ),
-        borderRadius: AppRadius.cardBorder,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final narrow = constraints.maxWidth < 640;
-              final title = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'BI Command Center',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: AppColors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    fromRemote ? 'Live · Supabase' : 'Demo dataset',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.gold,
-                        ),
-                  ),
-                ],
-              );
-              final actions = Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.icon(
-                    onPressed: onOpenAi,
-                    icon: const Icon(LucideIcons.sparkles, size: 16),
-                    label: const Text('BI AI'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.gold,
-                      foregroundColor: AppColors.deepBlack,
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: onOpenEtl,
-                    icon: const Icon(LucideIcons.workflow, size: 16),
-                    label: const Text('ETL'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.white,
-                      side: BorderSide(
-                        color: AppColors.gold.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: onRefresh,
-                    icon: const Icon(
-                      LucideIcons.refreshCw,
-                      color: AppColors.white,
-                    ),
-                    tooltip: 'Refresh',
-                  ),
-                ],
-              );
-              if (narrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [title, const SizedBox(height: 12), actions],
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(child: title),
-                  actions,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Business Intelligence · Analytics · Data Warehouse',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.white.withValues(alpha: 0.7),
+    return RefreshIndicator(
+      onRefresh: () async => onRefresh(),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: _PageFrame(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.base,
+                  AppSpacing.base,
+                  AppSpacing.base,
+                  0,
                 ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(LucideIcons.activity, size: 14, color: AppColors.gold),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  ticker,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.gold,
-                      ),
+                child: _Header(
+                  connected: connected,
+                  periodDays: snapshot.periodDays,
+                  onRefresh: onRefresh,
                 ),
               ),
-            ],
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _PageFrame(child: _KpiGrid(kpis: snapshot.kpis)),
+          ),
+          SliverToBoxAdapter(
+            child: _PageFrame(
+              child: _ResponsivePanels(
+                dailySeries: snapshot.dailySeries,
+                leadStatuses: snapshot.leadStatuses,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _PageFrame(child: _ModuleGrid(modules: snapshot.modules)),
+          ),
+          SliverToBoxAdapter(
+            child: _PageFrame(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.base,
+                  0,
+                  AppSpacing.base,
+                  AppSpacing.xxl,
+                ),
+                child: _ActivityPanel(items: snapshot.recentActivity),
+              ),
+            ),
           ),
         ],
       ),
@@ -429,149 +114,581 @@ class _BiadwHeader extends StatelessWidget {
   }
 }
 
-class _EnterpriseFeatureStrip extends StatelessWidget {
-  const _EnterpriseFeatureStrip({required this.onSelect});
+class _PageFrame extends StatelessWidget {
+  const _PageFrame({required this.child});
 
-  final void Function(BiadwCommandTab) onSelect;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      (BiadwCommandTab.overview, 'Intelligence Hub™', LucideIcons.layoutDashboard),
-      (BiadwCommandTab.ai, 'AI Briefing™', LucideIcons.sparkles),
-      (BiadwCommandTab.forecasts, 'Forecast Engine™', LucideIcons.trendingUp),
-      (BiadwCommandTab.quality, 'Quality Center™', LucideIcons.shieldCheck),
-      (BiadwCommandTab.scorecards, 'Board Intelligence™', LucideIcons.award),
-    ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: items
-            .map(
-              (e) => ActionChip(
-                avatar: Icon(e.$3, size: 16),
-                label: Text(e.$2),
-                onPressed: () => onSelect(e.$1),
-              ),
-            )
-            .toList(),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1440),
+        child: SizedBox(width: double.infinity, child: child),
       ),
     );
   }
 }
 
-class _KpiStrip extends StatelessWidget {
-  const _KpiStrip({required this.kpis});
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.connected,
+    required this.periodDays,
+    required this.onRefresh,
+  });
+
+  final bool connected;
+  final int? periodDays;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return AdminAnalyticsHeader(
+      section: AdminAnalyticsSection.overview,
+      title: 'Admin Analytics',
+      subtitle: periodDays == null
+          ? "We're gathering operational insights."
+          : 'Operational insights for the last $periodDays days.',
+      onRefresh: onRefresh,
+      status: Text(
+        connected
+            ? 'Your latest records are here.'
+            : "We're gathering the latest records.",
+        style: const TextStyle(
+          color: Color(0xFF9AA1AB),
+          fontSize: 12,
+          height: 1.35,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+class _KpiGrid extends StatelessWidget {
+  const _KpiGrid({required this.kpis});
 
   final List<BiadwKpi> kpis;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: SizedBox(
-        height: 96,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: kpis.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 10),
-          itemBuilder: (context, i) {
-            final k = kpis[i];
-            return Container(
-              width: 148,
-              padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.base,
+        0,
+        AppSpacing.base,
+        AppSpacing.base,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 1180
+              ? 4
+              : constraints.maxWidth >= 680
+              ? 2
+              : 1;
+          final width =
+              (constraints.maxWidth - (columns - 1) * AppSpacing.md) / columns;
+          return Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.md,
+            children: kpis
+                .map(
+                  (kpi) => SizedBox(
+                    width: width,
+                    child: _MetricCard(kpi: kpi),
+                  ),
+                )
+                .toList(),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({required this.kpi});
+
+  final BiadwKpi kpi;
+
+  @override
+  Widget build(BuildContext context) {
+    final caption = switch (kpi.key) {
+      'revenue_mtd' when kpi.value == 0 => 'No collections this month',
+      'revenue_mtd' => 'Paid this month',
+      'project_progress' => 'Average across projects',
+      _ => 'Current total',
+    };
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF141820),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: AppRadius.cardBorder,
-                border: Border.all(
-                  color: AppColors.charcoal.withValues(alpha: 0.08),
-                ),
+                color: AppColors.gold.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
               ),
+              child: Icon(_kpiIcon(kpi.key), color: AppColors.gold, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    k.label,
+                    kpi.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall,
+                    style: const TextStyle(
+                      color: Color(0xFF9AA1AB),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 4),
                   Text(
-                    k.displayValue,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: k.status == 'watch' || k.status == 'critical'
-                              ? AppColors.gold
-                              : AppColors.charcoal,
-                        ),
+                    kpi.displayValue,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                      fontFamily: kpi.unit == 'currency' ? 'Roboto' : null,
+                      fontFamilyFallback: kpi.unit == 'currency'
+                          ? const ['Segoe UI', 'Arial', 'sans-serif']
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFF6E7682), fontSize: 11),
                   ),
                 ],
               ),
-            );
-          },
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _SearchAndFilters extends StatelessWidget {
-  const _SearchAndFilters({
-    required this.ui,
-    required this.onSearch,
-    required this.onStatus,
+class _ResponsivePanels extends StatelessWidget {
+  const _ResponsivePanels({
+    required this.dailySeries,
+    required this.leadStatuses,
   });
 
-  final BiadwUiState ui;
-  final ValueChanged<String> onSearch;
-  final ValueChanged<String?> onStatus;
+  final List<BiadwDailyPoint> dailySeries;
+  final List<BiadwLeadStatus> leadStatuses;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Column(
-        children: [
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Search ETL, dashboards, reports, quality…',
-              prefixIcon: const Icon(LucideIcons.search, size: 18),
-              border: OutlineInputBorder(borderRadius: AppRadius.cardBorder),
-              isDense: true,
-            ),
-            onChanged: onSearch,
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: 8,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.base,
+        0,
+        AppSpacing.base,
+        AppSpacing.base,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final trend = _Panel(
+            title: 'Operational trend',
+            subtitle: 'Leads and applications by day',
+            child: _TrendChart(points: dailySeries),
+          );
+          final statuses = _Panel(
+            title: 'Lead pipeline',
+            subtitle: 'Current CRM status distribution',
+            child: _StatusBars(items: leadStatuses),
+          );
+          if (constraints.maxWidth < 900) {
+            return Column(
               children: [
-                FilterChip(
-                  label: const Text('All'),
-                  selected: ui.statusFilter == null,
-                  onSelected: (_) => onStatus(null),
-                ),
-                FilterChip(
-                  label: const Text('Failed'),
-                  selected: ui.statusFilter == 'failed',
-                  onSelected: (_) => onStatus('failed'),
-                ),
-                FilterChip(
-                  label: const Text('Open'),
-                  selected: ui.statusFilter == 'open',
-                  onSelected: (_) => onStatus('open'),
-                ),
-                FilterChip(
-                  label: const Text('Published'),
-                  selected: ui.statusFilter == 'published',
-                  onSelected: (_) => onStatus('published'),
-                ),
+                trend,
+                const SizedBox(height: AppSpacing.md),
+                statuses,
               ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 3, child: trend),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(flex: 2, child: statuses),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _Panel extends StatelessWidget {
+  const _Panel({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF141820),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x18FFFFFF)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
             ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(color: Color(0xFF9AA1AB), fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TrendChart extends StatelessWidget {
+  const _TrendChart({required this.points});
+
+  final List<BiadwDailyPoint> points;
+
+  @override
+  Widget build(BuildContext context) {
+    if (points.isEmpty) {
+      return const SizedBox(
+        height: 190,
+        child: Center(child: Text('No trend data for this period')),
+      );
+    }
+    return Column(
+      children: [
+        const Row(
+          children: [
+            _LegendDot(color: Color(0xFFF5E6B8), label: 'Leads'),
+            SizedBox(width: 14),
+            _LegendDot(color: AppColors.gold, label: 'Applications'),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 190,
+          width: double.infinity,
+          child: CustomPaint(
+            painter: _TrendPainter(points: points),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              DateFormat('MMM d').format(points.first.date),
+              style: const TextStyle(color: Color(0xFF9AA1AB), fontSize: 11),
+            ),
+            Text(
+              DateFormat('MMM d').format(points.last.date),
+              style: const TextStyle(color: Color(0xFF9AA1AB), fontSize: 11),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(color: Color(0xFFC8CDD4), fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrendPainter extends CustomPainter {
+  const _TrendPainter({required this.points});
+
+  final List<BiadwDailyPoint> points;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final grid = Paint()
+      ..color = AppColors.neutral400.withValues(alpha: 0.18)
+      ..strokeWidth = 1;
+    for (var row = 0; row <= 3; row++) {
+      final y = size.height * row / 3;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+
+    final peak = points.fold<int>(
+      1,
+      (value, point) =>
+          math.max(value, math.max(point.leads, point.applications)),
+    );
+    Path pathFor(int Function(BiadwDailyPoint) valueOf) {
+      final path = Path();
+      for (var index = 0; index < points.length; index++) {
+        final x = points.length == 1
+            ? size.width / 2
+            : size.width * index / (points.length - 1);
+        final y =
+            size.height -
+            (valueOf(points[index]) / peak) * (size.height - AppSpacing.sm);
+        index == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+      }
+      return path;
+    }
+
+    final leads = pathFor((point) => point.leads);
+    final fill = Path.from(leads)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      fill,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x55F5E6B8), Color(0x00F5E6B8)],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      leads,
+      Paint()
+        ..color = const Color(0xFFF5E6B8)
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke,
+    );
+    canvas.drawPath(
+      pathFor((point) => point.applications),
+      Paint()
+        ..color = AppColors.gold
+        ..strokeWidth = 2.2
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrendPainter oldDelegate) =>
+      oldDelegate.points != points;
+}
+
+class _StatusBars extends StatelessWidget {
+  const _StatusBars({required this.items});
+
+  final List<BiadwLeadStatus> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const SizedBox(
+        height: 190,
+        child: Center(child: Text('No lead status data')),
+      );
+    }
+    final maximum = items.fold<int>(
+      1,
+      (value, item) => math.max(value, item.value),
+    );
+    return Column(
+      children: items.take(7).map((item) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    '${item.value}',
+                    style: const TextStyle(
+                      color: AppColors.gold,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              LinearProgressIndicator(
+                value: item.value / maximum,
+                minHeight: 7,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                color: AppColors.gold,
+                backgroundColor: const Color(0x22FFFFFF),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _ModuleGrid extends StatelessWidget {
+  const _ModuleGrid({required this.modules});
+
+  final List<BiadwModuleMetric> modules;
+
+  @override
+  Widget build(BuildContext context) {
+    if (modules.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.base,
+        0,
+        AppSpacing.base,
+        AppSpacing.base,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Business modules',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 1100
+                  ? 3
+                  : constraints.maxWidth >= 600
+                  ? 2
+                  : 1;
+              final width =
+                  (constraints.maxWidth - (columns - 1) * AppSpacing.md) /
+                  columns;
+              return Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.md,
+                children: modules
+                    .map(
+                      (module) => SizedBox(
+                        width: width,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF141820),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0x18FFFFFF)),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            leading: Icon(
+                              _moduleIcon(module.key),
+                              color: AppColors.gold,
+                              size: 18,
+                            ),
+                            title: Text(
+                              module.label,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              module.detail,
+                              style: const TextStyle(
+                                color: Color(0xFF9AA1AB),
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: Text(
+                              BiadwKpi(
+                                key: module.key,
+                                label: module.label,
+                                value: module.value,
+                                unit: 'count',
+                              ).displayValue,
+                              style: const TextStyle(
+                                color: AppColors.gold,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              );
+            },
           ),
         ],
       ),
@@ -579,433 +696,214 @@ class _SearchAndFilters extends StatelessWidget {
   }
 }
 
-class _TabBar extends StatelessWidget {
-  const _TabBar({required this.selected, required this.onSelect});
+class _ActivityPanel extends StatelessWidget {
+  const _ActivityPanel({required this.items});
 
-  final BiadwCommandTab selected;
-  final void Function(BiadwCommandTab) onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: BiadwCommandTab.values
-              .map(
-                (t) => Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text(t.label),
-                    selected: selected == t,
-                    onSelected: (_) => onSelect(t),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.icon,
-    required this.child,
-  });
-
-  final String title;
-  final IconData icon;
-  final Widget child;
+  final List<BiadwActivity> items;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: AppRadius.cardBorder,
-          border: Border.all(color: AppColors.charcoal.withValues(alpha: 0.08)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: 18, color: AppColors.gold),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+    return _Panel(
+      title: 'Recent operational activity',
+      subtitle: 'Latest events across live source systems',
+      child: items.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+              child: Center(child: Text('No recent activity')),
+            )
+          : Column(
+              children: items.map((activity) {
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.gold.withValues(alpha: 0.14),
+                    child: Icon(
+                      _activityIcon(activity.type),
+                      color: AppColors.gold,
+                      size: 16,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              child,
-            ],
+                  title: Text(
+                    activity.label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${_activityType(activity.type)} · '
+                    '${DateFormat('MMM d, HH:mm').format(activity.occurredAt.toLocal())}',
+                    style: const TextStyle(color: Color(0xFF9AA1AB), fontSize: 12),
+                  ),
+                );
+              }).toList(),
+            ),
+    );
+  }
+}
+
+String _activityType(String value) {
+  if (value.isEmpty) return 'Activity';
+  return '${value[0].toUpperCase()}${value.substring(1)}';
+}
+
+IconData _kpiIcon(String key) {
+  return switch (key) {
+    'crm_leads' => LucideIcons.barChart3,
+    'qualified_leads' => LucideIcons.badgeCheck,
+    'clients' => LucideIcons.users,
+    'revenue_mtd' => LucideIcons.wallet,
+    'applications' => LucideIcons.fileText,
+    'inspections' => LucideIcons.clipboardCheck,
+    'project_progress' => LucideIcons.hardHat,
+    'open_tickets' => LucideIcons.ticket,
+    _ => LucideIcons.activity,
+  };
+}
+
+IconData _moduleIcon(String key) {
+  return switch (key) {
+    'sales' => LucideIcons.badgePercent,
+    'finance' => LucideIcons.landmark,
+    'construction' => LucideIcons.hardHat,
+    'support' => LucideIcons.headphones,
+    'properties' => LucideIcons.building2,
+    'investors' => LucideIcons.trendingUp,
+    _ => LucideIcons.layers,
+  };
+}
+
+IconData _activityIcon(String type) {
+  return switch (type) {
+    'lead' => LucideIcons.userPlus,
+    'payment' => LucideIcons.wallet,
+    'application' => LucideIcons.fileText,
+    'inspection' => LucideIcons.calendarCheck,
+    _ => LucideIcons.zap,
+  };
+}
+
+class _LoadingState extends StatelessWidget {
+  const _LoadingState({required this.connected});
+
+  final bool connected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(AppSpacing.base),
+      children: [
+        _Header(
+          connected: connected,
+          periodDays: null,
+          onRefresh: null,
+        ),
+        const SizedBox(height: AppSpacing.xxxl),
+        const Center(child: CircularProgressIndicator()),
+        const SizedBox(height: AppSpacing.base),
+        const Center(child: Text('Loading operational analytics…')),
+      ],
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({
+    required this.error,
+    required this.connected,
+    required this.onRetry,
+  });
+
+  final Object error;
+  final bool connected;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(AppSpacing.base),
+      children: [
+        _Header(
+          connected: connected,
+          periodDays: null,
+          onRefresh: onRetry,
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Icon(
+          Icons.cloud_off_outlined,
+          size: 48,
+          color: Theme.of(context).colorScheme.error,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'Operational analytics unavailable',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          error.toString(),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Center(
+          child: FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
           ),
         ),
-      ),
+      ],
     );
   }
 }
 
-class _ActivityList extends StatelessWidget {
-  const _ActivityList({required this.activities});
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({
+    required this.connected,
+    required this.onRefresh,
+  });
 
-  final List<BiadwActivity> activities;
-
-  @override
-  Widget build(BuildContext context) {
-    if (activities.isEmpty) {
-      return const Text('No recent activity');
-    }
-    return Column(
-      children: activities
-          .map(
-            (a) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              leading: const Icon(LucideIcons.activity, size: 16),
-              title: Text(a.summary),
-              subtitle: Text(a.actorLabel ?? a.action),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _SourceList extends StatelessWidget {
-  const _SourceList({required this.items});
-
-  final List<BiadwDataSource> items;
+  final bool connected;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: items
-          .map(
-            (s) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(s.name),
-              subtitle: Text(
-                '${s.code ?? ''} · ${s.sourceModule} · ${s.status}',
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _DatasetList extends StatelessWidget {
-  const _DatasetList({required this.items});
-
-  final List<BiadwDataset> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: items
-          .map(
-            (d) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(d.name),
-              subtitle: Text(
-                '${d.code ?? ''} · ${d.grainLabel ?? d.datasetType} · ~${d.rowEstimate} rows',
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _EtlList extends StatelessWidget {
-  const _EtlList({required this.items});
-
-  final List<BiadwEtlJob> items;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) return const Text('No ETL jobs');
-    return Column(
-      children: items
-          .map(
-            (j) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              leading: Icon(
-                j.isFailed ? LucideIcons.xCircle : LucideIcons.checkCircle,
-                size: 16,
-                color: j.isFailed ? AppColors.gold : AppColors.charcoal,
-              ),
-              title: Text(j.name),
-              subtitle: Text('${j.code ?? ''} · ${j.status} · ${j.summary ?? ''}'),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _KpiDetailList extends StatelessWidget {
-  const _KpiDetailList({required this.items});
-
-  final List<BiadwKpi> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: items
-          .map(
-            (k) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text('${k.label}: ${k.displayValue}'),
-              subtitle: Text(
-                '${k.code ?? ''} · ${k.status}'
-                '${k.changePct != null ? ' · Δ ${k.changePct!.toStringAsFixed(1)}%' : ''}',
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _DashboardList extends StatelessWidget {
-  const _DashboardList({required this.items});
-
-  final List<BiadwDashboard> items;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) return const Text('No dashboards');
-    return Column(
-      children: items
-          .map(
-            (d) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(d.title),
-              subtitle: Text(
-                '${d.code ?? ''} · ${d.audience} · ${d.status}',
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _ReportList extends StatelessWidget {
-  const _ReportList({required this.items});
-
-  final List<BiadwReport> items;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) return const Text('No reports');
-    return Column(
-      children: items
-          .map(
-            (r) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(r.title),
-              subtitle: Text(
-                '${r.periodLabel ?? ''} · ${r.status} · ${r.summary ?? ''}',
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _ForecastList extends StatelessWidget {
-  const _ForecastList({required this.items});
-
-  final List<BiadwForecast> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: items
-          .map(
-            (f) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text('${f.title}: ${f.displayValue}'),
-              subtitle: Text(
-                '${f.horizonLabel ?? ''} · confidence ${f.confidencePct.toStringAsFixed(0)}% · ${f.summary ?? ''}',
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _ScorecardList extends StatelessWidget {
-  const _ScorecardList({required this.items});
-
-  final List<BiadwScorecard> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: items
-          .map(
-            (s) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(
-                '${s.title} — ${s.overallScore.toStringAsFixed(1)}',
-              ),
-              subtitle: Text(
-                '${s.audience.toUpperCase()} · ${s.periodLabel ?? ''} · ${s.summary ?? ''}',
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _QualityList extends StatelessWidget {
-  const _QualityList({required this.items});
-
-  final List<BiadwQualityIssue> items;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) return const Text('No quality issues');
-    return Column(
-      children: items
-          .map(
-            (q) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              leading: Icon(
-                LucideIcons.alertCircle,
-                size: 16,
-                color: q.severity == 'critical' ? AppColors.gold : null,
-              ),
-              title: Text(q.title),
-              subtitle: Text(
-                '${q.code ?? ''} · ${q.severity}/${q.status} · ${q.datasetLabel ?? ''}',
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _CatalogList extends StatelessWidget {
-  const _CatalogList({required this.items});
-
-  final List<BiadwCatalogEntry> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: items
-          .map(
-            (c) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(c.title),
-              subtitle: Text('${c.catalogType} · ${c.ownerLabel ?? ''}'),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _LineageList extends StatelessWidget {
-  const _LineageList({required this.items});
-
-  final List<BiadwLineageEdge> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: items
-          .map(
-            (l) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text('${l.sourceLabel} → ${l.targetLabel}'),
-              subtitle: Text('${l.lineageType} · ${l.summary ?? ''}'),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _SignalList extends StatelessWidget {
-  const _SignalList({required this.signals});
-
-  final List<String> signals;
-
-  @override
-  Widget build(BuildContext context) {
-    if (signals.isEmpty) return const Text('No active signals');
-    return Column(
-      children: signals
-          .map(
-            (s) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              leading: const Icon(LucideIcons.radio, size: 16),
-              title: Text(s),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
-
-class _AiList extends StatelessWidget {
-  const _AiList({required this.items});
-
-  final List<BiadwAiInsight> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: items
-          .map(
-            (a) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(a.title),
-              subtitle: Text(
-                '${a.body}\n${a.disclaimer}'
-                '${a.confidencePct != null ? ' · ${a.confidencePct!.toStringAsFixed(0)}%' : ''}',
-              ),
-              isThreeLine: true,
-            ),
-          )
-          .toList(),
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(AppSpacing.base),
+      children: [
+        _Header(
+          connected: connected,
+          periodDays: 30,
+          onRefresh: onRefresh,
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        const Icon(Icons.inbox_outlined, size: 52),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'No operational data yet',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        const Text(
+          'The live analytics query completed successfully but returned no '
+          'metrics, trends, module totals, or activity.',
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        Center(
+          child: OutlinedButton.icon(
+            onPressed: onRefresh,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
+          ),
+        ),
+      ],
     );
   }
 }

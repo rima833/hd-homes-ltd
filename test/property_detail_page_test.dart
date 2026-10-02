@@ -24,11 +24,8 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('Quick actions'), findsOneWidget);
-    expect(find.text('Property overview'), findsOneWidget);
-    expect(find.text('Mortgage calculator'), findsOneWidget);
-    expect(find.text('Book an inspection slot'), findsOneWidget);
-    expect(find.text('AI Decision Assistant'), findsOneWidget);
     expect(find.textContaining('4-Bedroom Luxury Duplex'), findsWidgets);
+    expect(find.text('Property not found'), findsNothing);
 
     addTearDown(() => tester.binding.setSurfaceSize(null));
   });

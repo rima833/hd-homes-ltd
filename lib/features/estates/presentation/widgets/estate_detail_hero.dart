@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
+import 'package:hdhomesproject/core/media/widgets/delivery_image.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/core/widgets/feedback/app_badge.dart';
@@ -29,26 +30,14 @@ class EstateDetailHero extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.charcoal,
-                  AppColors.gold.withValues(alpha: 0.25),
-                  AppColors.deepBlack,
-                ],
-              ),
-            ),
-            child: Center(
-              child: Icon(
-                s.heroVideoUrl != null ? LucideIcons.video : LucideIcons.plane,
-                size: 64,
-                color: AppColors.gold.withValues(alpha: 0.4),
-              ),
-            ),
-          ),
+          if (s.heroImageUrl != null && s.heroImageUrl!.isNotEmpty)
+            MediaDeliveryImage(
+              url: s.heroImageUrl!,
+              fit: BoxFit.cover,
+              errorWidget: _heroFallback(s),
+            )
+          else
+            _heroFallback(s),
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -138,6 +127,29 @@ class EstateDetailHero extends StatelessWidget {
         Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
         Text(value, style: const TextStyle(color: AppColors.white, fontWeight: FontWeight.w600)),
       ],
+    );
+  }
+
+  Widget _heroFallback(EstateSummary s) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.charcoal,
+            AppColors.gold.withValues(alpha: 0.25),
+            AppColors.deepBlack,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          s.heroVideoUrl != null ? LucideIcons.video : LucideIcons.plane,
+          size: 64,
+          color: AppColors.gold.withValues(alpha: 0.4),
+        ),
+      ),
     );
   }
 }

@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/kyc_models.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/kyc_service.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/auth_controller.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/mfa_controller.dart';
+import 'package:hdhomesproject/features/authentication/presentation/providers/profile_controller.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/verification_controller.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final kycServiceProvider = Provider<KycService>((ref) {
   final configured = ref.watch(supabaseConfiguredProvider);
@@ -15,7 +20,64 @@ final kycServiceProvider = Provider<KycService>((ref) {
   );
 });
 
+void _invalidateKycData(Ref ref) {
+  ref.invalidate(kycHubProvider);
+  ref.invalidate(kycReviewQueueProvider);
+  ref.invalidate(kycReviewCaseProvider);
+  ref.invalidate(profileHubProvider);
+}
+
+/// Live invalidation for compliance hub + staff review queue.
+final kycRealtimeProvider = Provider<void>((ref) {
+  ref.keepAlive();
+  if (!ref.watch(supabaseConfiguredProvider)) return;
+  final client = ref.watch(supabaseClientProvider);
+  final channel = client.channel('admin-kyc')
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'kyc_profiles',
+      callback: (_) => _invalidateKycData(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'kyc_documents',
+      callback: (_) => _invalidateKycData(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'verification_requests',
+      callback: (_) => _invalidateKycData(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'document_reviews',
+      callback: (_) => _invalidateKycData(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'investor_compliance',
+      callback: (_) => _invalidateKycData(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'kyc_events',
+      callback: (_) => _invalidateKycData(ref),
+    )
+    ..subscribe();
+
+  ref.onDispose(() {
+    unawaited(client.removeChannel(channel));
+  });
+});
+
 final kycHubProvider = FutureProvider<KycHubSnapshot?>((ref) async {
+  ref.watch(kycRealtimeProvider);
   final session = ref.watch(identitySessionProvider);
   if (!session.isAuthenticated) return null;
   final verification = ref.watch(verificationSnapshotProvider);
@@ -29,9 +91,20 @@ final kycHubProvider = FutureProvider<KycHubSnapshot?>((ref) async {
 });
 
 final kycReviewQueueProvider = FutureProvider<List<KycReviewQueueItem>>((ref) async {
+  ref.watch(kycRealtimeProvider);
   final session = ref.watch(identitySessionProvider);
   if (!session.isStaff) return const [];
-  return ref.watch(kycServiceProvider).loadReviewQueue();
+  return ref.read(kycServiceProvider).loadReviewQueue();
+});
+
+final kycReviewCaseProvider =
+    FutureProvider.autoDispose.family<KycReviewCase, String>((ref, userId) async {
+  ref.watch(kycRealtimeProvider);
+  final session = ref.watch(identitySessionProvider);
+  if (!session.isStaff) {
+    throw const AuthenticationException('Staff access is required to review KYC.');
+  }
+  return ref.read(kycServiceProvider).loadReviewCase(userId);
 });
 
 class KycUiState {
@@ -98,12 +171,13 @@ class KycController extends Notifier<KycUiState> {
         mimeType: mime,
       );
       ref.invalidate(kycHubProvider);
+      ref.invalidate(profileHubProvider);
       state = state.copyWith(isBusy: false, message: 'Document uploaded.');
       return true;
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }
@@ -114,11 +188,12 @@ class KycController extends Notifier<KycUiState> {
     try {
       await _service.deleteDraftDocument(userId: userId, documentId: documentId);
       ref.invalidate(kycHubProvider);
+      ref.invalidate(profileHubProvider);
       state = state.copyWith(isBusy: false, message: 'Document removed.');
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
     }
   }
@@ -128,12 +203,13 @@ class KycController extends Notifier<KycUiState> {
     try {
       await _service.saveCompliance(userId, info);
       ref.invalidate(kycHubProvider);
+      ref.invalidate(profileHubProvider);
       state = state.copyWith(isBusy: false, message: 'Compliance details saved.');
       return true;
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }
@@ -144,6 +220,8 @@ class KycController extends Notifier<KycUiState> {
     try {
       await _service.submitForReview(userId, target: target);
       ref.invalidate(kycHubProvider);
+      ref.invalidate(kycReviewQueueProvider);
+      ref.invalidate(profileHubProvider);
       state = state.copyWith(
         isBusy: false,
         message: 'Submitted for compliance review.',
@@ -152,7 +230,7 @@ class KycController extends Notifier<KycUiState> {
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }
@@ -175,13 +253,15 @@ class KycController extends Notifier<KycUiState> {
         reviewerId: reviewerId,
       );
       ref.invalidate(kycReviewQueueProvider);
+      ref.invalidate(kycReviewCaseProvider);
       ref.invalidate(kycHubProvider);
+      ref.invalidate(profileHubProvider);
       state = state.copyWith(isBusy: false, message: 'Review recorded.');
       return true;
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }

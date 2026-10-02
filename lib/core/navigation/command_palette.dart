@@ -64,18 +64,18 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
           actions: {
             _OpenCommandPaletteIntent:
                 CallbackAction<_OpenCommandPaletteIntent>(
-              onInvoke: (_) {
-                _open();
-                return null;
-              },
-            ),
+                  onInvoke: (_) {
+                    _open();
+                    return null;
+                  },
+                ),
             _CloseCommandPaletteIntent:
                 CallbackAction<_CloseCommandPaletteIntent>(
-              onInvoke: (_) {
-                if (isOpen) _close();
-                return null;
-              },
-            ),
+                  onInvoke: (_) {
+                    if (isOpen) _close();
+                    return null;
+                  },
+                ),
           },
           child: Stack(
             children: [
@@ -100,7 +100,7 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
   }
 }
 
-class _CommandPaletteOverlay extends ConsumerWidget {
+class _CommandPaletteOverlay extends ConsumerStatefulWidget {
   const _CommandPaletteOverlay({
     required this.searchController,
     required this.focusNode,
@@ -114,18 +114,40 @@ class _CommandPaletteOverlay extends ConsumerWidget {
   final void Function(String path) onNavigate;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ui = ref.watch(commandCenterControllerProvider);
+  ConsumerState<_CommandPaletteOverlay> createState() =>
+      _CommandPaletteOverlayState();
+}
+
+class _CommandPaletteOverlayState
+    extends ConsumerState<_CommandPaletteOverlay> {
+  final _overlayKey = GlobalKey<OverlayState>();
+  late final OverlayEntry _entry;
+
+  @override
+  void initState() {
+    super.initState();
+    _entry = OverlayEntry(builder: _buildPalette);
+  }
+
+  @override
+  void dispose() {
+    // Overlay unmount removes the entry; avoid double-remove.
+    super.dispose();
+  }
+
+  Widget _buildPalette(BuildContext overlayContext) {
+    final ui = ref.read(commandCenterControllerProvider);
     final controller = ref.read(commandCenterControllerProvider.notifier);
-    final snap = ref.watch(enterpriseSearchSnapshotProvider).valueOrNull;
+    final snap = ref.read(enterpriseSearchSnapshotProvider).valueOrNull;
     final result = ui.result;
-    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    final isMobile = MediaQuery.sizeOf(overlayContext).width < 600;
+    final queryEmpty = ui.query.trim().isEmpty;
 
     return Stack(
       children: [
         ModalBarrier(
           color: AppColors.deepBlack.withValues(alpha: 0.65),
-          onDismiss: onClose,
+          onDismiss: widget.onClose,
         ),
         Align(
           alignment: isMobile ? Alignment.topCenter : Alignment.center,
@@ -138,11 +160,13 @@ class _CommandPaletteOverlay extends ConsumerWidget {
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: isMobile ? double.infinity : 720,
-                maxHeight:
-                    MediaQuery.sizeOf(context).height * (isMobile ? 0.92 : 0.78),
+                maxHeight: MediaQuery.sizeOf(overlayContext).height *
+                    (isMobile ? 0.92 : 0.78),
               ),
               child: Material(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                color: Theme.of(overlayContext)
+                    .colorScheme
+                    .surfaceContainerHighest,
                 borderRadius: AppRadius.dialogBorder,
                 elevation: 20,
                 clipBehavior: Clip.antiAlias,
@@ -157,8 +181,8 @@ class _CommandPaletteOverlay extends ConsumerWidget {
                           const SizedBox(width: 12),
                           Expanded(
                             child: TextField(
-                              controller: searchController,
-                              focusNode: focusNode,
+                              controller: widget.searchController,
+                              focusNode: widget.focusNode,
                               autofocus: true,
                               onChanged: controller.setQuery,
                               decoration: const InputDecoration(
@@ -166,24 +190,24 @@ class _CommandPaletteOverlay extends ConsumerWidget {
                                     'Search everything or run a command…',
                                 border: InputBorder.none,
                               ),
-                              onSubmitted: (v) async {
-                                await controller.commitHistory(v);
-                                final items = result?.groups
+                              onSubmitted: (v) {
+                                final submitted = controller.submitSearch(v);
+                                final items = submitted?.groups
                                         .expand((g) => g.items)
                                         .toList() ??
                                     const [];
-                                final cmds = result?.commands ?? const [];
+                                final cmds = submitted?.commands ?? const [];
                                 if (items.isNotEmpty) {
-                                  onNavigate(items.first.path);
+                                  widget.onNavigate(items.first.path);
                                 } else if (cmds.isNotEmpty) {
-                                  onNavigate(cmds.first.routeOrKey);
+                                  widget.onNavigate(cmds.first.routeOrKey);
                                 }
                               },
                             ),
                           ),
                           IconButton(
                             tooltip: 'Close',
-                            onPressed: onClose,
+                            onPressed: widget.onClose,
                             icon: const Icon(LucideIcons.x),
                           ),
                         ],
@@ -213,9 +237,13 @@ class _CommandPaletteOverlay extends ConsumerWidget {
                         ui: ui,
                         snap: snap,
                         onToggle: controller.toggleModule,
-                        onNavigate: onNavigate,
+                        onNavigate: widget.onNavigate,
+                        onResultOpen: (path) {
+                          controller.recordResultOpen();
+                          widget.onNavigate(path);
+                        },
                         onSuggestion: (q) {
-                          searchController.text = q;
+                          widget.searchController.text = q;
                           controller.setQuery(q);
                         },
                         onClearHistory: controller.clearHistory,
@@ -225,11 +253,13 @@ class _CommandPaletteOverlay extends ConsumerWidget {
                       Padding(
                         padding: const EdgeInsets.all(10),
                         child: Text(
-                          result.zeroResults
-                              ? 'No authorized results · ${result.latencyMs}ms'
-                              : '${result.totalCount} results · ${result.latencyMs}ms'
-                                  '${result.intent?.location != null ? ' · intent: ${result.intent!.location}' : ''}',
-                          style: Theme.of(context).textTheme.bodySmall,
+                          queryEmpty
+                              ? 'Type to search anything · ${result.latencyMs}ms'
+                              : result.zeroResults
+                                  ? 'No authorized results · ${result.latencyMs}ms'
+                                  : '${result.totalCount} results · ${result.latencyMs}ms'
+                                      '${result.intent?.location != null ? ' · intent: ${result.intent!.location}' : ''}',
+                          style: Theme.of(overlayContext).textTheme.bodySmall,
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -242,6 +272,22 @@ class _CommandPaletteOverlay extends ConsumerWidget {
       ],
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    // Stable Overlay so Close tooltips work (palette sits above Navigator
+    // Overlay in MaterialApp.router builder) without remounting on keystrokes.
+    ref.listen(commandCenterControllerProvider, (previous, next) {
+      _entry.markNeedsBuild();
+    });
+    ref.listen(enterpriseSearchSnapshotProvider, (previous, next) {
+      _entry.markNeedsBuild();
+    });
+    return Overlay(
+      key: _overlayKey,
+      initialEntries: [_entry],
+    );
+  }
 }
 
 class _CommandCenterBody extends StatelessWidget {
@@ -250,6 +296,7 @@ class _CommandCenterBody extends StatelessWidget {
     required this.snap,
     required this.onToggle,
     required this.onNavigate,
+    required this.onResultOpen,
     required this.onSuggestion,
     required this.onClearHistory,
   });
@@ -258,6 +305,7 @@ class _CommandCenterBody extends StatelessWidget {
   final EnterpriseSearchSnapshot? snap;
   final void Function(SearchResultModule) onToggle;
   final void Function(String path) onNavigate;
+  final void Function(String path) onResultOpen;
   final void Function(String query) onSuggestion;
   final VoidCallback onClearHistory;
 
@@ -267,12 +315,45 @@ class _CommandCenterBody extends StatelessWidget {
     final queryEmpty = ui.query.trim().isEmpty;
 
     if (queryEmpty) {
+      final portalCommands = result?.commands ?? const [];
+      final portalGroups = result?.groups ?? const [];
       return ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          if (portalCommands.isNotEmpty || portalGroups.isNotEmpty) ...[
+            Text(
+              'Go to',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 6),
+            if (portalCommands.isNotEmpty)
+              for (final c in portalCommands.take(14))
+                ListTile(
+                  dense: true,
+                  leading: const Icon(LucideIcons.cornerDownRight, size: 18),
+                  title: Text(c.label),
+                  subtitle: Text(c.category),
+                  onTap: () => onNavigate(c.routeOrKey),
+                )
+            else
+              for (final group in portalGroups)
+                for (final item in group.items.take(8))
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(LucideIcons.arrowRight, size: 18),
+                    title: Text(item.title),
+                    subtitle: Text(item.entry.subtitle ?? group.module.label),
+                    onTap: () => onResultOpen(item.path),
+                  ),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+          ],
           if (snap?.favoriteCommands.isNotEmpty == true) ...[
-            Text('Pinned commands',
-                style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              'Pinned commands',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,
@@ -288,8 +369,10 @@ class _CommandCenterBody extends StatelessWidget {
             const SizedBox(height: 16),
           ],
           if (snap?.pinnedWorkspaces.isNotEmpty == true) ...[
-            Text('Intelligent Workspace Launcher',
-                style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              'Intelligent Workspace Launcher',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             ...snap!.pinnedWorkspaces.map(
               (w) => ListTile(
                 dense: true,
@@ -303,8 +386,10 @@ class _CommandCenterBody extends StatelessWidget {
           ],
           Row(
             children: [
-              Text('Recent searches',
-                  style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                'Recent searches',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const Spacer(),
               TextButton(onPressed: onClearHistory, child: const Text('Clear')),
             ],
@@ -317,23 +402,43 @@ class _CommandCenterBody extends StatelessWidget {
               onTap: () => onSuggestion(h.query),
             ),
           ),
-          const SizedBox(height: 8),
-          Text('Suggestions', style: Theme.of(context).textTheme.titleSmall),
-          ...EnterpriseSearchCatalog.suggest('').map(
-            (s) => ListTile(
-              dense: true,
-              leading: Icon(
-                s.kind == 'command'
-                    ? LucideIcons.zap
-                    : s.kind == 'saved'
-                        ? LucideIcons.bookmark
-                        : LucideIcons.sparkles,
-                size: 18,
+          if (result?.suggestions.isNotEmpty == true) ...[
+            const SizedBox(height: 8),
+            Text('Suggestions', style: Theme.of(context).textTheme.titleSmall),
+            ...result!.suggestions.map(
+              (s) => ListTile(
+                dense: true,
+                leading: Icon(
+                  s.kind == 'command'
+                      ? LucideIcons.zap
+                      : s.kind == 'saved'
+                      ? LucideIcons.bookmark
+                      : LucideIcons.sparkles,
+                  size: 18,
+                ),
+                title: Text(s.label),
+                onTap: () => onSuggestion(s.query),
               ),
-              title: Text(s.label),
-              onTap: () => onSuggestion(s.query),
             ),
-          ),
+          ] else ...[
+            const SizedBox(height: 8),
+            Text('Suggestions', style: Theme.of(context).textTheme.titleSmall),
+            ...EnterpriseSearchCatalog.suggest('').map(
+              (s) => ListTile(
+                dense: true,
+                leading: Icon(
+                  s.kind == 'command'
+                      ? LucideIcons.zap
+                      : s.kind == 'saved'
+                      ? LucideIcons.bookmark
+                      : LucideIcons.sparkles,
+                  size: 18,
+                ),
+                title: Text(s.label),
+                onTap: () => onSuggestion(s.query),
+              ),
+            ),
+          ],
         ],
       );
     }
@@ -364,8 +469,10 @@ class _CommandCenterBody extends StatelessWidget {
         if (result.commands.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-            child: Text('Commands',
-                style: Theme.of(context).textTheme.titleSmall),
+            child: Text(
+              'Commands',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
           ),
           for (final c in result.commands.take(8))
             ListTile(
@@ -373,7 +480,7 @@ class _CommandCenterBody extends StatelessWidget {
               title: Text(c.label),
               subtitle: Text(c.category),
               trailing: const Text('↵'),
-              onTap: () => onNavigate(c.routeOrKey),
+              onTap: () => onResultOpen(c.routeOrKey),
             ),
         ],
         for (final group in result.groups) ...[
@@ -406,7 +513,7 @@ class _CommandCenterBody extends StatelessWidget {
                           .join(' · '),
                   ].where((e) => e.isNotEmpty).join(' · '),
                 ),
-                onTap: () => onNavigate(item.path),
+                onTap: () => onResultOpen(item.path),
               ),
         ],
         if (result.related.isNotEmpty) ...[
@@ -424,7 +531,7 @@ class _CommandCenterBody extends StatelessWidget {
               leading: const Icon(LucideIcons.link, size: 16),
               title: Text(r.title),
               subtitle: Text(r.module.label),
-              onTap: () => onNavigate(r.path),
+              onTap: () => onResultOpen(r.path),
             ),
         ],
         if (result.zeroResults)
@@ -440,22 +547,21 @@ class _CommandCenterBody extends StatelessWidget {
   }
 
   IconData _iconFor(SearchResultModule m) => switch (m) {
-        SearchResultModule.property || SearchResultModule.estate =>
-          LucideIcons.building2,
-        SearchResultModule.client ||
-        SearchResultModule.investor ||
-        SearchResultModule.staff ||
-        SearchResultModule.user ||
-        SearchResultModule.lead =>
-          LucideIcons.user,
-        SearchResultModule.document => LucideIcons.fileText,
-        SearchResultModule.report => LucideIcons.barChart3,
-        SearchResultModule.command => LucideIcons.zap,
-        SearchResultModule.ticket => LucideIcons.lifeBuoy,
-        SearchResultModule.blog => LucideIcons.newspaper,
-        SearchResultModule.workspace => LucideIcons.layoutDashboard,
-        _ => LucideIcons.search,
-      };
+    SearchResultModule.property ||
+    SearchResultModule.estate => LucideIcons.building2,
+    SearchResultModule.client ||
+    SearchResultModule.investor ||
+    SearchResultModule.staff ||
+    SearchResultModule.user ||
+    SearchResultModule.lead => LucideIcons.user,
+    SearchResultModule.document => LucideIcons.fileText,
+    SearchResultModule.report => LucideIcons.barChart3,
+    SearchResultModule.command => LucideIcons.zap,
+    SearchResultModule.ticket => LucideIcons.lifeBuoy,
+    SearchResultModule.blog => LucideIcons.newspaper,
+    SearchResultModule.workspace => LucideIcons.layoutDashboard,
+    _ => LucideIcons.search,
+  };
 }
 
 class _OpenCommandPaletteIntent extends Intent {

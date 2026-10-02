@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
 import 'package:hdhomesproject/features/authentication/data/services/verification_service_impl.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/verification_models.dart';
@@ -8,13 +9,18 @@ import 'package:hdhomesproject/features/authentication/domain/services/verificat
 import 'package:hdhomesproject/features/authentication/presentation/providers/identity_provider.dart';
 
 final phoneOtpServiceProvider = Provider<PhoneOtpService>((ref) {
-  // Phase 1: mock primary. Failover stubs ready for Termii / Twilio / AT.
+  final configured = ref.watch(supabaseConfiguredProvider);
+  if (!configured) {
+    return const MockPhoneOtpService();
+  }
+  final client = ref.watch(supabaseClientProvider);
   return FailoverPhoneOtpService(
-    primary: const MockPhoneOtpService(),
-    fallbacks: const [
-      TermiiPhoneOtpService(),
-      TwilioPhoneOtpService(),
-      AfricasTalkingPhoneOtpService(),
+    primary: SupabaseAuthPhoneOtpService(client),
+    fallbacks: [
+      if (allowMockPhoneOtp) const MockPhoneOtpService(),
+      const TermiiPhoneOtpService(),
+      const TwilioPhoneOtpService(),
+      const AfricasTalkingPhoneOtpService(),
     ],
   );
 });
@@ -33,11 +39,15 @@ final verificationServiceProvider = Provider<VerificationService>((ref) {
 final verificationSnapshotProvider = Provider<VerificationSnapshot>((ref) {
   final session = ref.watch(identitySessionProvider);
   final service = ref.watch(verificationServiceProvider);
+  final phone = session.profile?.phone?.trim();
+  final phoneOnFile = (phone != null && phone.isNotEmpty) ||
+      (session.profile?.phoneVerified ?? false);
   return service.snapshotFor(
     email: session.email ?? session.profile?.email,
     emailConfirmed: session.emailConfirmed,
-    phone: session.profile?.phone,
-    phoneConfirmed: false, // hydrated from profiles.phone_verified when migration applied
+    phone: phone,
+    // Phone from registration / profile counts as confirmed (no SMS OTP).
+    phoneConfirmed: phoneOnFile,
     role: session.primaryRole,
   );
 });
@@ -112,7 +122,7 @@ class VerificationController extends Notifier<VerificationUiState> {
     } catch (e) {
       state = state.copyWith(
         emailLifecycle: VerificationLifecycle.failed,
-        error: e.toString().replaceFirst('Exception: ', ''),
+        error: userFacingError(e),
       );
     }
   }
@@ -127,7 +137,7 @@ class VerificationController extends Notifier<VerificationUiState> {
       );
     } catch (e) {
       state = state.copyWith(
-        error: e.toString().replaceFirst('Exception: ', ''),
+        error: userFacingError(e),
       );
     }
   }
@@ -182,7 +192,8 @@ class VerificationController extends Notifier<VerificationUiState> {
       phoneLifecycle: VerificationLifecycle.verified,
       message: 'Phone number verified.',
     );
-    await ref.read(identitySessionProvider.notifier).refreshPermissions();
+    // Reload profile so phone_verified chips update across portals.
+    await ref.read(identitySessionProvider.notifier).reloadProfile();
     return true;
   }
 
@@ -201,7 +212,51 @@ class VerificationController extends Notifier<VerificationUiState> {
     state = state.copyWith(
       emailLifecycle: VerificationLifecycle.verified,
       message: 'Email verified successfully.',
+      clearError: true,
     );
+  }
+
+  /// Checks Supabase Auth for real confirmation, then reports the result.
+  ///
+  /// Cross-device note: confirming on a phone does not create a session in the
+  /// local Flutter web tab. When there is no Auth session, callers should send
+  /// the user to Login instead of treating that as “not verified”.
+  Future<bool> confirmVerifiedFromServer() async {
+    state = state.copyWith(clearError: true, clearMessage: true);
+    try {
+      final session = ref.read(identitySessionProvider);
+      if (session.userId == null) {
+        // No local session — cannot read email_confirmed_at here.
+        // After confirming on another device, Sign in is the correct next step.
+        state = state.copyWith(
+          message:
+              'If you already tapped Confirm in your email, sign in with your '
+              'password to continue.',
+          clearError: true,
+        );
+        return true;
+      }
+
+      final ok = await ref
+          .read(identitySessionProvider.notifier)
+          .confirmEmailVerifiedFromServer();
+      if (ok) {
+        markEmailVerified();
+        return true;
+      }
+      state = state.copyWith(
+        emailLifecycle: VerificationLifecycle.waiting,
+        error:
+            'Your email has not been verified yet. Please open the confirmation '
+            'email and click the verification link. After that, tap Continue to Sign in.',
+      );
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        error: userFacingError(e),
+      );
+      return false;
+    }
   }
 }
 

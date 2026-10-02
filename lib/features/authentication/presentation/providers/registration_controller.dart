@@ -25,8 +25,9 @@ final registrationRepositoryProvider = Provider<RegistrationRepository>((ref) {
       captcha: ref.watch(captchaServiceProvider),
     );
   }
-  final client =
-      ref.watch(supabaseConfiguredProvider) ? ref.watch(supabaseClientProvider) : null;
+  final client = ref.watch(supabaseConfiguredProvider)
+      ? ref.watch(supabaseClientProvider)
+      : null;
   return RegistrationRepositoryImpl(
     authRepository: authRepo,
     client: client,
@@ -138,6 +139,17 @@ class RegistrationController extends Notifier<RegistrationFlowState> {
     }
   }
 
+  /// Staff/portal invites skip the client-or-investor picker.
+  void beginInvitedRegistration() {
+    if ((state.draft.invitationToken ?? '').trim().isEmpty) return;
+    if (state.step != RegistrationStep.accountType) return;
+    state = state.copyWith(
+      step: RegistrationStep.personalInfo,
+      fieldErrors: {},
+      clearError: true,
+    );
+  }
+
   bool _validateCurrentStep() {
     final draft = state.draft;
     switch (state.step) {
@@ -155,8 +167,9 @@ class RegistrationController extends Notifier<RegistrationFlowState> {
           state = state.copyWith(fieldErrors: errors);
           return false;
         }
-        final referralError =
-            RegistrationValidator.validateReferralCode(draft.referralCode);
+        final referralError = RegistrationValidator.validateReferralCode(
+          draft.referralCode,
+        );
         if (referralError != null) {
           state = state.copyWith(
             fieldErrors: {...errors, 'referralCode': referralError},
@@ -180,7 +193,10 @@ class RegistrationController extends Notifier<RegistrationFlowState> {
         }
         return true;
       case RegistrationStep.review:
-        return RegistrationValidator.stepIsValid(RegistrationStep.review, draft);
+        return RegistrationValidator.stepIsValid(
+          RegistrationStep.review,
+          draft,
+        );
     }
   }
 
@@ -201,11 +217,46 @@ class RegistrationController extends Notifier<RegistrationFlowState> {
     }
   }
 
+  /// Creates the auth user from a staff invite without the client wizard.
+  Future<RegistrationResult?> submitStaffInvite() async {
+    final errors = RegistrationValidator.validateStaffAccess(state.draft);
+    if (errors.values.any((e) => e != null)) {
+      state = state.copyWith(fieldErrors: errors, clearError: true);
+      return null;
+    }
+    final legal = RegistrationValidator.validateLegal(state.draft);
+    if (legal != null) {
+      state = state.copyWith(errorMessage: legal, fieldErrors: {});
+      return null;
+    }
+
+    state = state.copyWith(
+      isSubmitting: true,
+      clearError: true,
+      fieldErrors: {},
+    );
+    try {
+      final result = await _repo.register(state.draft);
+      state = state.copyWith(isSubmitting: false, result: result);
+      return result;
+    } catch (e) {
+      final message = userFacingError(
+        e,
+        fallback: 'Unable to create your staff account. Please try again.',
+      );
+      state = state.copyWith(isSubmitting: false, errorMessage: message);
+      return null;
+    }
+  }
+
   Future<RegistrationResult?> submit() async {
     if (state.step != RegistrationStep.review && !_validateCurrentStep()) {
       return null;
     }
-    if (!RegistrationValidator.stepIsValid(RegistrationStep.review, state.draft)) {
+    if (!RegistrationValidator.stepIsValid(
+      RegistrationStep.review,
+      state.draft,
+    )) {
       state = state.copyWith(
         errorMessage: 'Please complete all steps before creating your account.',
       );
@@ -218,9 +269,10 @@ class RegistrationController extends Notifier<RegistrationFlowState> {
       state = state.copyWith(isSubmitting: false, result: result);
       return result;
     } catch (e) {
-      final message = e is AppException
-          ? e.message
-          : 'Unable to create your account. Please try again.';
+      final message = userFacingError(
+        e,
+        fallback: 'Unable to create your account. Please try again.',
+      );
       state = state.copyWith(isSubmitting: false, errorMessage: message);
       return null;
     }
@@ -234,8 +286,8 @@ class RegistrationController extends Notifier<RegistrationFlowState> {
 
 final registrationControllerProvider =
     NotifierProvider<RegistrationController, RegistrationFlowState>(
-  RegistrationController.new,
-);
+      RegistrationController.new,
+    );
 
 class _UnavailableAuthBridge implements AuthRepository {
   @override
@@ -249,6 +301,9 @@ class _UnavailableAuthBridge implements AuthRepository {
 
   @override
   Future<UserProfile?> fetchCurrentProfile() async => null;
+
+  @override
+  Future<UserProfile?> refreshEmailVerificationStatus() async => null;
 
   @override
   Future<Set<String>> refreshPermissions() async => {};

@@ -137,6 +137,30 @@ class MfaEnrollmentDraft {
   final String friendlyName;
 }
 
+/// Allowed "trust this device" windows on the MFA challenge screen.
+abstract final class MfaTrustDurationOptions {
+  static const days14 = 14;
+  static const days30 = 30;
+  static const days90 = 90; // 3 months
+
+  static const all = <int>[days14, days30, days90];
+
+  static String label(int days) => switch (days) {
+        days14 => '14 days',
+        days30 => '30 days',
+        days90 => '3 months',
+        _ => '$days days',
+      };
+
+  static int clampToAllowed(int days) {
+    if (all.contains(days)) return days;
+    // Nearest allowed window.
+    return all.reduce(
+      (a, b) => (a - days).abs() <= (b - days).abs() ? a : b,
+    );
+  }
+}
+
 /// Snapshot of MFA state for UI / Security Readiness Score.
 class MfaStatusSnapshot {
   const MfaStatusSnapshot({
@@ -144,22 +168,36 @@ class MfaStatusSnapshot {
     this.totpEnrolled = false,
     this.backupCodesRemaining = 0,
     this.trustedDeviceCount = 0,
+    this.currentDeviceTrusted = false,
     this.aalSatisfied = true,
     this.policy = MfaPolicyCatalog.client,
     this.factorIds = const [],
+    this.statusKnown = true,
   });
 
   final bool enabled;
   final bool totpEnrolled;
   final int backupCodesRemaining;
   final int trustedDeviceCount;
+  final bool currentDeviceTrusted;
   final bool aalSatisfied;
   final MfaPolicy policy;
   final List<String> factorIds;
 
-  bool get needsSetup => policy.isEnforced && !enabled;
+  /// False when MFA APIs could not be queried (missing session / network).
+  /// Prevents redirect loops that force enrollment on a failed probe.
+  final bool statusKnown;
 
-  bool get needsChallenge => enabled && !aalSatisfied;
+  bool get needsSetup =>
+      statusKnown && policy.isEnforced && !enabled;
+
+  /// Second factor required unless AAL2 is already satisfied or this device
+  /// is within an active trust window.
+  bool get needsChallenge {
+    if (!statusKnown || !enabled || aalSatisfied) return false;
+    if (currentDeviceTrusted) return false;
+    return true;
+  }
 }
 
 /// Adaptive Security Engine™ decision.
@@ -210,8 +248,11 @@ class MfaTrustedDevice {
   final DateTime? lastActivityAt;
   final bool isCurrent;
 
-  bool get isTrustValid =>
-      trustedUntil != null && trustedUntil!.isAfter(DateTime.now());
+  bool get isTrustValid {
+    final until = trustedUntil;
+    if (until == null) return false;
+    return until.toUtc().isAfter(DateTime.now().toUtc());
+  }
 }
 
 /// Security Readiness Score (extends Part 5 health).

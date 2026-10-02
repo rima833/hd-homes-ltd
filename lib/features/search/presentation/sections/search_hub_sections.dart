@@ -18,11 +18,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 /// Hub sections — quick filters, advanced, map, lifestyle, commute, AI search, results.
 class SearchHubSections extends HookConsumerWidget {
-  const SearchHubSections({
-    super.key,
-    this.advancedKey,
-    this.resultsKey,
-  });
+  const SearchHubSections({super.key, this.advancedKey, this.resultsKey});
 
   final GlobalKey? advancedKey;
   final GlobalKey? resultsKey;
@@ -59,9 +55,14 @@ class SearchHubSections extends HookConsumerWidget {
                 runSpacing: AppSpacing.sm,
                 children: cms.quickFilters.map((q) {
                   return ActionChip(
-                    avatar: Icon(SearchIcons.resolve(q.iconName), size: 16, color: AppColors.gold),
+                    avatar: Icon(
+                      SearchIcons.resolve(q.iconName),
+                      size: 16,
+                      color: AppColors.gold,
+                    ),
                     label: Text(q.label),
-                    onPressed: () => applyFilters(_quickFilter(filters, q.label)),
+                    onPressed: () =>
+                        applyFilters(_quickFilter(filters, q.label)),
                   );
                 }).toList(),
               ),
@@ -84,14 +85,22 @@ class SearchHubSections extends HookConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(showAdvanced.value ? Icons.expand_less : Icons.expand_more),
+                    icon: Icon(
+                      showAdvanced.value
+                          ? Icons.expand_less
+                          : Icons.expand_more,
+                    ),
                     onPressed: () => showAdvanced.value = !showAdvanced.value,
                   ),
                 ],
               ),
               if (showAdvanced.value) ...[
                 const SizedBox(height: AppSpacing.lg),
-                _AdvancedFilterPanel(filters: filters, cms: cms, onApply: applyFilters),
+                _AdvancedFilterPanel(
+                  filters: filters,
+                  cms: cms,
+                  onApply: applyFilters,
+                ),
               ],
             ],
           ),
@@ -113,12 +122,19 @@ class SearchHubSections extends HookConsumerWidget {
                     width: context.isMobile ? double.infinity : 260,
                     child: Card(
                       child: ListTile(
-                        leading: Icon(SearchIcons.resolve(l.iconName), color: AppColors.gold),
+                        leading: Icon(
+                          SearchIcons.resolve(l.iconName),
+                          color: AppColors.gold,
+                        ),
                         title: Text(l.title),
                         subtitle: Text(l.description),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => applyFilters(
-                          filters.copyWith(lifestyle: l.filterTag, clearLifestyle: false, sort: MarketplaceSort.bestMatch),
+                          filters.copyWith(
+                            lifestyle: l.filterTag,
+                            clearLifestyle: false,
+                            sort: MarketplaceSort.bestMatch,
+                          ),
                         ),
                       ),
                     ),
@@ -135,7 +151,8 @@ class SearchHubSections extends HookConsumerWidget {
               const AnimatedSectionTitle(
                 overline: 'COMMUTE',
                 title: 'Commute search',
-                subtitle: 'Find homes within your travel time — traffic integration in future.',
+                subtitle:
+                    'Find homes within your travel time — traffic integration in future.',
               ),
               const SizedBox(height: AppSpacing.lg),
               Wrap(
@@ -145,7 +162,8 @@ class SearchHubSections extends HookConsumerWidget {
                   return FilterChip(
                     label: Text('${c.label}\n→ ${c.destination}'),
                     selected: selected,
-                    onSelected: (_) => commuteMinutes.value = selected ? null : c.minutes,
+                    onSelected: (_) =>
+                        commuteMinutes.value = selected ? null : c.minutes,
                   );
                 }).toList(),
               ),
@@ -157,14 +175,15 @@ class SearchHubSections extends HookConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const AnimatedSectionTitle(
-                overline: 'AI SEARCH',
-                title: 'AI Smart Search',
+                overline: 'SMART SEARCH',
+                title: 'Smart Search',
                 subtitle: 'Describe what you want in plain language.',
               ),
               const SizedBox(height: AppSpacing.lg),
               TextField(
                 decoration: const InputDecoration(
-                  hintText: 'e.g. 4-bedroom duplex in Abuja under ₦180M with pool',
+                  hintText:
+                      'e.g. 4-bedroom duplex in Abuja under ₦180M with pool',
                   prefixIcon: Icon(LucideIcons.sparkles, color: AppColors.gold),
                 ),
                 maxLines: 2,
@@ -174,20 +193,27 @@ class SearchHubSections extends HookConsumerWidget {
               Wrap(
                 spacing: AppSpacing.xs,
                 children: cms.aiExampleQueries
-                    .map((e) => ActionChip(label: Text(e, style: const TextStyle(fontSize: 11)), onPressed: () {
+                    .map(
+                      (e) => ActionChip(
+                        label: Text(e, style: const TextStyle(fontSize: 11)),
+                        onPressed: () {
                           aiQuery.value = e;
                           final parsed = parseAiSearchQuery(e);
                           aiResult.value = parsed;
                           applyFilters(parsed.filters);
-                        }))
+                        },
+                      ),
+                    )
                     .toList(),
               ),
               const SizedBox(height: AppSpacing.base),
               PrimaryButton(
-                label: 'Run AI Search',
+                label: 'Run Smart Search',
                 icon: LucideIcons.sparkles,
                 onPressed: () {
-                  final parsed = parseAiSearchQuery(aiQuery.value.isEmpty ? controller.text : aiQuery.value);
+                  final parsed = parseAiSearchQuery(
+                    aiQuery.value.isEmpty ? controller.text : aiQuery.value,
+                  );
                   aiResult.value = parsed;
                   controller.text = parsed.filters.query;
                   applyFilters(parsed.filters);
@@ -201,10 +227,14 @@ class SearchHubSections extends HookConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('AI extracted (${aiResult.value!.confidence}% confidence)',
-                            style: Theme.of(context).textTheme.titleSmall),
+                        Text(
+                          'Criteria extracted (${aiResult.value!.confidence}% confidence)',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
                         const SizedBox(height: AppSpacing.sm),
-                        ...aiResult.value!.extractedCriteria.map((c) => Text('• $c')),
+                        ...aiResult.value!.extractedCriteria.map(
+                          (c) => Text('• $c'),
+                        ),
                       ],
                     ),
                   ),
@@ -234,7 +264,10 @@ class SearchHubSections extends HookConsumerWidget {
 
   MarketplaceFilters _quickFilter(MarketplaceFilters f, String label) {
     return switch (label) {
-      'Houses' => f.copyWith(category: PropertyCategory.residential, type: 'House'),
+      'Houses' => f.copyWith(
+        category: PropertyCategory.residential,
+        type: 'House',
+      ),
       'Apartments' => f.copyWith(type: 'Apartment'),
       'Duplexes' => f.copyWith(type: 'Duplex'),
       'Terraces' => f.copyWith(type: 'Terrace'),
@@ -243,9 +276,16 @@ class SearchHubSections extends HookConsumerWidget {
       'Luxury' => f.copyWith(lifestyle: 'Luxury Living'),
       'New Listings' => f.copyWith(sort: MarketplaceSort.newest),
       'Featured' => f.copyWith(sort: MarketplaceSort.popular),
-      'Ready to Move' => f.copyWith(completionStatus: CompletionStatus.readyToMove),
-      'Under Construction' => f.copyWith(completionStatus: CompletionStatus.underConstruction),
-      'Investment' => f.copyWith(purpose: PropertyPurpose.invest, sort: MarketplaceSort.bestInvestment),
+      'Ready to Move' => f.copyWith(
+        completionStatus: CompletionStatus.readyToMove,
+      ),
+      'Under Construction' => f.copyWith(
+        completionStatus: CompletionStatus.underConstruction,
+      ),
+      'Investment' => f.copyWith(
+        purpose: PropertyPurpose.invest,
+        sort: MarketplaceSort.bestInvestment,
+      ),
       _ => f,
     };
   }
@@ -293,10 +333,22 @@ class _AdvancedFilterPanel extends ConsumerWidget {
                 value: filters.sort,
                 decoration: const InputDecoration(labelText: 'Sort'),
                 items: const [
-                  DropdownMenuItem(value: MarketplaceSort.bestMatch, child: Text('Best match')),
-                  DropdownMenuItem(value: MarketplaceSort.newest, child: Text('Newest')),
-                  DropdownMenuItem(value: MarketplaceSort.bestInvestment, child: Text('Investment')),
-                  DropdownMenuItem(value: MarketplaceSort.priceLowHigh, child: Text('Price ↑')),
+                  DropdownMenuItem(
+                    value: MarketplaceSort.bestMatch,
+                    child: Text('Best match'),
+                  ),
+                  DropdownMenuItem(
+                    value: MarketplaceSort.newest,
+                    child: Text('Newest'),
+                  ),
+                  DropdownMenuItem(
+                    value: MarketplaceSort.bestInvestment,
+                    child: Text('Investment'),
+                  ),
+                  DropdownMenuItem(
+                    value: MarketplaceSort.priceLowHigh,
+                    child: Text('Price ↑'),
+                  ),
                 ],
                 onChanged: (v) {
                   if (v != null) onApply(filters.copyWith(sort: v));
@@ -330,7 +382,10 @@ class _AdvancedFilterPanel extends ConsumerWidget {
             return ActionChip(
               label: Text(tag),
               onPressed: () => onApply(
-                filters.copyWith(purpose: PropertyPurpose.invest, sort: MarketplaceSort.bestInvestment),
+                filters.copyWith(
+                  purpose: PropertyPurpose.invest,
+                  sort: MarketplaceSort.bestInvestment,
+                ),
               ),
             );
           }).toList(),

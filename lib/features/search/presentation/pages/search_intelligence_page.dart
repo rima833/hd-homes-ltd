@@ -45,6 +45,8 @@ class SearchIntelligencePage extends HookConsumerWidget {
         SearchHeroSection(
           headline: cms.heroHeadline,
           subheadline: cms.heroSubheadline,
+          backgroundImageUrl: cms.backgroundImageUrl,
+          backgroundVideoUrl: cms.backgroundVideoUrl,
           onAdvancedFilters: () => scrollTo(advancedKey),
           searchBar: GlobalSearchBar(
             controller: controller,

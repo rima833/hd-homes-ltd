@@ -1,7 +1,35 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/domain/data/hub_page_cms.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/search/data/models/search_intelligence.dart';
 
-final searchHubCmsProvider = Provider<SearchHubCms>((ref) => _cms);
+final searchHubCmsProvider = Provider<SearchHubCms>((ref) {
+  final base = _cms;
+  if (!ref.watch(supabaseConfiguredProvider)) return base;
+  final overlay =
+      hubHeroFromPage(ref.watch(publishedPageBySlugProvider('search')).valueOrNull);
+  if (overlay.isEmpty) return base;
+  return SearchHubCms(
+    heroHeadline: overlay.headline ?? base.heroHeadline,
+    heroSubheadline: overlay.subheadline ?? base.heroSubheadline,
+    backgroundImageUrl:
+        overlay.backgroundImageUrl ?? base.backgroundImageUrl,
+    backgroundVideoUrl:
+        overlay.backgroundVideoUrl ?? base.backgroundVideoUrl,
+    popularSearches: base.popularSearches,
+    recentSearches: base.recentSearches,
+    quickFilters: base.quickFilters,
+    lifestyleOptions: base.lifestyleOptions,
+    commutePresets: base.commutePresets,
+    amenityFilters: base.amenityFilters,
+    investmentFilters: base.investmentFilters,
+    neighborhoods: base.neighborhoods,
+    aiExampleQueries: base.aiExampleQueries,
+    dreamHomeQuestions: base.dreamHomeQuestions,
+    discoveryFeed: base.discoveryFeed,
+  );
+});
 
 final _cms = SearchHubCms(
   heroHeadline: 'Find Your Perfect Property — Intelligently.',

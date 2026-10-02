@@ -4,7 +4,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/website/components/page_container.dart';
 
-/// Full-width section with optional background and scroll-reveal animation.
+/// Full-width section band with optional background and scroll-reveal.
+///
+/// Owns vertical rhythm for the public site. Child content is already
+/// wrapped in [PageContainer] — do **not** nest another PageContainer.
 class SectionWrapper extends StatelessWidget {
   const SectionWrapper({
     super.key,
@@ -12,12 +15,20 @@ class SectionWrapper extends StatelessWidget {
     this.backgroundColor,
     this.padding,
     this.animate = true,
+    this.compact = false,
+    this.bandPadding,
   });
 
   final Widget child;
   final Color? backgroundColor;
+  /// Optional override for the inner [PageContainer] padding.
   final EdgeInsetsGeometry? padding;
   final bool animate;
+  /// Tighter vertical padding for consecutive related blocks.
+  final bool compact;
+  /// Override outer band padding. Use [EdgeInsets.zero] when the child
+  /// already owns vertical rhythm (avoids double spacing).
+  final EdgeInsetsGeometry? bandPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -34,10 +45,12 @@ class SectionWrapper extends StatelessWidget {
           .slideY(begin: 0.04, end: 0, duration: AppDurations.normal);
     }
 
+    final vertical = compact ? AppSpacing.xxl : AppSpacing.section;
+
     return Container(
       width: double.infinity,
       color: backgroundColor,
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.section),
+      padding: bandPadding ?? EdgeInsets.symmetric(vertical: vertical),
       child: content,
     );
   }

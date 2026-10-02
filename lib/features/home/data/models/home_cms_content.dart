@@ -10,7 +10,6 @@ class HomeCmsContent {
     required this.estates,
     required this.properties,
     required this.investments,
-    required this.constructionProjects,
     required this.testimonials,
     required this.partners,
     required this.awards,
@@ -22,6 +21,17 @@ class HomeCmsContent {
     required this.liveActivities,
     required this.executiveWelcome,
     required this.announcement,
+    this.cta = const HomeCtaContent(
+      headline: 'Ready to find your next home or investment?',
+      subheadline:
+          'Book an inspection, request a callback, or speak with our team today.',
+      primaryLabel: 'Book Inspection',
+      primaryPath: '/book-inspection',
+      secondaryLabel: 'Contact Sales',
+      secondaryPath: '/contact',
+    ),
+    this.sectionVisibility = const {},
+    this.sectionOrder = const [],
   });
 
   final HomeHeroContent hero;
@@ -32,7 +42,6 @@ class HomeCmsContent {
   final List<HomeEstateItem> estates;
   final List<HomePropertyItem> properties;
   final List<HomeInvestmentItem> investments;
-  final List<HomeConstructionItem> constructionProjects;
   final List<HomeTestimonialItem> testimonials;
   final List<HomePartnerItem> partners;
   final List<HomeAwardItem> awards;
@@ -43,7 +52,16 @@ class HomeCmsContent {
   final List<HomeDownloadItem> downloads;
   final List<HomeLiveActivityItem> liveActivities;
   final HomeExecutiveWelcome executiveWelcome;
+  final HomeCtaContent cta;
   final String announcement;
+
+  /// CMS section_key → visible. Missing keys default to visible.
+  final Map<String, bool> sectionVisibility;
+
+  /// Ordered section keys from CMS (by sort_order). Empty = default HomePage order.
+  final List<String> sectionOrder;
+
+  bool isSectionVisible(String key) => sectionVisibility[key] ?? true;
 }
 
 class HomeHeroContent {
@@ -58,6 +76,7 @@ class HomeHeroContent {
     required this.tertiaryCtaPath,
     this.backgroundImageUrl,
     this.backgroundVideoUrl,
+    this.overlayOpacity = 0.55,
   });
 
   final String headline;
@@ -70,14 +89,61 @@ class HomeHeroContent {
   final String tertiaryCtaPath;
   final String? backgroundImageUrl;
   final String? backgroundVideoUrl;
+  final double overlayOpacity;
+
+  HomeHeroContent copyWith({
+    String? headline,
+    String? subheadline,
+    String? primaryCtaLabel,
+    String? primaryCtaPath,
+    String? secondaryCtaLabel,
+    String? secondaryCtaPath,
+    String? tertiaryCtaLabel,
+    String? tertiaryCtaPath,
+    String? backgroundImageUrl,
+    String? backgroundVideoUrl,
+    double? overlayOpacity,
+    bool clearImage = false,
+    bool clearVideo = false,
+  }) {
+    return HomeHeroContent(
+      headline: headline ?? this.headline,
+      subheadline: subheadline ?? this.subheadline,
+      primaryCtaLabel: primaryCtaLabel ?? this.primaryCtaLabel,
+      primaryCtaPath: primaryCtaPath ?? this.primaryCtaPath,
+      secondaryCtaLabel: secondaryCtaLabel ?? this.secondaryCtaLabel,
+      secondaryCtaPath: secondaryCtaPath ?? this.secondaryCtaPath,
+      tertiaryCtaLabel: tertiaryCtaLabel ?? this.tertiaryCtaLabel,
+      tertiaryCtaPath: tertiaryCtaPath ?? this.tertiaryCtaPath,
+      backgroundImageUrl:
+          clearImage ? null : (backgroundImageUrl ?? this.backgroundImageUrl),
+      backgroundVideoUrl:
+          clearVideo ? null : (backgroundVideoUrl ?? this.backgroundVideoUrl),
+      overlayOpacity: overlayOpacity ?? this.overlayOpacity,
+    );
+  }
 }
 
 class HomeStatItem {
-  const HomeStatItem({required this.value, required this.label, this.suffix});
+  const HomeStatItem({
+    required this.value,
+    required this.label,
+    this.suffix,
+    this.caption,
+    this.iconName,
+    this.description = '',
+    this.logoUrl,
+    this.placement = 'orbit',
+  });
 
   final int value;
   final String label;
   final String? suffix;
+  final String? caption;
+  final String? iconName;
+  final String description;
+  final String? logoUrl;
+  final String placement;
 }
 
 class HomeAboutContent {
@@ -90,16 +156,32 @@ class HomeAboutContent {
     required this.highlights,
     required this.ctaLabel,
     required this.ctaPath,
+    this.titleAccent,
+    this.backgroundImageUrl,
   });
 
   final String title;
+  final String? titleAccent;
   final String story;
   final String mission;
   final String vision;
   final List<String> values;
-  final List<String> highlights;
+  final List<HomeAboutHighlight> highlights;
   final String ctaLabel;
   final String ctaPath;
+  final String? backgroundImageUrl;
+}
+
+class HomeAboutHighlight {
+  const HomeAboutHighlight({
+    required this.title,
+    required this.description,
+    required this.iconName,
+  });
+
+  final String title;
+  final String description;
+  final String iconName;
 }
 
 class HomeWhyChooseItem {
@@ -196,22 +278,6 @@ class HomeInvestmentItem {
   final String route;
 }
 
-class HomeConstructionItem {
-  const HomeConstructionItem({
-    required this.name,
-    required this.progress,
-    required this.completionDate,
-    required this.update,
-    required this.route,
-  });
-
-  final String name;
-  final double progress;
-  final String completionDate;
-  final String update;
-  final String route;
-}
-
 class HomeTestimonialItem {
   const HomeTestimonialItem({
     required this.name,
@@ -219,6 +285,7 @@ class HomeTestimonialItem {
     required this.quote,
     required this.rating,
     required this.verified,
+    this.avatarUrl,
   });
 
   final String name;
@@ -226,13 +293,23 @@ class HomeTestimonialItem {
   final String quote;
   final double rating;
   final bool verified;
+  final String? avatarUrl;
 }
 
 class HomePartnerItem {
-  const HomePartnerItem({required this.name, required this.category});
+  const HomePartnerItem({
+    required this.name,
+    required this.category,
+    this.tagline = '',
+    this.logoUrl,
+    this.iconName = 'building',
+  });
 
   final String name;
   final String category;
+  final String tagline;
+  final String? logoUrl;
+  final String iconName;
 }
 
 class HomeAwardItem {
@@ -240,11 +317,15 @@ class HomeAwardItem {
     required this.title,
     required this.year,
     required this.issuer,
+    this.description = '',
+    this.iconName = 'award',
   });
 
   final String title;
   final String year;
   final String issuer;
+  final String description;
+  final String iconName;
 }
 
 class HomeBlogItem {
@@ -254,6 +335,8 @@ class HomeBlogItem {
     required this.excerpt,
     required this.route,
     required this.date,
+    this.coverImageUrl,
+    this.featured = false,
   });
 
   final String title;
@@ -261,6 +344,8 @@ class HomeBlogItem {
   final String excerpt;
   final String route;
   final String date;
+  final String? coverImageUrl;
+  final bool featured;
 }
 
 class HomeMarketInsightItem {
@@ -334,4 +419,22 @@ class HomeExecutiveWelcome {
   final String title;
   final String message;
   final String? videoUrl;
+}
+
+class HomeCtaContent {
+  const HomeCtaContent({
+    required this.headline,
+    required this.subheadline,
+    required this.primaryLabel,
+    required this.primaryPath,
+    required this.secondaryLabel,
+    required this.secondaryPath,
+  });
+
+  final String headline;
+  final String subheadline;
+  final String primaryLabel;
+  final String primaryPath;
+  final String secondaryLabel;
+  final String secondaryPath;
 }

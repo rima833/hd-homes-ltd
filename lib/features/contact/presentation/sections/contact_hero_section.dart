@@ -3,15 +3,19 @@ import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/core/website/components/cms_hero_media_background.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-/// Section 1 — Premium contact hero.
+/// Section 1 — Premium contact hero with CMS image/video background.
 class ContactHeroSection extends StatelessWidget {
   const ContactHeroSection({
     super.key,
     required this.headline,
     required this.subheadline,
+    this.backgroundImageUrl,
+    this.backgroundVideoUrl,
+    this.showHubIntro = false,
     this.onContactSales,
     this.onBookInspection,
     this.onTalkAdvisor,
@@ -20,6 +24,9 @@ class ContactHeroSection extends StatelessWidget {
 
   final String headline;
   final String subheadline;
+  final String? backgroundImageUrl;
+  final String? backgroundVideoUrl;
+  final bool showHubIntro;
   final VoidCallback? onContactSales;
   final VoidCallback? onBookInspection;
   final VoidCallback? onTalkAdvisor;
@@ -33,19 +40,15 @@ class ContactHeroSection extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.charcoal,
-                  AppColors.gold.withValues(alpha: 0.2),
-                  AppColors.deepBlack,
-                ],
-              ),
-            ),
-            child: Center(
+          CmsHeroMediaBackground(
+            imageUrl: backgroundImageUrl,
+            videoUrl: backgroundVideoUrl,
+            fallbackColors: [
+              AppColors.charcoal,
+              AppColors.gold.withValues(alpha: 0.2),
+              AppColors.deepBlack,
+            ],
+            fallbackChild: Center(
               child: Icon(
                 LucideIcons.headphones,
                 size: 72,
@@ -58,17 +61,58 @@ class ContactHeroSection extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.transparent, AppColors.deepBlack.withValues(alpha: 0.92)],
+                colors: [
+                  Colors.transparent,
+                  AppColors.deepBlack.withValues(alpha: 0.92),
+                ],
                 stops: const [0.35, 1.0],
               ),
             ),
           ),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: context.pagePadding, vertical: AppSpacing.xxl),
+            padding: EdgeInsets.symmetric(
+              horizontal: context.pagePadding,
+              vertical: AppSpacing.xxl,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (showHubIntro) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: AppColors.gold.withValues(alpha: 0.55),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          LucideIcons.sparkles,
+                          size: 14,
+                          color: AppColors.gold,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'CONTACT HUB',
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppColors.gold,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.4,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.base),
+                ],
                 Text(
                   headline,
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
@@ -79,7 +123,9 @@ class ContactHeroSection extends StatelessWidget {
                 const SizedBox(height: AppSpacing.base),
                 Text(
                   subheadline,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondaryDark),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppColors.textSecondaryDark,
+                      ),
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 Wrap(
@@ -107,7 +153,8 @@ class ContactHeroSection extends StatelessWidget {
                       label: 'Become an Investor',
                       variant: ButtonVariant.ghost,
                       icon: LucideIcons.landmark,
-                      onPressed: onInvestor ?? () => context.go(RoutePaths.investment),
+                      onPressed:
+                          onInvestor ?? () => context.go(RoutePaths.investment),
                     ),
                   ],
                 ),

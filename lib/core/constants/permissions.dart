@@ -7,6 +7,7 @@ abstract final class PermissionSlugs {
   static const publishProperty = 'publish_property';
   static const manageUsers = 'manage_users';
   static const manageRoles = 'manage_roles';
+  static const configurePermissions = 'configure_permissions';
   static const managePayments = 'manage_payments';
   static const manageBlog = 'manage_blog';
   static const manageMarketing = 'manage_marketing';
@@ -14,6 +15,22 @@ abstract final class PermissionSlugs {
   static const manageCrm = 'manage_crm';
   static const manageReports = 'manage_reports';
   static const manageSettings = 'manage_settings';
+
+  static const viewOrganization = 'view_organization';
+  static const manageOrganization = 'manage_organization';
+  static const manageStaff = 'manage_staff';
+  static const viewStaffDirectory = 'view_staff_directory';
+  static const viewAuditLogs = 'view_audit_logs';
+  static const exportAuditLogs = 'export_audit_logs';
+
+  static const consultationsView = 'consultations.view';
+  static const consultationsManage = 'consultations.manage';
+  static const consultationsSettings = 'consultations.settings';
+
+  static const callbacksView = 'callbacks.view';
+  static const callbacksManage = 'callbacks.manage';
+  static const callbacksSettings = 'callbacks.settings';
+
   static const viewExecutiveDashboard = 'view_executive_dashboard';
   static const customizeDashboard = 'customize_dashboard';
   static const generateExecutiveReports = 'generate_executive_reports';
@@ -52,6 +69,12 @@ abstract final class PermissionSlugs {
   static const investorsAi = 'investors.ai';
   static const investorsAssign = 'investors.assign';
   static const investorsKyc = 'investors.kyc';
+  static const investorsCommunicate = 'investors.communicate';
+  static const investorsPayments = 'investors.payments';
+  static const investorsTasks = 'investors.tasks';
+  static const investorsReports = 'investors.reports';
+  static const investorsReferrals = 'investors.referrals';
+  static const investorsAudit = 'investors.audit';
 
   static const salesRead = 'sales.read';
   static const salesWrite = 'sales.write';
@@ -101,19 +124,6 @@ abstract final class PermissionSlugs {
   static const marketingAi = 'marketing.ai';
   static const marketingPublish = 'marketing.publish';
   static const marketingSocial = 'marketing.social';
-
-  static const hrRead = 'hr.read';
-  static const hrWrite = 'hr.write';
-  static const hrEmployees = 'hr.employees';
-  static const hrRecruitment = 'hr.recruitment';
-  static const hrAttendance = 'hr.attendance';
-  static const hrLeave = 'hr.leave';
-  static const hrPerformance = 'hr.performance';
-  static const hrPayroll = 'hr.payroll';
-  static const hrAnalytics = 'hr.analytics';
-  static const hrAi = 'hr.ai';
-  static const hrApprovals = 'hr.approvals';
-  static const hrAssets = 'hr.assets';
 
   static const eocRead = 'eoc.read';
   static const eocWrite = 'eoc.write';
@@ -247,6 +257,21 @@ abstract final class PermissionSlugs {
   static const integrationAi = 'integration.ai';
   static const integrationAdmin = 'integration.admin';
 
+  static const securityRead = 'security.read';
+  static const securityWrite = 'security.write';
+  static const securityIam = 'security.iam';
+  static const securityMfa = 'security.mfa';
+  static const securityThreats = 'security.threats';
+  static const securityIncidents = 'security.incidents';
+  static const securityAudit = 'security.audit';
+  static const securityPrivacy = 'security.privacy';
+  static const securitySecrets = 'security.secrets';
+  static const securityBackup = 'security.backup';
+  static const securityDr = 'security.dr';
+  static const securityAi = 'security.ai';
+  static const securityAnalytics = 'security.analytics';
+  static const securityAdmin = 'security.admin';
+
   static const List<String> all = [
     viewProperties,
     createProperty,
@@ -262,6 +287,18 @@ abstract final class PermissionSlugs {
     manageCrm,
     manageReports,
     manageSettings,
+    viewOrganization,
+    manageOrganization,
+    manageStaff,
+    viewStaffDirectory,
+    viewAuditLogs,
+    exportAuditLogs,
+    consultationsView,
+    consultationsManage,
+    consultationsSettings,
+    callbacksView,
+    callbacksManage,
+    callbacksSettings,
     viewExecutiveDashboard,
     customizeDashboard,
     generateExecutiveReports,
@@ -297,6 +334,12 @@ abstract final class PermissionSlugs {
     investorsAi,
     investorsAssign,
     investorsKyc,
+    investorsCommunicate,
+    investorsPayments,
+    investorsTasks,
+    investorsReports,
+    investorsReferrals,
+    investorsAudit,
     salesRead,
     salesWrite,
     salesReservations,
@@ -342,18 +385,6 @@ abstract final class PermissionSlugs {
     marketingAi,
     marketingPublish,
     marketingSocial,
-    hrRead,
-    hrWrite,
-    hrEmployees,
-    hrRecruitment,
-    hrAttendance,
-    hrLeave,
-    hrPerformance,
-    hrPayroll,
-    hrAnalytics,
-    hrAi,
-    hrApprovals,
-    hrAssets,
     eocRead,
     eocWrite,
     eocKpis,
@@ -477,5 +508,19 @@ abstract final class PermissionSlugs {
     integrationMonitoring,
     integrationAi,
     integrationAdmin,
+    securityRead,
+    securityWrite,
+    securityIam,
+    securityMfa,
+    securityThreats,
+    securityIncidents,
+    securityAudit,
+    securityPrivacy,
+    securitySecrets,
+    securityBackup,
+    securityDr,
+    securityAi,
+    securityAnalytics,
+    securityAdmin,
   ];
 }

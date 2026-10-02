@@ -11,6 +11,7 @@ export 'components/global_notification_bar.dart';
 export 'components/hero_section.dart';
 export 'components/newsletter_banner.dart';
 export 'components/page_container.dart';
+export 'components/scale_safe_carousel.dart';
 export 'components/scroll_progress_bar.dart';
 export 'components/scroll_to_top_button.dart';
 export 'components/search_overlay.dart';

@@ -5,6 +5,7 @@ abstract final class AppColors {
   // Brand
   static const Color gold = Color(0xFFD4A34E);
   static const Color goldLight = Color(0xFFF4C978);
+  static const Color primaryGold = gold;
   static const Color charcoal = Color(0xFF3F4148);
   static const Color deepBlack = Color(0xFF0F1115);
   static const Color white = Color(0xFFFFFFFF);
@@ -52,6 +53,16 @@ abstract final class AppColors {
   static const Color neutral800 = Color(0xFF1F2937);
   static const Color neutral900 = Color(0xFF111827);
   static const Color neutral950 = deepBlack;
+
+  // Slate aliases (portal / secondary text on dark surfaces)
+  static const Color slate100 = neutral100;
+  static const Color slate400 = neutral400;
+  static const Color slate500 = neutral500;
+  static const Color slate700 = neutral700;
+  static const Color slate800 = neutral800;
+
+  /// Brand navy (client portal surfaces)
+  static const Color navy = Color(0xFF0F2744);
 
   // Interactive states
   static Color primaryHover = goldLight;

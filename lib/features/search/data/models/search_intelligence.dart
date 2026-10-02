@@ -160,6 +160,8 @@ class SearchHubCms {
   const SearchHubCms({
     required this.heroHeadline,
     required this.heroSubheadline,
+    this.backgroundImageUrl,
+    this.backgroundVideoUrl,
     required this.popularSearches,
     required this.recentSearches,
     required this.quickFilters,
@@ -175,6 +177,8 @@ class SearchHubCms {
 
   final String heroHeadline;
   final String heroSubheadline;
+  final String? backgroundImageUrl;
+  final String? backgroundVideoUrl;
   final List<String> popularSearches;
   final List<String> recentSearches;
   final List<QuickFilterChip> quickFilters;

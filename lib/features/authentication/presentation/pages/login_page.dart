@@ -8,8 +8,11 @@ import 'package:hdhomesproject/core/storage/storage_service.dart';
 import 'package:hdhomesproject/core/theme/app_theme.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
+import 'package:hdhomesproject/features/authentication/domain/entities/login_audience.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/login_validator.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/auth_controller.dart';
+import 'package:hdhomesproject/features/authentication/presentation/providers/login_audience_provider.dart';
+import 'package:hdhomesproject/features/authentication/presentation/providers/organization_controller.dart';
 import 'package:hdhomesproject/features/authentication/presentation/widgets/auth_password_field.dart';
 import 'package:hdhomesproject/features/authentication/presentation/widgets/login_brand_panel.dart';
 import 'package:hdhomesproject/features/authentication/presentation/widgets/social_login_buttons.dart';
@@ -18,9 +21,16 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 /// Premium Unified Authentication Gateway — Volume 3 Part 3.
 class LoginPage extends HookConsumerWidget {
-  const LoginPage({super.key, this.redirectPath});
+  const LoginPage({
+    super.key,
+    this.redirectPath,
+    this.invitationToken,
+    this.initialEmail,
+  });
 
   final String? redirectPath;
+  final String? invitationToken;
+  final String? initialEmail;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,23 +40,40 @@ class LoginPage extends HookConsumerWidget {
     final rememberMe = useState(false);
     final authState = ref.watch(authControllerProvider);
     final security = ref.watch(securityServiceProvider);
+    final audienceAsync = ref.watch(loginAudienceHintProvider);
+    final audience = audienceAsync.valueOrNull;
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= 900;
 
     useEffect(() {
+      void onEmailChanged() {
+        ref.read(loginEmailHintProvider.notifier).setEmail(emailController.text);
+      }
+
+      emailController.addListener(onEmailChanged);
       Future.microtask(() async {
         try {
           final storage = await ref.read(storageServiceProvider.future);
           rememberMe.value = storage.rememberMe;
         } catch (_) {}
+        if (initialEmail != null && initialEmail!.trim().isNotEmpty) {
+          emailController.text = initialEmail!.trim();
+          ref
+              .read(loginEmailHintProvider.notifier)
+              .setEmail(initialEmail!.trim());
+        } else {
+          onEmailChanged();
+        }
       });
-      return null;
+      return () => emailController.removeListener(onEmailChanged);
     }, const []);
 
     String? authErrorMessage(Object? error) {
-      if (error is AppException) return friendlyErrorMessage(error);
-      if (error != null) return 'Sign in failed. Please try again.';
-      return null;
+      if (error == null) return null;
+      return userFacingError(
+        error,
+        fallback: 'Sign in failed. Check your email and password, then try again.',
+      );
     }
 
     ref.listen(authControllerProvider, (prev, next) {
@@ -78,6 +105,27 @@ class LoginPage extends HookConsumerWidget {
             rememberMe: rememberMe.value,
             redirectPath: redirectPath,
           );
+      if (!context.mounted) return;
+      if (result != null &&
+          invitationToken != null &&
+          invitationToken!.trim().isNotEmpty) {
+        try {
+          await ref
+              .read(organizationServiceProvider)
+              .acceptAnyInvitation(invitationToken!.trim());
+          await ref.read(identitySessionProvider.notifier).refreshPermissions();
+          if (context.mounted) {
+            context.go(RoutePaths.dashboard);
+          }
+          return;
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(userFacingError(e))),
+            );
+          }
+        }
+      }
       if (!context.mounted || result != null) return;
       final after = ref.read(authControllerProvider);
       final message = authErrorMessage(after.error) ??
@@ -108,11 +156,15 @@ class LoginPage extends HookConsumerWidget {
                   ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Sign in to continue to your HD Homes workspace',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondaryLight,
-                  ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 240),
+              child: Text(
+                LoginAudienceCopy.formSubtitle(audience),
+                key: ValueKey(audience?.name ?? 'default'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondaryLight,
+                    ),
+              ),
             ),
             if (inlineError != null) ...[
               const SizedBox(height: AppSpacing.base),
@@ -172,6 +224,7 @@ class LoginPage extends HookConsumerWidget {
               autofillHints: const [AutofillHints.email, AutofillHints.username],
               validator: LoginValidator.validateEmail,
             ),
+            if (audience != null) LoginAudienceHint(audience: audience),
             const SizedBox(height: AppSpacing.base),
             AuthPasswordField(
               controller: passwordController,
@@ -196,10 +249,12 @@ class LoginPage extends HookConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
             PrimaryButton(
               label: 'Sign in',
+              loadingLabel: 'Signing in…',
               expand: true,
               icon: LucideIcons.logIn,
               isLoading: authState.isLoading,
-              onPressed: authState.isLoading || security.isLockedOut ? null : submit,
+              onPressed:
+                  authState.isLoading || security.isLockedOut ? null : submit,
             ),
             const SizedBox(height: AppSpacing.lg),
             const SocialLoginButtons(),
@@ -221,7 +276,10 @@ class LoginPage extends HookConsumerWidget {
       body: isWide
           ? Row(
               children: [
-                const Expanded(flex: 5, child: LoginBrandPanel()),
+                Expanded(
+                  flex: 5,
+                  child: LoginBrandPanel(audience: audience),
+                ),
                 Expanded(
                   flex: 4,
                   child: SafeArea(

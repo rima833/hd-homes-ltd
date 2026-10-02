@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
-import 'package:hdhomesproject/features/authentication/domain/entities/account_security_models.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/account_security_service.dart';
-import 'package:hdhomesproject/features/authentication/domain/services/registration_validator.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/auth_controller.dart';
-import 'package:hdhomesproject/features/authentication/presentation/providers/verification_controller.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+export 'security_health_providers.dart';
 
 final accountSecurityServiceProvider = Provider<AccountSecurityService>((ref) {
   final configured = ref.watch(supabaseConfiguredProvider);
@@ -14,15 +14,6 @@ final accountSecurityServiceProvider = Provider<AccountSecurityService>((ref) {
     security: ref.watch(securityServiceProvider),
     sessions: ref.watch(sessionRepositoryProvider),
     client: configured ? ref.watch(supabaseClientProvider) : null,
-  );
-});
-
-final securityHealthProvider = Provider<SecurityHealthSnapshot>((ref) {
-  final verification = ref.watch(verificationSnapshotProvider);
-  return SecurityHealthSnapshot.compute(
-    passwordStrength: PasswordStrength.good,
-    emailVerified: verification.emailVerified,
-    phoneVerified: verification.phoneVerified,
   );
 });
 
@@ -74,13 +65,14 @@ class AccountSecurityController extends Notifier<AccountSecurityUiState> {
       state = state.copyWith(
         isSubmitting: false,
         message:
-            'If an account exists for that email, we sent a secure reset link. Check your inbox and spam folder.',
+            'If an account exists for that email, we sent a secure reset link. '
+            'Open the link in this same browser where HD Homes is running, then choose a new password.',
       );
       return true;
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }
@@ -107,7 +99,7 @@ class AccountSecurityController extends Notifier<AccountSecurityUiState> {
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }
@@ -137,7 +129,7 @@ class AccountSecurityController extends Notifier<AccountSecurityUiState> {
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }

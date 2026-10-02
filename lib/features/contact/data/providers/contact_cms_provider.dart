@@ -1,7 +1,83 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/domain/data/hub_page_cms.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/contact/data/models/contact_content.dart';
+import 'package:hdhomesproject/features/settings/presentation/providers/platform_settings_providers.dart';
 
-final contactHubCmsProvider = Provider<ContactHubCms>((ref) => _cms);
+const _defaultSupportHours = 'Mon–Fri 8:00 AM – 5:00 PM';
+
+/// Contact Hub content with phone / WhatsApp / email / hours from Platform
+/// Control Center (`app_settings.contact`) when published, plus landing hero
+/// media from Admin → Website → Pages (`contact` slug).
+final contactHubCmsProvider = Provider<ContactHubCms>((ref) {
+  final settings = ref.watch(publishedPlatformSettingsProvider).valueOrNull;
+  final phone = settings?.supportPhone.trim() ?? '';
+  final whatsapp = settings?.supportWhatsapp.trim() ?? '';
+  final email = settings?.supportEmail.trim() ?? '';
+  final hours = settings?.supportHours.trim() ?? '';
+  final address = settings?.officeAddress.trim() ?? '';
+  final city = settings?.city.trim() ?? '';
+  final country = settings?.country.trim() ?? '';
+
+  final officeLabel = () {
+    if (city.isNotEmpty) {
+      return country.isNotEmpty ? '$city, $country' : city;
+    }
+    if (address.isNotEmpty) {
+      final parts = address
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (parts.length >= 2) {
+        return parts.sublist(parts.length - 2).join(', ');
+      }
+      return address;
+    }
+    return _cms.officeLabel;
+  }();
+
+  final supportHours = hours.isNotEmpty ? hours : _defaultSupportHours;
+
+  final overlay = ref.watch(supabaseConfiguredProvider)
+      ? hubHeroFromPage(
+          ref.watch(publishedPageBySlugProvider('contact')).valueOrNull,
+        )
+      : const HubPageHeroOverlay();
+
+  return _cms.copyWith(
+    heroHeadline: overlay.headline ?? _cms.heroHeadline,
+    heroSubheadline: overlay.subheadline ?? _cms.heroSubheadline,
+    backgroundImageUrl:
+        overlay.backgroundImageUrl ?? _cms.backgroundImageUrl,
+    backgroundVideoUrl:
+        overlay.backgroundVideoUrl ?? _cms.backgroundVideoUrl,
+    phone: phone.isNotEmpty ? phone : _cms.phone,
+    whatsapp: whatsapp.isNotEmpty ? whatsapp : _cms.whatsapp,
+    email: email.isNotEmpty ? email : _cms.email,
+    supportHours: supportHours,
+    officeLabel: officeLabel,
+    contactOptions: [
+      for (final option in _cms.contactOptions)
+        if (option.id == ContactChannelId.phone ||
+            option.id == ContactChannelId.whatsapp ||
+            option.id == ContactChannelId.liveChat)
+          ContactOption(
+            id: option.id,
+            title: option.title,
+            description: option.description,
+            iconName: option.iconName,
+            department: option.department,
+            availability: supportHours,
+            responseTime: option.responseTime,
+            ctaLabel: option.ctaLabel,
+          )
+        else
+          option,
+    ],
+  );
+});
 
 final contactDepartmentsProvider =
     Provider<List<DepartmentInfo>>((ref) => ref.watch(contactHubCmsProvider).departments);
@@ -17,9 +93,11 @@ final _cms = ContactHubCms(
   heroHeadline: "We're Here to Help You Build Your Future.",
   heroSubheadline:
       'Reach HD Homes through any channel — sales, inspections, investments, partnerships, and support. Every inquiry flows into our CRM.',
-  phone: '+234 800 HD HOMES',
-  whatsapp: '+234 901 234 5678',
-  email: 'hello@hdhomes.ng',
+  phone: '07080596171',
+  whatsapp: '07080596171',
+  email: 'info@hdhomesltd.com',
+  supportHours: _defaultSupportHours,
+  officeLabel: 'Abuja, Nigeria',
   contactOptions: const [
     ContactOption(
       id: ContactChannelId.phone,

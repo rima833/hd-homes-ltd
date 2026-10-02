@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:hdhomesproject/core/auth/models/security_event.dart';
+import 'package:hdhomesproject/core/auth/services/security_service.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/app_role.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/observability_models.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/rbac_models.dart';
@@ -10,17 +12,18 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class RbacService {
   RbacService({
     required AuditService audit,
+    SecurityService? security,
     SupabaseClient? client,
   })  : _audit = audit,
+        _security = security,
         _client = client;
 
   final AuditService _audit;
+  final SecurityService? _security;
   final SupabaseClient? _client;
 
   final Map<String, Set<String>> _localRolePerms = {};
   final List<RoleDefinition> _localRoles = [];
-  final List<PermissionGroup> _localGroups = [];
-  int _accessDenied = 0;
 
   bool get isConfigured => _client != null;
 
@@ -29,7 +32,11 @@ class RbacService {
     final permissions = await listPermissions();
     final groups = await listGroups();
     final policies = await listApprovalPolicies();
+    final accessRequests = await listAccessRequests();
     final matrix = buildMatrix(roles, permissions);
+    final membersWithRoles = await _countUsersWithRoles();
+    final pendingApprovals =
+        accessRequests.where((r) => r.isPending).length;
     final analytics = RbacAnalytics(
       rolesInUse: roles.where((r) => r.lifecycle == RoleLifecycle.active).length,
       permissionCount: permissions.length,
@@ -39,9 +46,10 @@ class RbacService {
           .where((r) =>
               r.slug == AppRole.superAdmin.slug || r.slug == AppRole.admin.slug)
           .fold<int>(0, (a, r) => a + r.memberCount),
-      accessDeniedEvents: _accessDenied,
-      openApprovals: 0,
+      accessDeniedEvents: 0,
+      openApprovals: pendingApprovals,
       breakGlassSessions: 0,
+      membersWithRoles: membersWithRoles,
     );
     return RbacSnapshot(
       roles: roles,
@@ -49,6 +57,7 @@ class RbacService {
       groups: groups,
       matrix: matrix,
       policies: policies,
+      accessRequests: accessRequests,
       analytics: analytics,
     );
   }
@@ -77,7 +86,7 @@ class RbacService {
 
   Future<List<RoleDefinition>> listRoles() async {
     final client = _client;
-    if (client == null) return _ensureLocalRoles();
+    if (client == null) return const [];
 
     try {
       final rows = await client
@@ -86,22 +95,24 @@ class RbacService {
           .eq('is_deleted', false)
           .order('name');
       final rolePerms = await _loadAllRolePermissions();
+      final memberCounts = await _loadRoleMemberCounts();
       return (rows as List).map((raw) {
         final map = Map<String, dynamic>.from(raw as Map);
         final id = map['id'] as String;
+        map['member_count'] = memberCounts[id] ?? 0;
         return RoleDefinition.fromRow(
           map,
           permissions: rolePerms[id] ?? const {},
         );
       }).toList();
     } catch (_) {
-      return _ensureLocalRoles();
+      return const [];
     }
   }
 
   Future<List<PermissionDefinition>> listPermissions() async {
     final client = _client;
-    if (client == null) return PermissionCatalog.defaults;
+    if (client == null) return const [];
 
     try {
       final rows = await client
@@ -116,8 +127,8 @@ class RbacService {
                 PermissionDefinition.fromRow(Map<String, dynamic>.from(e as Map)),
           )
           .toList();
-      if (fromDb.isEmpty) return PermissionCatalog.defaults;
-      // Merge catalog metadata (dotted aliases) onto DB rows.
+      if (fromDb.isEmpty) return const [];
+      // Merge catalog metadata (dotted aliases) onto DB rows when available.
       return fromDb.map((db) {
         PermissionDefinition? catalog;
         for (final c in PermissionCatalog.defaults) {
@@ -139,13 +150,13 @@ class RbacService {
         );
       }).toList();
     } catch (_) {
-      return PermissionCatalog.defaults;
+      return const [];
     }
   }
 
   Future<List<PermissionGroup>> listGroups() async {
     final client = _client;
-    if (client == null) return _ensureLocalGroups();
+    if (client == null) return const [];
 
     try {
       final rows = await client.from('permission_groups').select().order('name');
@@ -156,27 +167,131 @@ class RbacService {
         final perms = await _groupPermissionSlugs(id);
         result.add(PermissionGroup.fromRow(map, permissions: perms));
       }
-      if (result.isEmpty) return _ensureLocalGroups();
+      if (result.isEmpty) return const [];
       return result;
     } catch (_) {
-      return _ensureLocalGroups();
+      return const [];
     }
   }
 
   Future<List<ApprovalPolicy>> listApprovalPolicies() async {
     final client = _client;
-    if (client == null) return _defaultPolicies();
+    if (client == null) return const [];
 
     try {
       final rows = await client.from('approval_policies').select().order('name');
-      final list = (rows as List)
+      return (rows as List)
           .map((e) => ApprovalPolicy.fromRow(Map<String, dynamic>.from(e as Map)))
           .toList();
-      if (list.isEmpty) return _defaultPolicies();
-      return list;
     } catch (_) {
-      return _defaultPolicies();
+      return const [];
     }
+  }
+
+  Future<List<AccessRequest>> listAccessRequests() async {
+    final client = _client;
+    if (client == null) return const [];
+
+    try {
+      final rows = await client
+          .from('access_requests')
+          .select(
+            '*, requester:profiles!access_requests_requester_id_fkey(first_name, last_name, preferred_name, email)',
+          )
+          .order('created_at', ascending: false)
+          .limit(80);
+      return (rows as List)
+          .map(
+            (e) => AccessRequest.fromRow(Map<String, dynamic>.from(e as Map)),
+          )
+          .toList();
+    } catch (_) {
+      try {
+        final rows = await client
+            .from('access_requests')
+            .select()
+            .order('created_at', ascending: false)
+            .limit(80);
+        return (rows as List)
+            .map(
+              (e) =>
+                  AccessRequest.fromRow(Map<String, dynamic>.from(e as Map)),
+            )
+            .toList();
+      } catch (_) {
+        return const [];
+      }
+    }
+  }
+
+  Future<ApprovalPolicy> setApprovalPolicyEnabled({
+    required String policyId,
+    required bool enabled,
+  }) async {
+    final client = _client;
+    if (client == null) throw StateError('Supabase is not configured.');
+    final row = await client.rpc(
+      'set_approval_policy_enabled',
+      params: {
+        'p_policy_id': policyId,
+        'p_enabled': enabled,
+      },
+    );
+    final map = row is Map
+        ? Map<String, dynamic>.from(row)
+        : (row is List && row.isNotEmpty
+            ? Map<String, dynamic>.from(row.first as Map)
+            : null);
+    if (map == null) throw StateError('Could not update approval policy.');
+    return ApprovalPolicy.fromRow(map);
+  }
+
+  Future<AccessRequest> createAccessRequest({
+    required String reason,
+    String? permissionSlug,
+    String? roleSlug,
+  }) async {
+    final client = _client;
+    if (client == null) throw StateError('Supabase is not configured.');
+    final row = await client.rpc(
+      'create_access_request',
+      params: {
+        'p_reason': reason,
+        'p_permission_slug': ?permissionSlug,
+        'p_role_slug': ?roleSlug,
+      },
+    );
+    final map = row is Map
+        ? Map<String, dynamic>.from(row)
+        : (row is List && row.isNotEmpty
+            ? Map<String, dynamic>.from(row.first as Map)
+            : null);
+    if (map == null) throw StateError('Could not create access request.');
+    return AccessRequest.fromRow(map);
+  }
+
+  Future<AccessRequest> reviewAccessRequest({
+    required String requestId,
+    required bool approve,
+    String? note,
+  }) async {
+    final client = _client;
+    if (client == null) throw StateError('Supabase is not configured.');
+    final row = await client.rpc(
+      'review_access_request',
+      params: {
+        'p_request_id': requestId,
+        'p_approve': approve,
+        'p_note': ?note,
+      },
+    );
+    final map = row is Map
+        ? Map<String, dynamic>.from(row)
+        : (row is List && row.isNotEmpty
+            ? Map<String, dynamic>.from(row.first as Map)
+            : null);
+    if (map == null) throw StateError('Could not review access request.');
+    return AccessRequest.fromRow(map);
   }
 
   PolicyEvaluation authorize({
@@ -194,7 +309,6 @@ class RbacService {
       branchScoped: branchScoped,
     );
     if (result.decision == PolicyDecision.deny) {
-      _accessDenied++;
       unawaited(
         _audit.publish(
           AuditPublishRequest(
@@ -224,68 +338,110 @@ class RbacService {
     final client = _client;
 
     if (client == null) {
-      final set = _localRolePerms.putIfAbsent(roleSlug, () => {});
-      if (granted) {
-        set.add(dbSlug);
-      } else {
-        set.remove(dbSlug);
-      }
-      await _auditRbac(
-        granted ? 'permission_assigned' : 'permission_removed',
-        actorId,
-        {
+      throw StateError('Supabase is not configured.');
+    }
+
+    await client.rpc(
+      'set_role_permission',
+      params: {
+        'p_role_id': roleId,
+        'p_permission_slug': dbSlug,
+        'p_granted': granted,
+        if (actorId != null) 'p_actor_id': actorId,
+      },
+    );
+
+    await _auditRbac(
+      granted ? 'permission_assigned' : 'permission_removed',
+      actorId,
+      {
+        'role': roleSlug,
+        'role_id': roleId,
+        'permission': dbSlug,
+        'granted': granted,
+      },
+      entityType: 'role_permissions',
+      entityId: roleId,
+      newValues: {
+        'role_slug': roleSlug,
+        'permission': dbSlug,
+        'granted': granted,
+      },
+    );
+    _security?.record(
+      SecurityEvent(
+        type: SecurityEventType.permissionChanged,
+        timestamp: DateTime.now(),
+        userId: actorId,
+        metadata: {
           'role': roleSlug,
+          'role_id': roleId,
           'permission': dbSlug,
+          'granted': granted,
         },
-      );
-      return;
+      ),
+    );
+  }
+
+  Future<PermissionDefinition> createPermission({
+    required String name,
+    required String slug,
+    required String module,
+    String? description,
+    String? actorId,
+  }) async {
+    final client = _client;
+    final trimmedName = name.trim();
+    final trimmedSlug = slug.trim().toLowerCase();
+    final trimmedModule = module.trim().isEmpty ? 'custom' : module.trim();
+    if (trimmedName.isEmpty || trimmedSlug.isEmpty) {
+      throw Exception('Permission name and slug are required.');
+    }
+    if (client == null) {
+      throw Exception('Supabase is not configured');
     }
 
     try {
-      final permRows = await client
-          .from('permissions')
-          .select('id')
-          .eq('slug', dbSlug)
-          .limit(1);
-      if ((permRows as List).isEmpty) return;
-      final permissionId = (permRows.first as Map)['id'] as String;
+      final inserted = await client.from('permissions').insert({
+        'name': trimmedName,
+        'slug': trimmedSlug,
+        'module': trimmedModule,
+        'description': description?.trim().isEmpty == true
+            ? null
+            : description?.trim(),
+        'status': 'active',
+        'is_deleted': false,
+        if (actorId != null) 'created_by': actorId,
+      }).select().single();
 
-      if (granted) {
-        await client.from('role_permissions').upsert({
-          'role_id': roleId,
-          'permission_id': permissionId,
-        });
-      } else {
-        await client
-            .from('role_permissions')
-            .delete()
-            .eq('role_id', roleId)
-            .eq('permission_id', permissionId);
-      }
+      await _auditRbac('permission_created', actorId, {
+        'permission': trimmedSlug,
+        'module': trimmedModule,
+      });
 
-      await _auditRbac(
-        granted ? 'permission_assigned' : 'permission_removed',
-        actorId,
-        {'role': roleSlug, 'permission': dbSlug},
+      return PermissionDefinition.fromRow(
+        Map<String, dynamic>.from(inserted),
       );
-    } catch (_) {
-      final set = _localRolePerms.putIfAbsent(roleSlug, () => {});
-      if (granted) {
-        set.add(dbSlug);
-      } else {
-        set.remove(dbSlug);
-      }
+    } catch (e) {
+      throw Exception('Unable to create permission: $e');
     }
   }
 
-  Future<RoleDefinition?> createRole({
+  Future<RoleDefinition> createRole({
     required String name,
     required String slug,
     String? description,
     String? cloneFromRoleId,
+    String? parentRoleId,
     String? actorId,
   }) async {
     final client = _client;
+    final trimmedName = name.trim();
+    final trimmedSlug = slug.trim().toLowerCase();
+    if (trimmedName.isEmpty || trimmedSlug.isEmpty) {
+      throw Exception('Role name and slug are required.');
+    }
+
     Set<String> seedPerms = {};
 
     if (cloneFromRoleId != null) {
@@ -302,32 +458,41 @@ class RbacService {
 
     if (client == null) {
       final role = RoleDefinition(
-        id: 'local-$slug',
-        name: name,
-        slug: slug,
+        id: 'local-$trimmedSlug',
+        name: trimmedName,
+        slug: trimmedSlug,
         description: description,
         permissionSlugs: seedPerms,
       );
       _localRoles.add(role);
-      _localRolePerms[slug] = {...seedPerms};
-      await _auditRbac('role_created', actorId, {'role': slug, 'cloned': cloneFromRoleId != null});
+      _localRolePerms[trimmedSlug] = {...seedPerms};
+      await _auditRbac('role_created', actorId, {
+        'role': trimmedSlug,
+        'cloned': cloneFromRoleId != null,
+      });
       return role;
     }
 
     try {
       final inserted = await client.from('roles').insert({
-        'name': name,
-        'slug': slug,
-        'description': description,
+        'name': trimmedName,
+        'slug': trimmedSlug,
+        'description': description?.trim().isEmpty == true
+            ? null
+            : description?.trim(),
         'is_system': false,
         'status': 'active',
+        'lifecycle': 'active',
+        'is_deleted': false,
+        if (parentRoleId != null && parentRoleId.isNotEmpty)
+          'parent_role_id': parentRoleId,
       }).select().single();
 
       final roleId = inserted['id'] as String;
       for (final perm in seedPerms) {
         await setRolePermission(
           roleId: roleId,
-          roleSlug: slug,
+          roleSlug: trimmedSlug,
           permissionSlug: perm,
           granted: true,
           actorId: actorId,
@@ -335,7 +500,7 @@ class RbacService {
       }
 
       await _auditRbac('role_created', actorId, {
-        'role': slug,
+        'role': trimmedSlug,
         'cloned_from': cloneFromRoleId,
       });
 
@@ -343,8 +508,83 @@ class RbacService {
         Map<String, dynamic>.from(inserted),
         permissions: seedPerms,
       );
-    } catch (_) {
-      return null;
+    } catch (e) {
+      throw Exception('Unable to create role: $e');
+    }
+  }
+
+  Future<RoleDefinition> updateRole({
+    required String roleId,
+    String? name,
+    String? description,
+    RoleLifecycle? lifecycle,
+    String? parentRoleId,
+    bool clearParent = false,
+    String? actorId,
+  }) async {
+    final client = _client;
+    if (client == null) {
+      throw Exception('Supabase is not configured');
+    }
+
+    final roles = await listRoles();
+    RoleDefinition? existing;
+    for (final r in roles) {
+      if (r.id == roleId) {
+        existing = r;
+        break;
+      }
+    }
+    if (existing == null) {
+      throw Exception('Role not found');
+    }
+    if (existing.isSystem && lifecycle == RoleLifecycle.archived) {
+      throw Exception('System roles cannot be archived');
+    }
+    if (existing.isSystem &&
+        ((name != null && name.trim().isNotEmpty && name.trim() != existing.name) ||
+            (description != null &&
+                description.trim() != (existing.description ?? '').trim()))) {
+      throw Exception('System roles cannot be edited');
+    }
+
+    try {
+      final patch = <String, dynamic>{
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+        if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+        if (description != null)
+          'description':
+              description.trim().isEmpty ? null : description.trim(),
+        if (clearParent)
+          'parent_role_id': null
+        else if (parentRoleId != null)
+          'parent_role_id': parentRoleId.isEmpty ? null : parentRoleId,
+        if (lifecycle != null) ...{
+          'lifecycle': lifecycle.slug,
+          'status': lifecycle == RoleLifecycle.archived ? 'archived' : 'active',
+          if (lifecycle == RoleLifecycle.archived) 'is_deleted': true,
+          if (lifecycle == RoleLifecycle.active) 'is_deleted': false,
+        },
+      };
+
+      final row = await client
+          .from('roles')
+          .update(patch)
+          .eq('id', roleId)
+          .select()
+          .single();
+
+      await _auditRbac('role_updated', actorId, {
+        'role': existing.slug,
+        'fields': patch.keys.toList(),
+      });
+
+      return RoleDefinition.fromRow(
+        Map<String, dynamic>.from(row),
+        permissions: existing.permissionSlugs,
+      );
+    } catch (e) {
+      throw Exception('Unable to update role: $e');
     }
   }
 
@@ -352,16 +592,48 @@ class RbacService {
     final client = _client;
     if (client == null) {
       _localRoles.removeWhere((r) => r.id == roleId);
-      await _auditRbac('role_archived', actorId, {'role': roleSlug});
+      await _auditRbac(
+        'role_archived',
+        actorId,
+        {'role': roleSlug, 'role_id': roleId},
+        entityType: 'roles',
+        entityId: roleId,
+      );
+      _security?.record(
+        SecurityEvent(
+          type: SecurityEventType.roleUpdated,
+          timestamp: DateTime.now(),
+          userId: actorId,
+          metadata: {'role': roleSlug, 'role_id': roleId, 'action': 'archived'},
+        ),
+      );
       return;
     }
     try {
       await client.from('roles').update({
         'status': 'archived',
+        'lifecycle': 'archived',
         'is_deleted': true,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', roleId);
-      await _auditRbac('role_archived', actorId, {'role': roleSlug});
-    } catch (_) {}
+      await _auditRbac(
+        'role_archived',
+        actorId,
+        {'role': roleSlug, 'role_id': roleId},
+        entityType: 'roles',
+        entityId: roleId,
+      );
+      _security?.record(
+        SecurityEvent(
+          type: SecurityEventType.roleUpdated,
+          timestamp: DateTime.now(),
+          userId: actorId,
+          metadata: {'role': roleSlug, 'role_id': roleId, 'action': 'archived'},
+        ),
+      );
+    } catch (e) {
+      throw Exception('Unable to archive role: $e');
+    }
   }
 
   Future<void> assignGroupToRole({
@@ -389,7 +661,16 @@ class RbacService {
     final client = _client;
     if (client == null) return null;
     final channel = client.channel('rbac-engine');
-    for (final table in ['roles', 'role_permissions', 'permissions', 'user_roles']) {
+    for (final table in [
+      'roles',
+      'role_permissions',
+      'permissions',
+      'user_roles',
+      'permission_groups',
+      'permission_group_items',
+      'approval_policies',
+      'access_requests',
+    ]) {
       channel.onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
@@ -399,6 +680,39 @@ class RbacService {
     }
     channel.subscribe();
     return channel;
+  }
+
+  Future<Map<String, int>> _loadRoleMemberCounts() async {
+    final client = _client;
+    if (client == null) return {};
+    try {
+      final rows = await client.from('user_roles').select('role_id');
+      final counts = <String, int>{};
+      for (final raw in rows as List) {
+        final id = (raw as Map)['role_id'] as String?;
+        if (id == null) continue;
+        counts[id] = (counts[id] ?? 0) + 1;
+      }
+      return counts;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<int> _countUsersWithRoles() async {
+    final client = _client;
+    if (client == null) return 0;
+    try {
+      final rows = await client.from('user_roles').select('user_id');
+      final ids = <String>{};
+      for (final raw in rows as List) {
+        final id = (raw as Map)['user_id'] as String?;
+        if (id != null) ids.add(id);
+      }
+      return ids.length;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<Map<String, Set<String>>> _loadAllRolePermissions() async {
@@ -447,111 +761,43 @@ class RbacService {
   Future<void> _auditRbac(
     String action,
     String? actorId,
-    Map<String, dynamic> metadata,
-  ) async {
+    Map<String, dynamic> metadata, {
+    String? entityType,
+    String? entityId,
+    Map<String, dynamic>? oldValues,
+    Map<String, dynamic>? newValues,
+  }) async {
+    final resolvedEntityType = entityType ??
+        (metadata['role_id'] != null
+            ? 'roles'
+            : metadata['permission'] != null
+                ? 'permissions'
+                : metadata['group'] != null
+                    ? 'permission_groups'
+                    : 'rbac');
+    final resolvedEntityId = entityId ??
+        metadata['role_id']?.toString() ??
+        metadata['role']?.toString() ??
+        metadata['permission']?.toString() ??
+        metadata['group']?.toString();
+
     unawaited(
       _audit.publish(
         AuditPublishRequest(
           action: action,
           module: 'rbac',
-          category: AuditEventCategory.admin,
+          category: AuditEventCategory.security,
           userId: actorId,
           severity: AuditSeverity.notice,
+          entityType: resolvedEntityType,
+          entityId: resolvedEntityId,
+          oldValues: oldValues,
+          newValues: newValues ?? metadata,
           metadata: metadata,
-          immutableVault: action.contains('role') || action.contains('permission'),
+          immutableVault:
+              action.contains('role') || action.contains('permission'),
         ),
       ),
     );
   }
-
-  List<RoleDefinition> _ensureLocalRoles() {
-    if (_localRoles.isEmpty) {
-      for (final role in AppRole.values) {
-        final slug = role.slug;
-        _localRoles.add(
-          RoleDefinition(
-            id: 'role-$slug',
-            name: slug.replaceAll('_', ' '),
-            slug: slug,
-            isSystem: true,
-            permissionSlugs: _localRolePerms[slug] ??
-                (role == AppRole.superAdmin
-                    ? PermissionCatalog.defaults
-                        .map((p) => p.effectiveDbSlug)
-                        .toSet()
-                    : const {}),
-          ),
-        );
-      }
-      // Seed matrix-friendly defaults for demo roles
-      _localRolePerms[AppRole.admin.slug] = {
-        for (final p in PermissionCatalog.defaults)
-          if (p.effectiveDbSlug != 'manage_roles') p.effectiveDbSlug,
-      };
-      _localRolePerms[AppRole.salesTeam.slug] = {
-        'view_properties',
-        'manage_crm',
-      };
-      _localRolePerms[AppRole.client.slug] = {'view_properties'};
-      _localRolePerms[AppRole.investor.slug] = {
-        'view_properties',
-        'manage_reports',
-      };
-    }
-    return _localRoles
-        .map(
-          (r) => RoleDefinition(
-            id: r.id,
-            name: r.name,
-            slug: r.slug,
-            description: r.description,
-            isSystem: r.isSystem,
-            lifecycle: r.lifecycle,
-            permissionSlugs: _localRolePerms[r.slug] ?? r.permissionSlugs,
-            memberCount: r.memberCount,
-          ),
-        )
-        .toList();
-  }
-
-  List<PermissionGroup> _ensureLocalGroups() {
-    if (_localGroups.isEmpty) {
-      for (final g in PermissionCatalog.defaultGroups) {
-        _localGroups.add(
-          PermissionGroup(
-            id: 'group-${g.slug}',
-            name: g.name,
-            slug: g.slug,
-            permissionSlugs: g.perms.toSet(),
-          ),
-        );
-      }
-    }
-    return List.unmodifiable(_localGroups);
-  }
-
-  List<ApprovalPolicy> _defaultPolicies() => const [
-        ApprovalPolicy(
-          id: 'pol-delete-property',
-          name: 'Delete Property',
-          actionType: ApprovalActionType.deleteProperty,
-          approverRoleSlug: 'admin',
-          description: 'Manager approval required to delete properties',
-        ),
-        ApprovalPolicy(
-          id: 'pol-refund',
-          name: 'Large Refund',
-          actionType: ApprovalActionType.largeRefund,
-          approverRoleSlug: 'finance',
-          thresholdAmount: 500000,
-          description: 'Finance approval for refunds ≥ ₦500,000',
-        ),
-        ApprovalPolicy(
-          id: 'pol-role-change',
-          name: 'Role Change',
-          actionType: ApprovalActionType.roleChange,
-          approverRoleSlug: 'super_admin',
-          description: 'Super Admin approval for role changes',
-        ),
-      ];
 }

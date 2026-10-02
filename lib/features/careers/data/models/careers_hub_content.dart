@@ -1,28 +1,10 @@
-// Careers Hub CMS models (Supabase wired in Volume 1.5).
+/// Careers Hub content models (CMS-backed with local fallbacks).
 
-enum CareerDepartment {
-  sales,
-  construction,
-  design,
-  marketing,
-  finance,
-  technology,
-  operations,
-  legal,
-}
-
-enum CareerEmploymentType {
-  fullTime,
-  partTime,
-  contract,
-  internship,
-}
-
-class CareerValue {
-  const CareerValue({
+class CareerBenefitCard {
+  const CareerBenefitCard({
     required this.title,
     required this.description,
-    required this.iconName,
+    this.iconName = 'sparkles',
   });
 
   final String title;
@@ -30,14 +12,16 @@ class CareerValue {
   final String iconName;
 }
 
-class CareerBenefit {
-  const CareerBenefit({
-    required this.title,
-    required this.description,
+class CareerStatItem {
+  const CareerStatItem({
+    required this.value,
+    required this.label,
+    this.iconName = 'briefcase',
   });
 
-  final String title;
-  final String description;
+  final String value;
+  final String label;
+  final String iconName;
 }
 
 class CareerJob {
@@ -48,88 +32,70 @@ class CareerJob {
     required this.location,
     required this.employmentType,
     required this.summary,
-    required this.responsibilities,
-    required this.requirements,
-    this.salaryRange,
+    this.description = '',
+    this.iconName = 'briefcase',
+    this.applyUrl,
     this.featured = false,
   });
 
   final String id;
   final String title;
-  final CareerDepartment department;
+  final String department;
   final String location;
-  final CareerEmploymentType employmentType;
+  final String employmentType;
   final String summary;
-  final List<String> responsibilities;
-  final List<String> requirements;
-  final String? salaryRange;
+  final String description;
+  final String iconName;
+  final String? applyUrl;
   final bool featured;
-}
-
-class CareerTestimonial {
-  const CareerTestimonial({
-    required this.name,
-    required this.role,
-    required this.quote,
-  });
-
-  final String name;
-  final String role;
-  final String quote;
-}
-
-class CareerFaq {
-  const CareerFaq({
-    required this.question,
-    required this.answer,
-  });
-
-  final String question;
-  final String answer;
 }
 
 class CareersHubCms {
   const CareersHubCms({
-    required this.heroHeadline,
-    required this.heroSubheadline,
-    required this.values,
+    required this.heroOverline,
+    required this.heroTitleLine1,
+    required this.heroTitleLine2,
+    required this.heroBody,
+    required this.cultureSummary,
+    required this.aboutSubtitle,
+    required this.stats,
     required this.benefits,
     required this.jobs,
-    required this.cultureSummary,
-    required this.testimonials,
-    required this.faqs,
+    required this.whyWorkWithUs,
+    required this.benefitPills,
     required this.openPositionsCount,
+    required this.ctaPrimaryLabel,
+    required this.ctaSecondaryLabel,
+    required this.cvBannerText,
+    required this.cvBannerCtaLabel,
+    required this.cvEmail,
+    this.heroImageUrl,
+    this.seoTitle,
+    this.seoDescription,
   });
 
-  final String heroHeadline;
-  final String heroSubheadline;
-  final List<CareerValue> values;
-  final List<CareerBenefit> benefits;
-  final List<CareerJob> jobs;
+  final String heroOverline;
+  final String heroTitleLine1;
+  final String heroTitleLine2;
+  final String heroBody;
+  final String? heroImageUrl;
   final String cultureSummary;
-  final List<CareerTestimonial> testimonials;
-  final List<CareerFaq> faqs;
+  final String aboutSubtitle;
+  final List<CareerStatItem> stats;
+  final List<CareerBenefitCard> benefits;
+  final List<CareerJob> jobs;
+  final List<String> whyWorkWithUs;
+  final List<String> benefitPills;
   final int openPositionsCount;
-}
+  final String ctaPrimaryLabel;
+  final String ctaSecondaryLabel;
+  final String cvBannerText;
+  final String cvBannerCtaLabel;
+  final String cvEmail;
+  final String? seoTitle;
+  final String? seoDescription;
 
-extension CareerDepartmentLabel on CareerDepartment {
-  String get label => switch (this) {
-        CareerDepartment.sales => 'Sales',
-        CareerDepartment.construction => 'Construction',
-        CareerDepartment.design => 'Design',
-        CareerDepartment.marketing => 'Marketing',
-        CareerDepartment.finance => 'Finance',
-        CareerDepartment.technology => 'Technology',
-        CareerDepartment.operations => 'Operations',
-        CareerDepartment.legal => 'Legal',
-      };
-}
-
-extension CareerEmploymentTypeLabel on CareerEmploymentType {
-  String get label => switch (this) {
-        CareerEmploymentType.fullTime => 'Full-time',
-        CareerEmploymentType.partTime => 'Part-time',
-        CareerEmploymentType.contract => 'Contract',
-        CareerEmploymentType.internship => 'Internship',
-      };
+  /// Legacy alias used by older section widgets.
+  String get heroHeadline => '$heroTitleLine1 $heroTitleLine2';
+  String get heroSubheadline => heroBody;
 }

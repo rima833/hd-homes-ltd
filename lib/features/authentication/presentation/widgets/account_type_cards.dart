@@ -25,93 +25,207 @@ class AccountTypeCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 720;
+    final selectable = RegistrationAccountType.selectable;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Choose how you want to use HD Homes',
-          style: Theme.of(context).textTheme.titleMedium,
+          'How will you use HD Homes?',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: 6),
         Text(
-          'You can expand your profile later — start with the role that fits today.',
-          style: Theme.of(context).textTheme.bodySmall,
+          'Client and investor accounts are open.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white60,
+              ),
         ),
-        const SizedBox(height: AppSpacing.lg),
-        ...RegistrationAccountType.selectable.map((type) {
-          final isSelected = selected == type;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.base),
-            child: Material(
-              color: isSelected
-                  ? AppColors.gold.withValues(alpha: 0.12)
-                  : Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: AppRadius.cardBorder,
-              child: InkWell(
-                onTap: () => onSelected(type),
-                borderRadius: AppRadius.cardBorder,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    borderRadius: AppRadius.cardBorder,
-                    border: Border.all(
-                      color: isSelected ? AppColors.gold : Colors.transparent,
-                      width: 1.5,
-                    ),
+        const SizedBox(height: 18),
+        if (wide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < selectable.length; i++) ...[
+                if (i > 0) const SizedBox(width: 12),
+                Expanded(
+                  child: _TypeCard(
+                    type: selectable[i],
+                    icon: _icon(selectable[i]),
+                    selected: selected == selectable[i],
+                    onTap: () => onSelected(selectable[i]),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(_icon(type), color: AppColors.gold),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(type.title, style: Theme.of(context).textTheme.titleMedium),
-                          ),
-                          if (isSelected)
-                            const Icon(LucideIcons.checkCircle2, color: AppColors.gold),
+                ),
+              ],
+            ],
+          )
+        else
+          Column(
+            children: [
+              for (final type in selectable)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _TypeCard(
+                    type: type,
+                    icon: _icon(type),
+                    selected: selected == type,
+                    onTap: () => onSelected(type),
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _TypeCard extends StatefulWidget {
+  const _TypeCard({
+    required this.type,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final RegistrationAccountType type;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_TypeCard> createState() => _TypeCardState();
+}
+
+class _TypeCardState extends State<_TypeCard> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = widget.selected;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: AnimatedScale(
+        scale: _hover || selected ? 1.01 : 1,
+        duration: const Duration(milliseconds: 180),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(18),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: selected
+                    ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.gold.withValues(alpha: 0.18),
+                          const Color(0xFF1A1D26),
                         ],
+                      )
+                    : null,
+                color: selected
+                    ? null
+                    : Colors.white.withValues(alpha: _hover ? 0.06 : 0.03),
+                border: Border.all(
+                  color: selected
+                      ? AppColors.gold
+                      : Colors.white.withValues(alpha: 0.1),
+                  width: selected ? 1.6 : 1,
+                ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.gold.withValues(alpha: 0.2),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.gold.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(widget.icon, color: AppColors.gold, size: 18),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(type.description),
-                      const SizedBox(height: AppSpacing.sm),
-                      ...type.benefits.map(
-                        (b) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Row(
-                            children: [
-                              const Icon(LucideIcons.check, size: 14, color: AppColors.gold),
-                              const SizedBox(width: 6),
-                              Expanded(child: Text(b, style: Theme.of(context).textTheme.bodySmall)),
-                            ],
-                          ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.type.title,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                      AnimatedOpacity(
+                        opacity: selected ? 1 : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: const Icon(
+                          LucideIcons.checkCircle2,
+                          color: AppColors.gold,
+                          size: 20,
                         ),
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 10),
+                  Text(
+                    widget.type.description,
+                    style: const TextStyle(color: Colors.white70, height: 1.35),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final b in widget.type.benefits)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Icon(
+                              LucideIcons.check,
+                              size: 14,
+                              color: AppColors.gold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              b,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: Colors.white60),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
-          );
-        }),
-        const SizedBox(height: AppSpacing.sm),
-        Text('Coming soon', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: RegistrationAccountType.upcoming
-              .map(
-                (t) => Chip(
-                  avatar: Icon(_icon(t), size: 16),
-                  label: Text(t.title),
-                ),
-              )
-              .toList(),
+          ),
         ),
-      ],
+      ),
     );
   }
 }

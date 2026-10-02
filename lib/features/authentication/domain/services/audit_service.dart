@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -22,7 +21,6 @@ class AuditService {
   final SupabaseClient? _client;
   final EnterpriseEventBus eventBus;
   final _random = Random.secure();
-  final List<AuditRecord> _localBuffer = [];
 
   String _newId() {
     final bytes = List<int>.generate(16, (_) => _random.nextInt(256));
@@ -35,8 +33,6 @@ class AuditService {
   }
 
   bool get isConfigured => _client != null;
-
-  List<AuditRecord> get recentLocal => List.unmodifiable(_localBuffer);
 
   /// Primary entry — publish a platform event through the Event Bus + persist.
   Future<AuditRecord> publish(AuditPublishRequest request) async {
@@ -136,70 +132,30 @@ class AuditService {
     return ObservabilityEngine.applyFilter(rows, filter);
   }
 
+  /// Server-aggregated OCC snapshot (no client KPI heuristics).
   Future<CommandCenterSnapshot> loadCommandCenter() async {
-    final now = DateTime.now().toUtc();
-    final startOfToday = DateTime.utc(now.year, now.month, now.day);
-    final recent = await _queryAuditLogs(
-      filter: const ObservabilityFilter(preset: ActivityDatePreset.last7Days),
-      limit: 80,
-    );
-    final today = recent
-        .where((r) => !r.createdAt.isBefore(startOfToday))
-        .toList();
-    final failedLogins = today
-        .where(
-          (r) =>
-              r.action.contains('login') &&
-              (r.status == AuditResultStatus.failure ||
-                  r.action.contains('fail')),
-        )
-        .length;
-    final alerts = await listAlerts(limit: 40);
-    final open = alerts
-        .where((a) => a.lifecycle != AlertLifecycle.resolved)
-        .toList();
-    final critical = open
-        .where(
-          (a) =>
-              a.severity == AuditSeverity.critical ||
-              a.severity == AuditSeverity.emergency,
-        )
-        .length;
-    final health = await listHealth();
-    final activeUsers = today.map((e) => e.userId).whereType<String>().toSet();
-
-    return CommandCenterSnapshot(
-      todayActivity: today.length,
-      activeUsersEstimate: activeUsers.length,
-      failedLogins: failedLogins,
-      openAlerts: open.length,
-      criticalAlerts: critical,
-      recentActivity: recent.take(25).toList(),
-      alerts: open.take(15).toList(),
-      health: health,
-      securityScore: ObservabilityEngine.computeSecurityScore(
-        openCritical: critical,
-        failedLoginsToday: failedLogins,
-        openAlerts: open.length,
-      ),
-    );
+    final client = _client;
+    if (client == null) {
+      throw StateError('Supabase is not configured for Observability.');
+    }
+    final raw = await client.rpc('observability_command_center');
+    if (raw is! Map) {
+      throw StateError('observability_command_center returned unexpected payload.');
+    }
+    return CommandCenterSnapshot.fromRpc(Map<String, dynamic>.from(raw));
   }
 
   Future<List<SystemAlert>> listAlerts({int limit = 50}) async {
     final client = _client;
     if (client == null) return const [];
-    try {
-      final rows = await client
-          .from('system_alerts')
-          .select()
-          .order('created_at', ascending: false)
-          .limit(limit);
-      return (rows as List)
-          .map((e) => SystemAlert.fromRow(Map<String, dynamic>.from(e as Map)))
-          .toList();
-    } catch (_) {
-      return const [];
-    }
+    final rows = await client
+        .from('system_alerts')
+        .select()
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (rows as List)
+        .map((e) => SystemAlert.fromRow(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   Future<void> acknowledgeAlert(String alertId, {String? actorId}) async {
@@ -218,27 +174,57 @@ class AuditService {
     );
   }
 
-  Future<List<SystemHealthCheck>> listHealth() async {
+  /// Acknowledge or resolve every open row that shares one alert signature.
+  Future<int> updateAlertGroup({
+    required String title,
+    required String? sourceModule,
+    required String severity,
+    required AlertLifecycle lifecycle,
+  }) async {
     final client = _client;
     if (client == null) {
-      return _defaultHealth(supabase: false);
+      throw StateError('Cannot update alert: Supabase is not configured.');
     }
-    try {
-      final rows = await client
-          .from('system_health')
-          .select()
-          .order('service_key');
-      final list = (rows as List)
-          .map(
-            (e) =>
-                SystemHealthCheck.fromRow(Map<String, dynamic>.from(e as Map)),
-          )
-          .toList();
-      if (list.isEmpty) return _defaultHealth(supabase: true);
-      return list;
-    } catch (_) {
-      return _defaultHealth(supabase: true);
+    final raw = await client.rpc(
+      'resolve_open_alert_group',
+      params: {
+        'p_title': title,
+        'p_source_module': sourceModule,
+        'p_severity': severity,
+        'p_lifecycle': lifecycle.slug,
+      },
+    );
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse('$raw') ?? 0;
+  }
+
+  Future<List<SystemHealthCheck>> listHealth() async {
+    final client = _client;
+    if (client == null) return const [];
+    final rows =
+        await client.from('system_health').select().order('service_key');
+    return (rows as List)
+        .map(
+          (e) =>
+              SystemHealthCheck.fromRow(Map<String, dynamic>.from(e as Map)),
+        )
+        .toList();
+  }
+
+  /// Invokes the deployed Edge health probe and returns refreshed rows.
+  Future<List<SystemHealthCheck>> runHealthProbe() async {
+    final client = _client;
+    if (client == null) {
+      throw StateError('Supabase is not configured for Observability.');
     }
+    final res = await client.functions.invoke('observability-health-probe');
+    if (res.status >= 400) {
+      throw StateError(
+        'Health probe failed (${res.status}): ${res.data}',
+      );
+    }
+    return listHealth();
   }
 
   Future<List<ChangeHistoryEntry>> loadChangeHistory({
@@ -247,27 +233,22 @@ class AuditService {
   }) async {
     final client = _client;
     if (client == null) return const [];
-    try {
-      final rows = await client
-          .from('change_history')
-          .select()
-          .eq('entity_type', entityType)
-          .eq('entity_id', entityId)
-          .order('created_at', ascending: false)
-          .limit(100);
-      return (rows as List)
-          .map(
-            (e) => ChangeHistoryEntry.fromRow(
-              Map<String, dynamic>.from(e as Map),
-            ),
-          )
-          .toList();
-    } catch (_) {
-      return const [];
-    }
+    final rows = await client
+        .from('change_history')
+        .select()
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .order('created_at', ascending: false)
+        .limit(100);
+    return (rows as List)
+        .map(
+          (e) => ChangeHistoryEntry.fromRow(
+            Map<String, dynamic>.from(e as Map),
+          ),
+        )
+        .toList();
   }
 
-  /// CSV export stub (permission-gated in UI).
   String exportCsv(List<AuditRecord> records) {
     final buf = StringBuffer(
       'id,created_at_utc,user_id,module,action,category,severity,status,entity_type,entity_id,correlation_id\n',
@@ -330,6 +311,21 @@ class AuditService {
     return channel;
   }
 
+  RealtimeChannel? subscribeHealth(void Function() onChange) {
+    final client = _client;
+    if (client == null) return null;
+    final channel = client.channel('system-health-feed');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'system_health',
+          callback: (_) => onChange(),
+        )
+        .subscribe();
+    return channel;
+  }
+
   void _onBusEvent(EventBusEnvelope envelope) {
     AppLogger.info(
       'EventBus: ${envelope.eventName} → ${envelope.request.module}',
@@ -365,191 +361,47 @@ class AuditService {
       metadata: request.metadata,
     );
 
-    _localBuffer.insert(0, record);
-    if (_localBuffer.length > 200) {
-      _localBuffer.removeRange(200, _localBuffer.length);
-    }
-
     AppLogger.info(
       'AuditEvent: ${request.module}/${request.action} [${request.severity.slug}]',
     );
 
     final client = _client;
-    if (client == null) return record;
-
-    try {
-      await client.rpc(
-        'publish_audit_event',
-        params: {
-          'p_id': id,
-          'p_user_id': request.userId,
-          'p_action': request.action,
-          'p_module': request.module,
-          'p_event_category': request.category.slug,
-          'p_entity_type': request.entityType,
-          'p_entity_id': request.entityId,
-          'p_old_values': request.oldValues,
-          'p_new_values': request.newValues,
-          'p_result_status': request.status.slug,
-          'p_severity': request.severity.slug,
-          'p_reason': request.reason,
-          'p_correlation_id': request.correlationId,
-          'p_request_id': request.requestId,
-          'p_actor_role': request.actorRole,
-          'p_session_id': request.sessionId,
-          'p_device': request.device,
-          'p_browser': request.browser,
-          'p_operating_system': request.operatingSystem,
-          'p_user_agent': request.userAgent,
-          'p_metadata': request.metadata,
-          'p_immutable': request.immutableVault,
-          'p_visible_to_user': request.visibleToUser,
-        },
+    if (client == null) {
+      AppLogger.warning(
+        'Audit event recorded locally only: Supabase is not configured.',
       );
       return record;
-    } catch (_) {
-      // Fall through to direct inserts when RPC not yet applied.
     }
 
-    try {
-      await client.from('audit_logs').insert({
-        'id': id,
-        'user_id': request.userId,
-        'action': request.action,
-        'module': request.module,
-        'entity_type': request.entityType,
-        'entity_id': request.entityId,
-        'user_agent': request.userAgent,
-        'metadata': request.metadata,
-        'event_category': request.category.slug,
-        'severity': request.severity.slug,
-        'result_status': request.status.slug,
-        'reason': request.reason,
-        'correlation_id': request.correlationId,
-        'request_id': request.requestId,
-        'actor_role': request.actorRole,
-        'session_id': request.sessionId,
-        'device': request.device,
-        'browser': request.browser,
-        'operating_system': request.operatingSystem,
-        'old_values': request.oldValues,
-        'new_values': request.newValues,
-      });
-    } catch (e) {
-      AppLogger.info('Audit persist soft-fail: $e');
-    }
-
-    if (request.visibleToUser && request.userId != null) {
-      try {
-        await client.from('activity_logs').insert({
-          'user_id': request.userId,
-          'activity_type': request.action,
-          'module': request.module,
-          'entity_type': request.entityType,
-          'entity_id': request.entityId,
-          'severity': request.severity.slug,
-          'audit_log_id': id,
-          'metadata': request.metadata,
-        });
-      } catch (_) {
-        try {
-          await client.from('user_activity').insert({
-            'user_id': request.userId,
-            'activity_type': request.action,
-            'entity_type': request.entityType,
-            'entity_id': request.entityId,
-            'metadata': {
-              ...request.metadata,
-              'module': request.module,
-              'audit_log_id': id,
-            },
-          });
-        } catch (_) {}
-      }
-    }
-
-    if (request.oldValues != null || request.newValues != null) {
-      unawaited(_writeChangeHistory(id, request));
-    }
-
-    if (request.severity.shouldAlert) {
-      unawaited(_raiseAlert(id, request));
-    }
-
-    if (request.immutableVault) {
-      unawaited(_vaultSnapshot(id, request));
-    }
-
+    await client.rpc(
+      'publish_audit_event',
+      params: {
+        'p_id': id,
+        'p_user_id': request.userId,
+        'p_action': request.action,
+        'p_module': request.module,
+        'p_event_category': request.category.slug,
+        'p_entity_type': request.entityType,
+        'p_entity_id': request.entityId,
+        'p_old_values': request.oldValues,
+        'p_new_values': request.newValues,
+        'p_result_status': request.status.slug,
+        'p_severity': request.severity.slug,
+        'p_reason': request.reason,
+        'p_correlation_id': request.correlationId,
+        'p_request_id': request.requestId,
+        'p_actor_role': request.actorRole,
+        'p_session_id': request.sessionId,
+        'p_device': request.device,
+        'p_browser': request.browser,
+        'p_operating_system': request.operatingSystem,
+        'p_user_agent': request.userAgent,
+        'p_metadata': request.metadata,
+        'p_immutable': request.immutableVault,
+        'p_visible_to_user': request.visibleToUser,
+      },
+    );
     return record;
-  }
-
-  Future<void> _writeChangeHistory(
-    String auditId,
-    AuditPublishRequest request,
-  ) async {
-    final client = _client;
-    if (client == null || request.entityType == null || request.entityId == null) {
-      return;
-    }
-    final oldMap = request.oldValues ?? const {};
-    final newMap = request.newValues ?? const {};
-    final keys = {...oldMap.keys, ...newMap.keys};
-    for (final key in keys) {
-      final ov = oldMap[key];
-      final nv = newMap[key];
-      if (ov == nv) continue;
-      try {
-        await client.from('change_history').insert({
-          'entity_type': request.entityType,
-          'entity_id': request.entityId,
-          'field_name': key,
-          'old_value': ov?.toString(),
-          'new_value': nv?.toString(),
-          'changed_by': request.userId,
-          'audit_log_id': auditId,
-        });
-      } catch (_) {}
-    }
-  }
-
-  Future<void> _raiseAlert(String auditId, AuditPublishRequest request) async {
-    final client = _client;
-    if (client == null) return;
-    try {
-      await client.from('system_alerts').insert({
-        'title': '${request.module}: ${request.action}',
-        'description': request.reason ?? request.action,
-        'severity': request.severity.slug,
-        'lifecycle': AlertLifecycle.open.slug,
-        'source_module': request.module,
-        'audit_log_id': auditId,
-        'metadata': request.metadata,
-      });
-    } catch (_) {}
-  }
-
-  Future<void> _vaultSnapshot(
-    String auditId,
-    AuditPublishRequest request,
-  ) async {
-    final client = _client;
-    if (client == null) return;
-    try {
-      await client.from('compliance_vault').insert({
-        'audit_log_id': auditId,
-        'event_category': request.category.slug,
-        'action': request.action,
-        'entity_type': request.entityType,
-        'entity_id': request.entityId,
-        'snapshot': {
-          'old_values': request.oldValues,
-          'new_values': request.newValues,
-          'metadata': request.metadata,
-          'user_id': request.userId,
-          'correlation_id': request.correlationId,
-        },
-      });
-    } catch (_) {}
   }
 
   Future<void> _updateAlertLifecycle(
@@ -558,15 +410,15 @@ class AuditService {
     String? actorId,
   }) async {
     final client = _client;
-    if (client == null) return;
-    try {
-      await client.from('system_alerts').update({
-        'lifecycle': lifecycle.slug,
-        if (lifecycle == AlertLifecycle.resolved)
-          'resolved_at': DateTime.now().toUtc().toIso8601String(),
-        if (actorId != null) 'resolved_by': actorId,
-      }).eq('id', alertId);
-    } catch (_) {}
+    if (client == null) {
+      throw StateError('Cannot update alert: Supabase is not configured.');
+    }
+    await client.from('system_alerts').update({
+      'lifecycle': lifecycle.slug,
+      if (lifecycle == AlertLifecycle.resolved)
+        'resolved_at': DateTime.now().toUtc().toIso8601String(),
+      'resolved_by': ?actorId,
+    }).eq('id', alertId);
   }
 
   Future<List<AuditRecord>> _queryAuditLogs({
@@ -575,108 +427,27 @@ class AuditService {
     int limit = 100,
   }) async {
     final client = _client;
-    if (client == null) {
-      return ObservabilityEngine.applyFilter(
-        _localBuffer,
-        filter.copyWith(userId: userId ?? filter.userId),
-      );
-    }
+    if (client == null) return const [];
 
     final (from, to) = filter.dateRange;
-    try {
-      var query = client.from('audit_logs').select();
-      final uid = userId ?? filter.userId;
-      if (uid != null) query = query.eq('user_id', uid);
-      if (filter.module != null) query = query.eq('module', filter.module!);
-      if (filter.category != null) {
-        query = query.eq('event_category', filter.category!.slug);
-      }
-      if (filter.severity != null) {
-        query = query.eq('severity', filter.severity!.slug);
-      }
-      final rows = await query
-          .gte('created_at', from.toIso8601String())
-          .lte('created_at', to.toIso8601String())
-          .order('created_at', ascending: false)
-          .limit(limit);
-      return (rows as List)
-          .map((e) => AuditRecord.fromRow(Map<String, dynamic>.from(e as Map)))
-          .toList();
-    } catch (_) {
-      // Fallback when extended columns not yet migrated.
-      try {
-        var query = client.from('audit_logs').select();
-        final uid = userId ?? filter.userId;
-        if (uid != null) query = query.eq('user_id', uid);
-        final rows = await query
-            .order('created_at', ascending: false)
-            .limit(limit);
-        return (rows as List)
-            .map(
-              (e) => AuditRecord.fromRow(Map<String, dynamic>.from(e as Map)),
-            )
-            .toList();
-      } catch (_) {
-        return ObservabilityEngine.applyFilter(_localBuffer, filter);
-      }
+    var query = client.from('audit_logs').select();
+    final uid = userId ?? filter.userId;
+    if (uid != null) query = query.eq('user_id', uid);
+    if (filter.module != null) query = query.eq('module', filter.module!);
+    if (filter.category != null) {
+      query = query.eq('event_category', filter.category!.slug);
     }
-  }
-
-  List<SystemHealthCheck> _defaultHealth({required bool supabase}) {
-    final now = DateTime.now().toUtc();
-    return [
-      SystemHealthCheck(
-        serviceKey: 'database',
-        label: 'Database',
-        status: supabase
-            ? SystemHealthStatus.healthy
-            : SystemHealthStatus.unknown,
-        checkedAt: now,
-        message: supabase ? 'Reachable' : 'Client not configured',
-      ),
-      SystemHealthCheck(
-        serviceKey: 'realtime',
-        label: 'Realtime',
-        status: supabase
-            ? SystemHealthStatus.healthy
-            : SystemHealthStatus.unknown,
-        checkedAt: now,
-      ),
-      SystemHealthCheck(
-        serviceKey: 'auth',
-        label: 'Authentication',
-        status: supabase
-            ? SystemHealthStatus.healthy
-            : SystemHealthStatus.unknown,
-        checkedAt: now,
-      ),
-      const SystemHealthCheck(
-        serviceKey: 'email',
-        label: 'Email provider',
-        status: SystemHealthStatus.degraded,
-        message: 'Queued delivery (Phase 1)',
-      ),
-      const SystemHealthCheck(
-        serviceKey: 'sms',
-        label: 'SMS provider',
-        status: SystemHealthStatus.degraded,
-        message: 'Queued delivery (Phase 1)',
-      ),
-      SystemHealthCheck(
-        serviceKey: 'storage',
-        label: 'Storage',
-        status: supabase
-            ? SystemHealthStatus.healthy
-            : SystemHealthStatus.unknown,
-        checkedAt: now,
-      ),
-      const SystemHealthCheck(
-        serviceKey: 'edge_functions',
-        label: 'Edge Functions',
-        status: SystemHealthStatus.unknown,
-        message: 'Not probed in Phase 1',
-      ),
-    ];
+    if (filter.severity != null) {
+      query = query.eq('severity', filter.severity!.slug);
+    }
+    final rows = await query
+        .gte('created_at', from.toIso8601String())
+        .lte('created_at', to.toIso8601String())
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return (rows as List)
+        .map((e) => AuditRecord.fromRow(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   String _csvEscape(String value) {

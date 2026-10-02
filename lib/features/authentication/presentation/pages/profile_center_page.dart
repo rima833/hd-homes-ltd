@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hdhomesproject/core/config/ai_features.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
+import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/core/widgets/feedback/confirmation_dialog.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/profile_models.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/profile_controller.dart';
+import 'package:hdhomesproject/features/authentication/presentation/widgets/account_portal_scaffold.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -22,30 +25,41 @@ class ProfileCenterPage extends HookConsumerWidget {
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= 900;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Profile'),
-        actions: [
-          IconButton(
-            tooltip: 'Security Center',
-            icon: const Icon(LucideIcons.shield),
-            onPressed: () => context.go(RoutePaths.securityCenter),
-          ),
-        ],
-      ),
+    return AccountPortalScaffold(
+      title: 'My Profile',
+      actions: [
+        IconButton(
+          tooltip: 'Security Center',
+          icon: const Icon(LucideIcons.shield),
+          onPressed: () => context.go(RoutePaths.securityCenter),
+        ),
+      ],
       body: hubAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.gold),
+        ),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Text('Unable to load profile: $e', textAlign: TextAlign.center),
+            child: Text(
+              userFacingError(e, fallback: 'Unable to load profile.'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.error),
+            ),
           ),
         ),
         data: (hub) {
           if (hub == null) {
-            return const Center(child: Text('Sign in to manage your profile.'));
+            return const Center(
+              child: Text(
+                'Sign in to manage your profile.',
+                style: TextStyle(color: AppColors.slate400),
+              ),
+            );
           }
-          final sections = DynamicUserIdentity.sectionsFor(hub.profile.primaryRole);
+          final sections = DynamicUserIdentity.sectionsFor(
+            hub.profile.primaryRole,
+          );
           final section = sections.contains(ui.section)
               ? ui.section
               : sections.first;
@@ -65,7 +79,10 @@ class ProfileCenterPage extends HookConsumerWidget {
                 ),
               if (ui.error != null)
                 MaterialBanner(
-                  content: Text(ui.error!, style: const TextStyle(color: AppColors.error)),
+                  content: Text(
+                    ui.error!,
+                    style: const TextStyle(color: AppColors.error),
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => controller.selectSection(section),
@@ -189,13 +206,18 @@ class _SectionBody extends ConsumerWidget {
           ProfileSection.personal => _PersonalSection(hub: hub, isBusy: isBusy),
           ProfileSection.contact => _ContactSection(hub: hub, isBusy: isBusy),
           ProfileSection.company => _CompanySection(hub: hub, isBusy: isBusy),
-          ProfileSection.communication =>
-            _CommunicationSection(hub: hub, isBusy: isBusy),
+          ProfileSection.communication => _CommunicationSection(
+            hub: hub,
+            isBusy: isBusy,
+          ),
           ProfileSection.regional ||
           ProfileSection.appearance ||
-          ProfileSection.privacy =>
-            _PreferencesSection(hub: hub, section: section, isBusy: isBusy),
-          ProfileSection.connected => const _ConnectedSection(),
+          ProfileSection.privacy => _PreferencesSection(
+            hub: hub,
+            section: section,
+            isBusy: isBusy,
+          ),
+          ProfileSection.connected => _OverviewSection(hub: hub),
           ProfileSection.summary => _SummarySection(hub: hub),
         },
       ),
@@ -211,14 +233,17 @@ class _OverviewSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final p = hub.profile;
+    final ui = ref.watch(profileControllerProvider);
     final controller = ref.read(profileControllerProvider.notifier);
+    final avatarUrl = ui.optimisticAvatarUrl ?? p.avatarUrl;
+    final hasAvatar = avatarUrl != null && avatarUrl.isNotEmpty;
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.xl),
       children: [
         Row(
           children: [
             ProfileAvatar(
-              imageUrl: p.avatarUrl,
+              imageUrl: hasAvatar ? avatarUrl : null,
               name: p.displayName,
               size: 88,
               onTap: () => controller.pickAndUploadAvatar(p.id),
@@ -228,7 +253,10 @@ class _OverviewSection extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(p.displayName, style: Theme.of(context).textTheme.headlineSmall),
+                  Text(
+                    p.displayName,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                   Text(p.email),
                   if (p.primaryRole != null)
                     Text(
@@ -265,19 +293,24 @@ class _OverviewSection extends ConsumerWidget {
         Row(
           children: [
             TextButton.icon(
-              onPressed: () => controller.pickAndUploadAvatar(p.id),
+              onPressed: ui.isBusy
+                  ? null
+                  : () => controller.pickAndUploadAvatar(p.id),
               icon: const Icon(LucideIcons.upload, size: 16),
-              label: const Text('Upload photo'),
+              label: Text(hasAvatar ? 'Change photo' : 'Upload photo'),
             ),
-            if (p.avatarUrl != null)
+            if (hasAvatar)
               TextButton(
-                onPressed: () => controller.removeAvatar(p.id),
+                onPressed: ui.isBusy ? null : () => controller.removeAvatar(p.id),
                 child: const Text('Remove'),
               ),
           ],
         ),
         const Divider(height: AppSpacing.xxl),
-        Text('Profile completion', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Profile completion',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: AppSpacing.sm),
         LinearProgressIndicator(
           value: hub.completion.percent / 100,
@@ -286,19 +319,30 @@ class _OverviewSection extends ConsumerWidget {
           color: AppColors.gold,
         ),
         const SizedBox(height: AppSpacing.xs),
-        Text('${hub.completion.percent}% complete · Account health ${hub.accountHealth}/100'),
+        Text(
+          '${hub.completion.percent}% complete · Account health ${hub.accountHealth}/100',
+        ),
         const SizedBox(height: AppSpacing.base),
-        ...hub.completion.missing.take(5).map(
+        ...hub.completion.missing
+            .take(5)
+            .map(
               (item) => ListTile(
                 dense: true,
-                leading: const Icon(LucideIcons.circle, size: 16, color: AppColors.gold),
+                leading: const Icon(
+                  LucideIcons.circle,
+                  size: 16,
+                  color: AppColors.gold,
+                ),
                 title: Text(item.label),
                 trailing: item.actionPath != null
                     ? TextButton(
                         onPressed: () => context.go(item.actionPath!),
                         child: Text(item.actionLabel ?? 'Fix'),
                       )
-                    : Text(item.actionLabel ?? '', style: Theme.of(context).textTheme.bodySmall),
+                    : Text(
+                        item.actionLabel ?? '',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
               ),
             ),
         const Divider(height: AppSpacing.xxl),
@@ -308,12 +352,13 @@ class _OverviewSection extends ConsumerWidget {
           subtitle: const Text('Theme, dashboard, favorites, accessibility'),
           onTap: () => context.go(RoutePaths.preferenceCenter),
         ),
-        ListTile(
-          leading: const Icon(LucideIcons.sparkles),
-          title: const Text('AI Workspace'),
-          subtitle: const Text('Digital assistant & copilots'),
-          onTap: () => context.go(RoutePaths.aiWorkspace),
-        ),
+        if (kAiFeaturesEnabled)
+          ListTile(
+            leading: const Icon(LucideIcons.sparkles),
+            title: const Text('AI Workspace'),
+            subtitle: const Text('Digital assistant & copilots'),
+            onTap: () => context.go(RoutePaths.aiWorkspace),
+          ),
         ListTile(
           leading: const Icon(LucideIcons.shield),
           title: const Text('Security Center'),
@@ -358,15 +403,30 @@ class _PersonalSection extends HookConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.xl),
       children: [
-        Text('Personal information', style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          'Personal information',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         const SizedBox(height: AppSpacing.lg),
-        TextField(controller: first, decoration: const InputDecoration(labelText: 'First name')),
+        TextField(
+          controller: first,
+          decoration: const InputDecoration(labelText: 'First name'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: middle, decoration: const InputDecoration(labelText: 'Middle name')),
+        TextField(
+          controller: middle,
+          decoration: const InputDecoration(labelText: 'Middle name'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: last, decoration: const InputDecoration(labelText: 'Last name')),
+        TextField(
+          controller: last,
+          decoration: const InputDecoration(labelText: 'Last name'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: preferred, decoration: const InputDecoration(labelText: 'Preferred name')),
+        TextField(
+          controller: preferred,
+          decoration: const InputDecoration(labelText: 'Preferred name'),
+        ),
         const SizedBox(height: AppSpacing.md),
         DropdownButtonFormField<String?>(
           // ignore: deprecated_member_use
@@ -381,9 +441,15 @@ class _PersonalSection extends HookConsumerWidget {
           onChanged: (v) => gender.value = v,
         ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: occupation, decoration: const InputDecoration(labelText: 'Occupation')),
+        TextField(
+          controller: occupation,
+          decoration: const InputDecoration(labelText: 'Occupation'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: nationality, decoration: const InputDecoration(labelText: 'Nationality')),
+        TextField(
+          controller: nationality,
+          decoration: const InputDecoration(labelText: 'Nationality'),
+        ),
         const SizedBox(height: AppSpacing.md),
         TextField(
           controller: bio,
@@ -397,18 +463,20 @@ class _PersonalSection extends HookConsumerWidget {
           isLoading: isBusy,
           onPressed: isBusy
               ? null
-              : () => ref.read(profileControllerProvider.notifier).savePersonal(
-                    p.copyWith(
-                      firstName: first.text,
-                      middleName: middle.text,
-                      lastName: last.text,
-                      preferredName: preferred.text,
-                      gender: gender.value,
-                      occupation: occupation.text,
-                      nationality: nationality.text,
-                      biography: bio.text,
+              : () => ref
+                    .read(profileControllerProvider.notifier)
+                    .savePersonal(
+                      p.copyWith(
+                        firstName: first.text,
+                        middleName: middle.text,
+                        lastName: last.text,
+                        preferredName: preferred.text,
+                        gender: gender.value,
+                        occupation: occupation.text,
+                        nationality: nationality.text,
+                        biography: bio.text,
+                      ),
                     ),
-                  ),
         ),
       ],
     );
@@ -436,7 +504,10 @@ class _ContactSection extends HookConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.xl),
       children: [
-        Text('Contact information', style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          'Contact information',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         const SizedBox(height: AppSpacing.sm),
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -452,21 +523,46 @@ class _ContactSection extends HookConsumerWidget {
           style: TextStyle(fontSize: 12),
         ),
         const SizedBox(height: AppSpacing.lg),
-        TextField(controller: phone, decoration: const InputDecoration(labelText: 'Phone')),
+        TextField(
+          controller: phone,
+          decoration: const InputDecoration(labelText: 'Phone'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: secondary, decoration: const InputDecoration(labelText: 'Secondary phone')),
+        TextField(
+          controller: secondary,
+          decoration: const InputDecoration(labelText: 'Secondary phone'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: whatsapp, decoration: const InputDecoration(labelText: 'WhatsApp')),
+        TextField(
+          controller: whatsapp,
+          decoration: const InputDecoration(labelText: 'WhatsApp'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: country, decoration: const InputDecoration(labelText: 'Country')),
+        TextField(
+          controller: country,
+          decoration: const InputDecoration(labelText: 'Country'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: state, decoration: const InputDecoration(labelText: 'State')),
+        TextField(
+          controller: state,
+          decoration: const InputDecoration(labelText: 'State'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: city, decoration: const InputDecoration(labelText: 'City')),
+        TextField(
+          controller: city,
+          decoration: const InputDecoration(labelText: 'City'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: address, decoration: const InputDecoration(labelText: 'Address'), maxLines: 2),
+        TextField(
+          controller: address,
+          decoration: const InputDecoration(labelText: 'Address'),
+          maxLines: 2,
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: postal, decoration: const InputDecoration(labelText: 'Postal code')),
+        TextField(
+          controller: postal,
+          decoration: const InputDecoration(labelText: 'Postal code'),
+        ),
         const SizedBox(height: AppSpacing.xl),
         PrimaryButton(
           label: 'Save contact info',
@@ -474,22 +570,20 @@ class _ContactSection extends HookConsumerWidget {
           isLoading: isBusy,
           onPressed: isBusy
               ? null
-              : () => ref.read(profileControllerProvider.notifier).savePersonal(
-                    p.copyWith(
-                      phone: phone.text,
-                      secondaryPhone: secondary.text,
-                      whatsapp: whatsapp.text,
-                      country: country.text,
-                      state: state.text,
-                      city: city.text,
-                      address: address.text,
-                      postalCode: postal.text,
+              : () => ref
+                    .read(profileControllerProvider.notifier)
+                    .savePersonal(
+                      p.copyWith(
+                        phone: phone.text,
+                        secondaryPhone: secondary.text,
+                        whatsapp: whatsapp.text,
+                        country: country.text,
+                        state: state.text,
+                        city: city.text,
+                        address: address.text,
+                        postalCode: postal.text,
+                      ),
                     ),
-                  ),
-        ),
-        TextButton(
-          onPressed: () => context.go(RoutePaths.verifyPhone),
-          child: const Text('Verify phone number'),
         ),
       ],
     );
@@ -516,21 +610,46 @@ class _CompanySection extends HookConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.xl),
       children: [
-        Text('Company information', style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          'Company information',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         const SizedBox(height: AppSpacing.lg),
-        TextField(controller: name, decoration: const InputDecoration(labelText: 'Company name')),
+        TextField(
+          controller: name,
+          decoration: const InputDecoration(labelText: 'Company name'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: type, decoration: const InputDecoration(labelText: 'Business type')),
+        TextField(
+          controller: type,
+          decoration: const InputDecoration(labelText: 'Business type'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: reg, decoration: const InputDecoration(labelText: 'Registration number')),
+        TextField(
+          controller: reg,
+          decoration: const InputDecoration(labelText: 'Registration number'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: tax, decoration: const InputDecoration(labelText: 'Tax ID')),
+        TextField(
+          controller: tax,
+          decoration: const InputDecoration(labelText: 'Tax ID'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: position, decoration: const InputDecoration(labelText: 'Your position')),
+        TextField(
+          controller: position,
+          decoration: const InputDecoration(labelText: 'Your position'),
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: address, decoration: const InputDecoration(labelText: 'Company address'), maxLines: 2),
+        TextField(
+          controller: address,
+          decoration: const InputDecoration(labelText: 'Company address'),
+          maxLines: 2,
+        ),
         const SizedBox(height: AppSpacing.md),
-        TextField(controller: website, decoration: const InputDecoration(labelText: 'Website')),
+        TextField(
+          controller: website,
+          decoration: const InputDecoration(labelText: 'Website'),
+        ),
         const SizedBox(height: AppSpacing.xl),
         PrimaryButton(
           label: 'Save company profile',
@@ -538,18 +657,20 @@ class _CompanySection extends HookConsumerWidget {
           isLoading: isBusy,
           onPressed: isBusy
               ? null
-              : () => ref.read(profileControllerProvider.notifier).saveCompany(
-                    hub.profile.id,
-                    CompanyProfile(
-                      companyName: name.text,
-                      businessType: type.text,
-                      registrationNumber: reg.text,
-                      taxId: tax.text,
-                      position: position.text,
-                      companyAddress: address.text,
-                      companyWebsite: website.text,
+              : () => ref
+                    .read(profileControllerProvider.notifier)
+                    .saveCompany(
+                      hub.profile.id,
+                      CompanyProfile(
+                        companyName: name.text,
+                        businessType: type.text,
+                        registrationNumber: reg.text,
+                        taxId: tax.text,
+                        position: position.text,
+                        companyAddress: address.text,
+                        companyWebsite: website.text,
+                      ),
                     ),
-                  ),
         ),
       ],
     );
@@ -571,7 +692,10 @@ class _CommunicationSection extends HookConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.xl),
       children: [
-        Text('Communication preferences', style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          'Communication preferences',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
         SwitchListTile(
           title: const Text('Email notifications'),
           value: prefs.value.emailEnabled,
@@ -629,10 +753,9 @@ class _CommunicationSection extends HookConsumerWidget {
           isLoading: isBusy,
           onPressed: isBusy
               ? null
-              : () => ref.read(profileControllerProvider.notifier).saveCommunication(
-                    hub.profile.id,
-                    prefs.value,
-                  ),
+              : () => ref
+                    .read(profileControllerProvider.notifier)
+                    .saveCommunication(hub.profile.id, prefs.value),
         ),
       ],
     );
@@ -661,8 +784,8 @@ class _PreferencesSection extends HookConsumerWidget {
           section == ProfileSection.regional
               ? 'Language & regional'
               : section == ProfileSection.appearance
-                  ? 'Appearance'
-                  : 'Privacy',
+              ? 'Appearance'
+              : 'Privacy',
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -699,7 +822,10 @@ class _PreferencesSection extends HookConsumerWidget {
             value: prefs.value.timezone,
             decoration: const InputDecoration(labelText: 'Timezone'),
             items: const [
-              DropdownMenuItem(value: 'Africa/Lagos', child: Text('Africa/Lagos')),
+              DropdownMenuItem(
+                value: 'Africa/Lagos',
+                child: Text('Africa/Lagos'),
+              ),
               DropdownMenuItem(value: 'UTC', child: Text('UTC')),
             ],
             onChanged: (v) {
@@ -736,7 +862,9 @@ class _PreferencesSection extends HookConsumerWidget {
             },
           ),
           const SizedBox(height: AppSpacing.sm),
-          const Text('Theme preference is saved to your account. Full app theming applies in a later release.'),
+          const Text(
+            'Theme preference is saved to your account. Full app theming applies in a later release.',
+          ),
         ],
         if (section == ProfileSection.privacy) ...[
           DropdownButtonFormField<String>(
@@ -746,7 +874,10 @@ class _PreferencesSection extends HookConsumerWidget {
             items: const [
               DropdownMenuItem(value: 'private', child: Text('Private')),
               DropdownMenuItem(value: 'staff', child: Text('Staff only')),
-              DropdownMenuItem(value: 'public', child: Text('Public (limited)')),
+              DropdownMenuItem(
+                value: 'public',
+                child: Text('Public (limited)'),
+              ),
             ],
             onChanged: (v) {
               if (v != null) {
@@ -757,7 +888,8 @@ class _PreferencesSection extends HookConsumerWidget {
           SwitchListTile(
             title: const Text('Marketing opt-in'),
             value: prefs.value.marketingOptIn,
-            onChanged: (v) => prefs.value = prefs.value.copyWith(marketingOptIn: v),
+            onChanged: (v) =>
+                prefs.value = prefs.value.copyWith(marketingOptIn: v),
           ),
           SwitchListTile(
             title: const Text('Product updates'),
@@ -768,8 +900,9 @@ class _PreferencesSection extends HookConsumerWidget {
           SwitchListTile(
             title: const Text('Cookie preferences accepted'),
             value: prefs.value.cookiePreferencesAccepted,
-            onChanged: (v) =>
-                prefs.value = prefs.value.copyWith(cookiePreferencesAccepted: v),
+            onChanged: (v) => prefs.value = prefs.value.copyWith(
+              cookiePreferencesAccepted: v,
+            ),
           ),
           SwitchListTile(
             title: const Text('Allow anonymized data sharing'),
@@ -785,45 +918,9 @@ class _PreferencesSection extends HookConsumerWidget {
           isLoading: isBusy,
           onPressed: isBusy
               ? null
-              : () => ref.read(profileControllerProvider.notifier).saveAppPreferences(
-                    hub.profile.id,
-                    prefs.value,
-                  ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ConnectedSection extends StatelessWidget {
-  const _ConnectedSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      children: [
-        Text('Connected accounts', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: AppSpacing.sm),
-        const Text('Link Google, Microsoft, or Apple when social login is enabled.'),
-        const SizedBox(height: AppSpacing.lg),
-        ListTile(
-          leading: const Icon(LucideIcons.chrome),
-          title: const Text('Google'),
-          subtitle: const Text('Coming soon'),
-          trailing: const Chip(label: Text('Soon')),
-        ),
-        ListTile(
-          leading: const Icon(LucideIcons.laptop),
-          title: const Text('Microsoft'),
-          subtitle: const Text('Coming soon'),
-          trailing: const Chip(label: Text('Soon')),
-        ),
-        ListTile(
-          leading: const Icon(LucideIcons.apple),
-          title: const Text('Apple'),
-          subtitle: const Text('Coming soon'),
-          trailing: const Chip(label: Text('Soon')),
+              : () => ref
+                    .read(profileControllerProvider.notifier)
+                    .saveAppPreferences(hub.profile.id, prefs.value),
         ),
       ],
     );
@@ -845,7 +942,9 @@ class _SummarySection extends ConsumerWidget {
         const SizedBox(height: AppSpacing.lg),
         ListTile(
           title: const Text('Member since'),
-          subtitle: Text(p.createdAt?.toLocal().toString().split(' ').first ?? '—'),
+          subtitle: Text(
+            p.createdAt?.toLocal().toString().split(' ').first ?? '—',
+          ),
         ),
         ListTile(
           title: const Text('Account status'),
@@ -864,10 +963,15 @@ class _SummarySection extends ConsumerWidget {
           subtitle: Text(p.lastLoginAt?.toLocal().toString() ?? '—'),
         ),
         const Divider(height: AppSpacing.xxl),
-        Text('Digital Identity Timeline', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Digital Identity Timeline',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: AppSpacing.sm),
         if (hub.activity.isEmpty)
-          const Text('Profile activity will appear here as you update your account.')
+          const Text(
+            'Profile activity will appear here as you update your account.',
+          )
         else
           ...hub.activity.map(
             (a) => ListTile(

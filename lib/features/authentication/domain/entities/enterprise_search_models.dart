@@ -12,14 +12,14 @@ enum SearchMode {
   commands;
 
   String get label => switch (this) {
-        SearchMode.universal => 'Universal',
-        SearchMode.properties => 'Properties',
-        SearchMode.people => 'People',
-        SearchMode.documents => 'Documents',
-        SearchMode.reports => 'Reports',
-        SearchMode.settings => 'Settings',
-        SearchMode.commands => 'Commands',
-      };
+    SearchMode.universal => 'Universal',
+    SearchMode.properties => 'Properties',
+    SearchMode.people => 'People',
+    SearchMode.documents => 'Documents',
+    SearchMode.reports => 'Reports',
+    SearchMode.settings => 'Settings',
+    SearchMode.commands => 'Commands',
+  };
 
   String get slug => name;
 }
@@ -49,57 +49,57 @@ enum SearchResultModule {
   location;
 
   String get label => switch (this) {
-        SearchResultModule.property => 'Properties',
-        SearchResultModule.estate => 'Estates',
-        SearchResultModule.blog => 'Blog',
-        SearchResultModule.service => 'Services',
-        SearchResultModule.user => 'Users',
-        SearchResultModule.staff => 'Staff',
-        SearchResultModule.client => 'Clients',
-        SearchResultModule.investor => 'Investors',
-        SearchResultModule.lead => 'Leads',
-        SearchResultModule.booking => 'Bookings',
-        SearchResultModule.document => 'Documents',
-        SearchResultModule.investment => 'Investments',
-        SearchResultModule.report => 'Reports',
-        SearchResultModule.ticket => 'Support Tickets',
-        SearchResultModule.notification => 'Notifications',
-        SearchResultModule.audit => 'Audit Logs',
-        SearchResultModule.role => 'Roles',
-        SearchResultModule.setting => 'Settings',
-        SearchResultModule.command => 'Commands',
-        SearchResultModule.workspace => 'Workspaces',
-        SearchResultModule.faq => 'FAQ',
-        SearchResultModule.location => 'Locations',
-      };
+    SearchResultModule.property => 'Properties',
+    SearchResultModule.estate => 'Estates',
+    SearchResultModule.blog => 'Blog',
+    SearchResultModule.service => 'Services',
+    SearchResultModule.user => 'Users',
+    SearchResultModule.staff => 'Staff',
+    SearchResultModule.client => 'Clients',
+    SearchResultModule.investor => 'Investors',
+    SearchResultModule.lead => 'Leads',
+    SearchResultModule.booking => 'Bookings',
+    SearchResultModule.document => 'Documents',
+    SearchResultModule.investment => 'Investments',
+    SearchResultModule.report => 'Reports',
+    SearchResultModule.ticket => 'Support Tickets',
+    SearchResultModule.notification => 'Notifications',
+    SearchResultModule.audit => 'Audit Logs',
+    SearchResultModule.role => 'Roles',
+    SearchResultModule.setting => 'Settings',
+    SearchResultModule.command => 'Commands',
+    SearchResultModule.workspace => 'Workspaces',
+    SearchResultModule.faq => 'FAQ',
+    SearchResultModule.location => 'Locations',
+  };
 
   String get slug => name;
 
   /// Permission slug required to see this module (null = public / any auth).
   String? get requiredPermission => switch (this) {
-        SearchResultModule.property => null,
-        SearchResultModule.estate => null,
-        SearchResultModule.blog => null,
-        SearchResultModule.service => null,
-        SearchResultModule.faq => null,
-        SearchResultModule.location => null,
-        SearchResultModule.user => 'view_users',
-        SearchResultModule.staff => 'view_users',
-        SearchResultModule.client => 'manage_crm',
-        SearchResultModule.investor => 'view_investments',
-        SearchResultModule.lead => 'manage_crm',
-        SearchResultModule.booking => 'manage_crm',
-        SearchResultModule.document => 'view_properties',
-        SearchResultModule.investment => 'view_investments',
-        SearchResultModule.report => 'manage_reports',
-        SearchResultModule.ticket => 'manage_tickets',
-        SearchResultModule.notification => null,
-        SearchResultModule.audit => 'view_audit_logs',
-        SearchResultModule.role => 'manage_roles',
-        SearchResultModule.setting => 'manage_roles',
-        SearchResultModule.command => null,
-        SearchResultModule.workspace => null,
-      };
+    SearchResultModule.property => null,
+    SearchResultModule.estate => null,
+    SearchResultModule.blog => null,
+    SearchResultModule.service => null,
+    SearchResultModule.faq => null,
+    SearchResultModule.location => null,
+    SearchResultModule.user => 'view_users',
+    SearchResultModule.staff => 'view_users',
+    SearchResultModule.client => 'manage_crm',
+    SearchResultModule.investor => 'view_investments',
+    SearchResultModule.lead => 'manage_crm',
+    SearchResultModule.booking => 'manage_crm',
+    SearchResultModule.document => 'view_properties',
+    SearchResultModule.investment => 'view_investments',
+    SearchResultModule.report => 'manage_reports',
+    SearchResultModule.ticket => 'manage_tickets',
+    SearchResultModule.notification => null,
+    SearchResultModule.audit => 'view_audit_logs',
+    SearchResultModule.role => 'manage_roles',
+    SearchResultModule.setting => 'manage_roles',
+    SearchResultModule.command => null,
+    SearchResultModule.workspace => null,
+  };
 
   static SearchResultModule fromSlug(String? raw) {
     return SearchResultModule.values.firstWhere(
@@ -134,8 +134,12 @@ class SearchIndexEntry {
   final Map<String, String> preview;
   final List<String> relatedIds;
 
-  String get haystack =>
-      [title, subtitle ?? '', ...keywords, module.label].join(' ').toLowerCase();
+  String get haystack => [
+    title,
+    subtitle ?? '',
+    ...keywords,
+    module.label,
+  ].join(' ').toLowerCase();
 }
 
 class SearchResultItem {
@@ -155,10 +159,7 @@ class SearchResultItem {
 }
 
 class SearchResultGroup {
-  const SearchResultGroup({
-    required this.module,
-    required this.items,
-  });
+  const SearchResultGroup({required this.module, required this.items});
 
   final SearchResultModule module;
   final List<SearchResultItem> items;
@@ -262,8 +263,7 @@ class SearchQueryResult {
   final bool zeroResults;
   final SemanticIntent? intent;
 
-  int get totalCount =>
-      groups.fold(0, (sum, g) => sum + g.items.length);
+  int get totalCount => groups.fold(0, (sum, g) => sum + g.items.length);
 }
 
 class SemanticIntent {
@@ -284,33 +284,118 @@ class SemanticIntent {
   final String? entityHint;
 }
 
-class SearchAnalyticsSnapshot {
-  const SearchAnalyticsSnapshot({
-    required this.topTerms,
-    required this.zeroResultTerms,
-    required this.popularCommands,
-    required this.avgLatencyMs,
-    required this.adoptionByDepartment,
+class SearchAnalyticsCount {
+  const SearchAnalyticsCount({required this.label, required this.count});
+
+  final String label;
+  final int count;
+
+  factory SearchAnalyticsCount.fromJson(Map<String, dynamic> json) {
+    return SearchAnalyticsCount(
+      label: json['label']?.toString() ?? '',
+      count: (json['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class SearchAnalyticsDailyPoint {
+  const SearchAnalyticsDailyPoint({
+    required this.date,
+    required this.searches,
+    required this.zeroResults,
   });
 
-  final List<({String label, int count})> topTerms;
-  final List<String> zeroResultTerms;
-  final List<({String label, int count})> popularCommands;
+  final DateTime date;
+  final int searches;
+  final int zeroResults;
+
+  factory SearchAnalyticsDailyPoint.fromJson(Map<String, dynamic> json) {
+    return SearchAnalyticsDailyPoint(
+      date:
+          DateTime.tryParse(json['date']?.toString() ?? '')?.toUtc() ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      searches: (json['searches'] as num?)?.toInt() ?? 0,
+      zeroResults: (json['zero_results'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+/// Privacy-safe aggregates returned by `get_admin_search_analytics`.
+class SearchAnalyticsSnapshot {
+  const SearchAnalyticsSnapshot({
+    required this.loadedAt,
+    required this.periodDays,
+    required this.totalSearches,
+    required this.uniqueSearchers,
+    required this.zeroResultCount,
+    required this.avgLatencyMs,
+    required this.topTerms,
+    required this.zeroResultTerms,
+    required this.popularModes,
+    required this.dailySeries,
+  });
+
+  final DateTime? loadedAt;
+  final int periodDays;
+  final int totalSearches;
+  final int uniqueSearchers;
+  final int zeroResultCount;
   final double avgLatencyMs;
-  final List<({String department, int searches})> adoptionByDepartment;
+  final List<SearchAnalyticsCount> topTerms;
+  final List<SearchAnalyticsCount> zeroResultTerms;
+  final List<SearchAnalyticsCount> popularModes;
+  final List<SearchAnalyticsDailyPoint> dailySeries;
+
+  bool get isEmpty => totalSearches == 0;
+
+  double get zeroResultRate =>
+      totalSearches == 0 ? 0 : zeroResultCount / totalSearches;
+
+  factory SearchAnalyticsSnapshot.fromJson(Map<String, dynamic> json) {
+    List<SearchAnalyticsCount> counts(String key) {
+      return (json[key] as List? ?? const [])
+          .whereType<Map>()
+          .map(
+            (value) =>
+                SearchAnalyticsCount.fromJson(Map<String, dynamic>.from(value)),
+          )
+          .where((value) => value.label.isNotEmpty)
+          .toList(growable: false);
+    }
+
+    final dailySeries = (json['daily_series'] as List? ?? const [])
+        .whereType<Map>()
+        .map(
+          (value) => SearchAnalyticsDailyPoint.fromJson(
+            Map<String, dynamic>.from(value),
+          ),
+        )
+        .toList(growable: false);
+
+    return SearchAnalyticsSnapshot(
+      loadedAt: DateTime.tryParse(json['loaded_at']?.toString() ?? '')?.toUtc(),
+      periodDays: (json['period_days'] as num?)?.toInt() ?? 30,
+      totalSearches: (json['total_searches'] as num?)?.toInt() ?? 0,
+      uniqueSearchers: (json['unique_searchers'] as num?)?.toInt() ?? 0,
+      zeroResultCount: (json['zero_result_count'] as num?)?.toInt() ?? 0,
+      avgLatencyMs: (json['avg_latency_ms'] as num?)?.toDouble() ?? 0,
+      topTerms: counts('top_terms'),
+      zeroResultTerms: counts('zero_result_terms'),
+      popularModes: counts('popular_modes'),
+      dailySeries: dailySeries,
+    );
+  }
 }
 
 class EnterpriseSearchSnapshot {
   const EnterpriseSearchSnapshot({
     required this.history,
     required this.favoriteCommands,
-    required this.analytics,
     required this.pinnedWorkspaces,
   });
 
   final List<SearchHistoryItem> history;
   final List<FavoriteCommand> favoriteCommands;
-  final SearchAnalyticsSnapshot analytics;
   final List<SearchIndexEntry> pinnedWorkspaces;
 }
 
@@ -412,8 +497,7 @@ abstract final class SearchRankingEngine {
       }
       if (filters.status != null &&
           filters.status!.isNotEmpty &&
-          e.preview['status']?.toLowerCase() !=
-              filters.status!.toLowerCase()) {
+          e.preview['status']?.toLowerCase() != filters.status!.toLowerCase()) {
         return false;
       }
       return true;
@@ -471,9 +555,7 @@ abstract final class SearchRankingEngine {
       )) {
         continue;
       }
-      out.add(
-        SearchResultItem(entry: related, score: 1, matchedOn: 'related'),
-      );
+      out.add(SearchResultItem(entry: related, score: 1, matchedOn: 'related'));
     }
     return out;
   }
@@ -507,15 +589,23 @@ abstract final class SemanticSearchFoundation {
     final q = raw.trim();
     final lower = q.toLowerCase();
     String? location;
-    for (final loc in ['lekki', 'vi', 'victoria island', 'abuja', 'ikoyi', 'ajah']) {
+    for (final loc in [
+      'lekki',
+      'vi',
+      'victoria island',
+      'abuja',
+      'ikoyi',
+      'ajah',
+    ]) {
       if (lower.contains(loc)) {
         location = loc;
         break;
       }
     }
     final bedsMatch = RegExp(r'(\d+)\s*-?\s*bed').firstMatch(lower);
-    final priceMatch =
-        RegExp(r'(?:under|below|<)\s*₦?\s*(\d+(?:\.\d+)?)\s*m').firstMatch(lower);
+    final priceMatch = RegExp(
+      r'(?:under|below|<)\s*₦?\s*(\d+(?:\.\d+)?)\s*m',
+    ).firstMatch(lower);
     String? status;
     if (lower.contains('available')) status = 'Available';
     if (lower.contains('awaiting') && lower.contains('kyc')) {
@@ -537,8 +627,8 @@ abstract final class SemanticSearchFoundation {
       entityHint: lower.contains('investor')
           ? 'investor'
           : lower.contains('client')
-              ? 'client'
-              : null,
+          ? 'client'
+          : null,
     );
   }
 }
@@ -546,282 +636,253 @@ abstract final class SemanticSearchFoundation {
 /// Seed / demo search index spanning modules (permission-aware at query time).
 abstract final class EnterpriseSearchCatalog {
   static List<SearchIndexEntry> seedIndex() => const [
-        SearchIndexEntry(
-          id: 'prop-lekki-pearl',
-          module: SearchResultModule.property,
-          title: 'Lekki Pearl Residence',
-          subtitle: 'Lekki Phase 1 · ₦185M · Available',
-          path: '/properties',
-          keywords: ['lekki', 'phase 1', 'apartment', '4 bedroom'],
-          popularity: 95,
-          preview: {
-            'price': '₦185M',
-            'location': 'Lekki Phase 1',
-            'status': 'Available',
-            'agent': 'Ada Okoro',
-          },
-          relatedIds: ['staff-ada', 'booking-lekki-1', 'doc-brochure-1'],
-        ),
-        SearchIndexEntry(
-          id: 'prop-lekki-gardens',
-          module: SearchResultModule.property,
-          title: 'Lekki Gardens Duplex',
-          subtitle: 'Lekki · ₦220M · Available',
-          path: '/properties',
-          keywords: ['lekki gardens', 'duplex', '4 bedroom'],
-          popularity: 80,
-          preview: {
-            'price': '₦220M',
-            'location': 'Lekki',
-            'status': 'Available',
-          },
-        ),
-        SearchIndexEntry(
-          id: 'estate-lekki',
-          module: SearchResultModule.estate,
-          title: 'Lekki Phase 1 Estate',
-          subtitle: 'Premium waterfront community',
-          path: '/estates',
-          keywords: ['lekki', 'estate', 'phase 1'],
-          popularity: 70,
-        ),
-        SearchIndexEntry(
-          id: 'blog-lekki-guide',
-          module: SearchResultModule.blog,
-          title: 'Investing in Lekki Properties',
-          subtitle: 'Market insights',
-          path: '/blog',
-          keywords: ['lekki', 'investment', 'guide'],
-          popularity: 40,
-        ),
-        SearchIndexEntry(
-          id: 'client-john',
-          module: SearchResultModule.client,
-          title: 'John Doe',
-          subtitle: 'Client · Assigned lead',
-          path: '/dashboard/clients',
-          keywords: ['john', 'doe', 'client'],
-          permissionSlug: 'manage_crm',
-          popularity: 50,
-          preview: {
-            'contact': '+234 800 000 0001',
-            'agent': 'Ada Okoro',
-          },
-          relatedIds: ['booking-lekki-1'],
-        ),
-        SearchIndexEntry(
-          id: 'investor-rima',
-          module: SearchResultModule.investor,
-          title: 'Rima Okoro',
-          subtitle: 'Investor · KYC awaiting approval',
-          path: '/dashboard/investors',
-          keywords: ['rima', 'investor', 'kyc'],
-          permissionSlug: 'view_investments',
-          popularity: 55,
-          preview: {'status': 'awaiting_kyc'},
-        ),
-        SearchIndexEntry(
-          id: 'staff-ada',
-          module: SearchResultModule.staff,
-          title: 'Ada Okoro',
-          subtitle: 'Sales Executive · Lagos',
-          path: '/dashboard/organization',
-          keywords: ['ada', 'sales', 'staff'],
-          permissionSlug: 'view_users',
-          popularity: 45,
-        ),
-        SearchIndexEntry(
-          id: 'booking-lekki-1',
-          module: SearchResultModule.booking,
-          title: 'Inspection — Lekki Pearl',
-          subtitle: 'Tomorrow 10:00',
-          path: '/client/inspections',
-          keywords: ['inspection', 'booking', 'lekki'],
-          permissionSlug: 'manage_crm',
-          popularity: 30,
-        ),
-        SearchIndexEntry(
-          id: 'doc-brochure-1',
-          module: SearchResultModule.document,
-          title: 'Lekki Pearl Brochure',
-          subtitle: 'PDF · Marketing',
-          path: '/dashboard/media',
-          keywords: ['brochure', 'document', 'lekki'],
-          permissionSlug: 'view_properties',
-          popularity: 25,
-        ),
-        SearchIndexEntry(
-          id: 'inv-plan-a',
-          module: SearchResultModule.investment,
-          title: 'Lekki Investment Plan A',
-          subtitle: 'ROI 18% · Active',
-          path: '/investor/portfolio',
-          keywords: ['investment', 'lekki', 'roi'],
-          permissionSlug: 'view_investments',
-          popularity: 60,
-        ),
-        SearchIndexEntry(
-          id: 'report-sales',
-          module: SearchResultModule.report,
-          title: 'Sales Summary — Today',
-          subtitle: 'Executive report',
-          path: '/dashboard/reports',
-          keywords: ['sales', 'report', 'today'],
-          permissionSlug: 'manage_reports',
-          popularity: 65,
-        ),
-        SearchIndexEntry(
-          id: 'ticket-1',
-          module: SearchResultModule.ticket,
-          title: 'High Priority Support Ticket',
-          subtitle: 'Open · Payment inquiry',
-          path: '/dashboard/crm',
-          keywords: ['support', 'ticket', 'priority'],
-          permissionSlug: 'manage_tickets',
-          popularity: 20,
-        ),
-        SearchIndexEntry(
-          id: 'role-sales',
-          module: SearchResultModule.role,
-          title: 'Sales Team Role',
-          subtitle: 'Permissions matrix',
-          path: '/dashboard/roles',
-          keywords: ['role', 'rbac', 'sales'],
-          permissionSlug: 'manage_roles',
-          popularity: 15,
-        ),
-        SearchIndexEntry(
-          id: 'setting-prefs',
-          module: SearchResultModule.setting,
-          title: 'Preference Center',
-          subtitle: 'Theme, accessibility, favorites',
-          path: '/account/preferences',
-          keywords: ['settings', 'preferences', 'theme'],
-          popularity: 35,
-        ),
-        SearchIndexEntry(
-          id: 'audit-cmd',
-          module: SearchResultModule.audit,
-          title: 'Activity Command Center',
-          subtitle: 'Audit logs & alerts',
-          path: '/dashboard/activity-logs',
-          keywords: ['audit', 'logs', 'health'],
-          permissionSlug: 'view_audit_logs',
-          popularity: 28,
-        ),
-        SearchIndexEntry(
-          id: 'ws-sales',
-          module: SearchResultModule.workspace,
-          title: 'Sales Workspace',
-          subtitle: 'Smart Workspace Builder™',
-          path: '/account/preferences',
-          keywords: ['workspace', 'dashboard', 'sales'],
-          popularity: 40,
-        ),
-        SearchIndexEntry(
-          id: 'svc-survey',
-          module: SearchResultModule.service,
-          title: 'Land Survey Services',
-          subtitle: 'Professional services',
-          path: '/services',
-          keywords: ['survey', 'services'],
-          popularity: 22,
-        ),
-        SearchIndexEntry(
-          id: 'cmd-create-property',
-          module: SearchResultModule.command,
-          title: 'Create Property',
-          subtitle: 'Quick action',
-          path: '/dashboard/properties',
-          keywords: ['add', 'new', 'property', 'create'],
-          permissionSlug: 'edit_property',
-          popularity: 90,
-        ),
-        SearchIndexEntry(
-          id: 'cmd-approve-kyc',
-          module: SearchResultModule.command,
-          title: 'Approve KYC',
-          subtitle: 'Compliance action',
-          path: '/dashboard/compliance',
-          keywords: ['kyc', 'approve', 'compliance'],
-          permissionSlug: 'manage_roles',
-          popularity: 50,
-        ),
-        SearchIndexEntry(
-          id: 'cmd-book-inspection',
-          module: SearchResultModule.command,
-          title: 'Book Inspection',
-          subtitle: 'Schedule visit',
-          path: '/book-inspection',
-          keywords: ['book', 'inspection', 'schedule'],
-          popularity: 85,
-        ),
-        SearchIndexEntry(
-          id: 'cmd-exec-sales',
-          module: SearchResultModule.command,
-          title: "View today's sales summary",
-          subtitle: 'Executive Command Center™',
-          path: '/dashboard/reports',
-          keywords: ['executive', 'sales', 'today'],
-          permissionSlug: 'manage_reports',
-          popularity: 75,
-        ),
-        SearchIndexEntry(
-          id: 'cmd-system-health',
-          module: SearchResultModule.command,
-          title: 'Open system health dashboard',
-          subtitle: 'Executive Command Center™',
-          path: '/dashboard/activity-logs',
-          keywords: ['health', 'system', 'observability'],
-          permissionSlug: 'view_audit_logs',
-          popularity: 55,
-        ),
-      ];
+    SearchIndexEntry(
+      id: 'prop-lekki-pearl',
+      module: SearchResultModule.property,
+      title: 'Lekki Pearl Residence',
+      subtitle: 'Lekki Phase 1 · ₦185M · Available',
+      path: '/properties',
+      keywords: ['lekki', 'phase 1', 'apartment', '4 bedroom'],
+      popularity: 95,
+      preview: {
+        'price': '₦185M',
+        'location': 'Lekki Phase 1',
+        'status': 'Available',
+        'agent': 'Ada Okoro',
+      },
+      relatedIds: ['staff-ada', 'booking-lekki-1', 'doc-brochure-1'],
+    ),
+    SearchIndexEntry(
+      id: 'prop-lekki-gardens',
+      module: SearchResultModule.property,
+      title: 'Lekki Gardens Duplex',
+      subtitle: 'Lekki · ₦220M · Available',
+      path: '/properties',
+      keywords: ['lekki gardens', 'duplex', '4 bedroom'],
+      popularity: 80,
+      preview: {'price': '₦220M', 'location': 'Lekki', 'status': 'Available'},
+    ),
+    SearchIndexEntry(
+      id: 'estate-lekki',
+      module: SearchResultModule.estate,
+      title: 'Lekki Phase 1 Estate',
+      subtitle: 'Premium waterfront community',
+      path: '/estates',
+      keywords: ['lekki', 'estate', 'phase 1'],
+      popularity: 70,
+    ),
+    SearchIndexEntry(
+      id: 'blog-lekki-guide',
+      module: SearchResultModule.blog,
+      title: 'Investing in Lekki Properties',
+      subtitle: 'Market insights',
+      path: '/blog',
+      keywords: ['lekki', 'investment', 'guide'],
+      popularity: 40,
+    ),
+    SearchIndexEntry(
+      id: 'client-john',
+      module: SearchResultModule.client,
+      title: 'John Doe',
+      subtitle: 'Client · Assigned lead',
+      path: '/dashboard/clients',
+      keywords: ['john', 'doe', 'client'],
+      permissionSlug: 'manage_crm',
+      popularity: 50,
+      preview: {'contact': '+234 800 000 0001', 'agent': 'Ada Okoro'},
+      relatedIds: ['booking-lekki-1'],
+    ),
+    SearchIndexEntry(
+      id: 'investor-rima',
+      module: SearchResultModule.investor,
+      title: 'Rima Okoro',
+      subtitle: 'Investor · KYC awaiting approval',
+      path: '/dashboard/investors',
+      keywords: ['rima', 'investor', 'kyc'],
+      permissionSlug: 'view_investments',
+      popularity: 55,
+      preview: {'status': 'awaiting_kyc'},
+    ),
+    SearchIndexEntry(
+      id: 'staff-ada',
+      module: SearchResultModule.staff,
+      title: 'Ada Okoro',
+      subtitle: 'Sales Executive · Lagos',
+      path: '/dashboard/organization',
+      keywords: ['ada', 'sales', 'staff'],
+      permissionSlug: 'view_users',
+      popularity: 45,
+    ),
+    SearchIndexEntry(
+      id: 'booking-lekki-1',
+      module: SearchResultModule.booking,
+      title: 'Inspection — Lekki Pearl',
+      subtitle: 'Tomorrow 10:00',
+      path: '/client/inspections',
+      keywords: ['inspection', 'booking', 'lekki'],
+      permissionSlug: 'manage_crm',
+      popularity: 30,
+    ),
+    SearchIndexEntry(
+      id: 'doc-brochure-1',
+      module: SearchResultModule.document,
+      title: 'Lekki Pearl Brochure',
+      subtitle: 'PDF · Marketing',
+      path: '/dashboard/media',
+      keywords: ['brochure', 'document', 'lekki'],
+      permissionSlug: 'view_properties',
+      popularity: 25,
+    ),
+    SearchIndexEntry(
+      id: 'inv-plan-a',
+      module: SearchResultModule.investment,
+      title: 'Lekki Investment Plan A',
+      subtitle: 'ROI 18% · Active',
+      path: '/investor/portfolio',
+      keywords: ['investment', 'lekki', 'roi'],
+      permissionSlug: 'view_investments',
+      popularity: 60,
+    ),
+    SearchIndexEntry(
+      id: 'report-sales',
+      module: SearchResultModule.report,
+      title: 'Sales Summary — Today',
+      subtitle: 'Executive report',
+      path: '/dashboard/reports',
+      keywords: ['sales', 'report', 'today'],
+      permissionSlug: 'manage_reports',
+      popularity: 65,
+    ),
+    SearchIndexEntry(
+      id: 'ticket-1',
+      module: SearchResultModule.ticket,
+      title: 'High Priority Support Ticket',
+      subtitle: 'Open · Payment inquiry',
+      path: '/dashboard/crm',
+      keywords: ['support', 'ticket', 'priority'],
+      permissionSlug: 'manage_tickets',
+      popularity: 20,
+    ),
+    SearchIndexEntry(
+      id: 'role-sales',
+      module: SearchResultModule.role,
+      title: 'Sales Team Role',
+      subtitle: 'Permissions matrix',
+      path: '/dashboard/roles',
+      keywords: ['role', 'rbac', 'sales'],
+      permissionSlug: 'manage_roles',
+      popularity: 15,
+    ),
+    SearchIndexEntry(
+      id: 'setting-prefs',
+      module: SearchResultModule.setting,
+      title: 'Preference Center',
+      subtitle: 'Theme, accessibility, favorites',
+      path: '/account/preferences',
+      keywords: ['settings', 'preferences', 'theme'],
+      popularity: 35,
+    ),
+    SearchIndexEntry(
+      id: 'audit-cmd',
+      module: SearchResultModule.audit,
+      title: 'Activity Command Center',
+      subtitle: 'Audit logs & alerts',
+      path: '/dashboard/activity-logs',
+      keywords: ['audit', 'logs', 'health'],
+      permissionSlug: 'view_audit_logs',
+      popularity: 28,
+    ),
+    SearchIndexEntry(
+      id: 'ws-sales',
+      module: SearchResultModule.workspace,
+      title: 'Sales Workspace',
+      subtitle: 'Smart Workspace Builder™',
+      path: '/account/preferences',
+      keywords: ['workspace', 'dashboard', 'sales'],
+      popularity: 40,
+    ),
+    SearchIndexEntry(
+      id: 'svc-survey',
+      module: SearchResultModule.service,
+      title: 'Land Survey Services',
+      subtitle: 'Professional services',
+      path: '/services',
+      keywords: ['survey', 'services'],
+      popularity: 22,
+    ),
+    SearchIndexEntry(
+      id: 'cmd-create-property',
+      module: SearchResultModule.command,
+      title: 'Create Property',
+      subtitle: 'Quick action',
+      path: '/dashboard/properties',
+      keywords: ['add', 'new', 'property', 'create'],
+      permissionSlug: 'edit_property',
+      popularity: 90,
+    ),
+    SearchIndexEntry(
+      id: 'cmd-approve-kyc',
+      module: SearchResultModule.command,
+      title: 'Approve KYC',
+      subtitle: 'Compliance action',
+      path: '/dashboard/compliance',
+      keywords: ['kyc', 'approve', 'compliance'],
+      permissionSlug: 'manage_roles',
+      popularity: 50,
+    ),
+    SearchIndexEntry(
+      id: 'cmd-book-inspection',
+      module: SearchResultModule.command,
+      title: 'Book Inspection',
+      subtitle: 'Schedule visit',
+      path: '/book-inspection',
+      keywords: ['book', 'inspection', 'schedule'],
+      popularity: 85,
+    ),
+    SearchIndexEntry(
+      id: 'cmd-exec-sales',
+      module: SearchResultModule.command,
+      title: "View today's sales summary",
+      subtitle: 'Executive Command Center™',
+      path: '/dashboard/reports',
+      keywords: ['executive', 'sales', 'today'],
+      permissionSlug: 'manage_reports',
+      popularity: 75,
+    ),
+    SearchIndexEntry(
+      id: 'cmd-system-health',
+      module: SearchResultModule.command,
+      title: 'Open system health dashboard',
+      subtitle: 'Executive Command Center™',
+      path: '/dashboard/activity-logs',
+      keywords: ['health', 'system', 'observability'],
+      permissionSlug: 'view_audit_logs',
+      popularity: 55,
+    ),
+  ];
 
-  static List<CommandPaletteAction> allCommands() {
-    final fromCatalog = CommandPaletteCatalog.actions;
-    final fromIndex = seedIndex()
-        .where((e) => e.module == SearchResultModule.command)
-        .map(
-          (e) => CommandPaletteAction(
-            id: e.id,
-            label: e.title,
-            routeOrKey: e.path,
-            keywords: e.keywords,
-            requiredPermission: e.permissionSlug,
-            category: 'action',
-          ),
-        );
-    return [...fromCatalog, ...fromIndex];
-  }
+  static List<CommandPaletteAction> allCommands() =>
+      CommandPaletteCatalog.actions;
 
   static List<SearchSuggestion> suggest(String partial) {
     final p = partial.trim().toLowerCase();
-    if (p.isEmpty) {
-      return const [
-        SearchSuggestion(label: 'Lekki Phase 1', query: 'Lekki Phase 1'),
-        SearchSuggestion(label: 'Create Property', query: 'Create Property', kind: 'command'),
-        SearchSuggestion(
-          label: 'Saved Search: Lekki Luxury Homes',
-          query: 'Lekki Luxury',
-          kind: 'saved',
-        ),
-      ];
-    }
-    final candidates = <SearchSuggestion>[
-      const SearchSuggestion(label: 'Lekki Phase 1', query: 'Lekki Phase 1'),
-      const SearchSuggestion(label: 'Lekki Gardens', query: 'Lekki Gardens'),
-      const SearchSuggestion(label: 'Lekki Properties', query: 'Lekki properties'),
-      const SearchSuggestion(label: 'Lekki Investments', query: 'Lekki investments'),
-      const SearchSuggestion(label: 'Lekki Clients', query: 'Lekki clients'),
-      const SearchSuggestion(
-        label: 'Saved Search: Lekki Luxury Homes',
-        query: 'Lekki Luxury',
-        kind: 'saved',
-      ),
-    ];
-    return candidates
-        .where((s) => s.label.toLowerCase().contains(p) || p.length >= 2)
+    return CommandPaletteCatalog.actions
+        .where((action) {
+          if (p.isEmpty) return true;
+          final searchable = [
+            action.label,
+            action.id,
+            ...action.keywords,
+          ].join(' ').toLowerCase();
+          return searchable.contains(p);
+        })
+        .map(
+          (action) => SearchSuggestion(
+            label: action.label,
+            query: action.label,
+            kind: 'command',
+          ),
+        )
         .take(6)
         .toList();
   }

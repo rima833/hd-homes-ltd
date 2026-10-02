@@ -333,7 +333,7 @@ class AuditRecord {
       status: AuditResultStatus.fromSlug(
         row['result_status'] as String? ?? row['status'] as String?,
       ),
-      createdAt: DateTime.parse(row['created_at'] as String).toUtc(),
+      createdAt: DateTime.parse(row['created_at'].toString()).toUtc(),
       userId: row['user_id'] as String?,
       actorRole: row['actor_role'] as String?,
       sessionId: row['session_id'] as String?,
@@ -390,7 +390,7 @@ class ChangeHistoryEntry {
       changedBy: row['changed_by'] as String?,
       reviewer: row['reviewer'] as String?,
       auditLogId: row['audit_log_id'] as String?,
-      createdAt: DateTime.parse(row['created_at'] as String).toUtc(),
+      createdAt: DateTime.parse(row['created_at'].toString()).toUtc(),
     );
   }
 }
@@ -406,6 +406,7 @@ class SystemAlert {
     this.sourceModule,
     this.auditLogId,
     this.assignedTo,
+    this.eventCount = 1,
   });
 
   final String id;
@@ -417,6 +418,7 @@ class SystemAlert {
   final String? sourceModule;
   final String? auditLogId;
   final String? assignedTo;
+  final int eventCount;
 
   factory SystemAlert.fromRow(Map<String, dynamic> row) {
     return SystemAlert(
@@ -428,7 +430,12 @@ class SystemAlert {
       sourceModule: row['source_module'] as String?,
       auditLogId: row['audit_log_id'] as String?,
       assignedTo: row['assigned_to'] as String?,
-      createdAt: DateTime.parse(row['created_at'] as String).toUtc(),
+      eventCount: switch (row['event_count']) {
+        int v => v,
+        num v => v.toInt(),
+        _ => int.tryParse('${row['event_count']}') ?? 1,
+      },
+      createdAt: DateTime.parse(row['created_at'].toString()).toUtc(),
     );
   }
 }
@@ -451,14 +458,19 @@ class SystemHealthCheck {
   final DateTime? checkedAt;
 
   factory SystemHealthCheck.fromRow(Map<String, dynamic> row) {
+    final latency = row['latency_ms'];
     return SystemHealthCheck(
       serviceKey: row['service_key'] as String? ?? 'unknown',
       label: row['label'] as String? ?? row['service_key'] as String? ?? 'Service',
       status: SystemHealthStatus.fromSlug(row['status'] as String?),
-      latencyMs: row['latency_ms'] as int?,
+      latencyMs: latency is int
+          ? latency
+          : latency is num
+              ? latency.toInt()
+              : int.tryParse('$latency'),
       message: row['message'] as String?,
       checkedAt: row['checked_at'] != null
-          ? DateTime.parse(row['checked_at'] as String).toUtc()
+          ? DateTime.tryParse(row['checked_at'].toString())?.toUtc()
           : null,
     );
   }
@@ -520,6 +532,19 @@ class ObservabilityFilter {
   }
 }
 
+class PlatformModuleVolume {
+  const PlatformModuleVolume({required this.module, required this.count});
+
+  final String module;
+  final int count;
+
+  String get label {
+    final pretty = module.replaceAll('_', ' ');
+    if (pretty.isEmpty) return module;
+    return pretty[0].toUpperCase() + pretty.substring(1);
+  }
+}
+
 class CommandCenterSnapshot {
   const CommandCenterSnapshot({
     required this.todayActivity,
@@ -531,17 +556,67 @@ class CommandCenterSnapshot {
     required this.alerts,
     required this.health,
     required this.securityScore,
+    this.openIssues = 0,
+    this.platformModules = const [],
+    this.generatedAt,
   });
 
   final int todayActivity;
   final int activeUsersEstimate;
   final int failedLogins;
   final int openAlerts;
+  final int openIssues;
   final int criticalAlerts;
   final List<AuditRecord> recentActivity;
   final List<SystemAlert> alerts;
   final List<SystemHealthCheck> health;
+  final List<PlatformModuleVolume> platformModules;
   final int securityScore;
+  final DateTime? generatedAt;
+
+  factory CommandCenterSnapshot.fromRpc(Map<String, dynamic> json) {
+    List<Map<String, dynamic>> asMaps(dynamic raw) {
+      if (raw is! List) return const [];
+      return raw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+
+    int asInt(dynamic v) {
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return int.tryParse('$v') ?? 0;
+    }
+
+    final openAlerts = asInt(json['open_alerts']);
+    return CommandCenterSnapshot(
+      todayActivity: asInt(json['today_activity']),
+      activeUsersEstimate: asInt(json['active_users']),
+      failedLogins: asInt(json['failed_logins']),
+      openAlerts: openAlerts,
+      openIssues: json.containsKey('open_issues')
+          ? asInt(json['open_issues'])
+          : openAlerts,
+      criticalAlerts: asInt(json['critical_alerts']),
+      securityScore: asInt(json['security_score']),
+      recentActivity:
+          asMaps(json['recent_activity']).map(AuditRecord.fromRow).toList(),
+      alerts: asMaps(json['alerts']).map(SystemAlert.fromRow).toList(),
+      health: asMaps(json['health']).map(SystemHealthCheck.fromRow).toList(),
+      platformModules: asMaps(json['platform_modules'])
+          .map(
+            (row) => PlatformModuleVolume(
+              module: row['module']?.toString() ?? 'system',
+              count: asInt(row['volume'] ?? row['count']),
+            ),
+          )
+          .toList(),
+      generatedAt: json['generated_at'] != null
+          ? DateTime.tryParse(json['generated_at'].toString())?.toUtc()
+          : null,
+    );
+  }
 }
 
 class ActivityTimelineSnapshot {

@@ -8,7 +8,6 @@ enum ExperienceMode {
   lifestyle,
   budget,
   investment,
-  map,
 }
 
 extension ExperienceModeX on ExperienceMode {
@@ -16,21 +15,18 @@ extension ExperienceModeX on ExperienceMode {
         ExperienceMode.lifestyle => AppStrings.modeLifestyle,
         ExperienceMode.budget => AppStrings.modeBudget,
         ExperienceMode.investment => AppStrings.modeInvestment,
-        ExperienceMode.map => AppStrings.modeMap,
       };
 
   IconData get icon => switch (this) {
         ExperienceMode.lifestyle => Icons.favorite_outline_rounded,
         ExperienceMode.budget => Icons.payments_outlined,
         ExperienceMode.investment => Icons.trending_up_rounded,
-        ExperienceMode.map => Icons.map_outlined,
       };
 
   String get route => switch (this) {
         ExperienceMode.lifestyle => RoutePaths.properties,
         ExperienceMode.budget => RoutePaths.properties,
         ExperienceMode.investment => RoutePaths.investment,
-        ExperienceMode.map => RoutePaths.estates,
       };
 }
 

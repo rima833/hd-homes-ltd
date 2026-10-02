@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/config/ai_features.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/features/eip/domain/entities/eip_models.dart';
 import 'package:hdhomesproject/features/eip/domain/services/eip_service.dart';
@@ -106,7 +107,7 @@ class IntegrationCommandCenterPage extends ConsumerWidget {
           ContainedPadding(
             child: _SectionCard(
               title: 'Enterprise Integration Command Center™',
-              icon: LucideIcons.cable,
+              icon: LucideIcons.plug,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -242,6 +243,8 @@ class IntegrationCommandCenterPage extends ConsumerWidget {
           ),
         ];
       case EipCommandTab.monitoring:
+        final briefing =
+            ref.read(eipServiceProvider).generateOpsBriefing(snap);
         return [
           ContainedPadding(
             child: _SectionCard(
@@ -251,7 +254,11 @@ class IntegrationCommandCenterPage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    ref.read(eipServiceProvider).generateOpsBriefing(snap),
+                    kAiFeaturesEnabled
+                        ? briefing
+                        : briefing
+                            .replaceAll(snap.aiDisclaimer, '')
+                            .trimRight(),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const Divider(height: 24),
@@ -479,7 +486,7 @@ class _EnterpriseFeatureStrip extends StatelessWidget {
       (
         EipCommandTab.overview,
         'Integration Command Center™',
-        LucideIcons.cable,
+        LucideIcons.plug,
       ),
       (
         EipCommandTab.workflows,
@@ -646,12 +653,15 @@ class _TabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleTabs = kAiFeaturesEnabled
+        ? EipCommandTab.values
+        : EipCommandTab.values.where((t) => t.name != 'ai').toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: EipCommandTab.values
+          children: visibleTabs
               .map(
                 (t) => Padding(
                   padding: const EdgeInsets.only(right: 8),

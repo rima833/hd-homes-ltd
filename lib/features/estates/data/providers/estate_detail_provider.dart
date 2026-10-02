@@ -249,11 +249,17 @@ EstateDetailContent _buildDetail(
       governmentProjects: 'Lekki Deep Sea Port, Dangote Refinery corridor, planned metro link',
     ),
     gallery: EstateGallery(
-      images: List.generate(8, (i) => 'gallery_${s.slug}_$i'),
-      videos: List.generate(2, (i) => 'video_${s.slug}_$i'),
-      hasDroneFootage: true,
+      images: s.galleryUrls.isNotEmpty
+          ? s.galleryUrls
+          : (s.heroImageUrl != null && s.heroImageUrl!.isNotEmpty
+              ? [s.heroImageUrl!]
+              : const []),
+      videos: s.heroVideoUrl != null && s.heroVideoUrl!.isNotEmpty
+          ? [s.heroVideoUrl!]
+          : const [],
+      hasDroneFootage: s.galleryUrls.length > 3,
       hasConstructionGallery: s.status != EstateStatus.completed,
-      hasLifestylePhotos: true,
+      hasLifestylePhotos: s.galleryUrls.isNotEmpty,
     ),
     virtualTour: const EstateVirtualTour(
       hasWalkthrough: true,

@@ -41,7 +41,8 @@ class SeoMetadata {
       '@context': 'https://schema.org',
       '@type': 'AboutPage',
       'name': 'About HD Homes Limited',
-      'description': 'Corporate profile of HD Homes Ltd, a premium Nigerian property developer.',
+      'description':
+          'Corporate profile of HD Homes Ltd, a premium Nigerian property developer.',
     },
   );
 
@@ -49,7 +50,7 @@ class SeoMetadata {
     title: 'Properties for Sale & Investment | HD Homes Marketplace',
     description:
         'Browse premium residential, commercial, and land properties across Nigeria. '
-        'AI-powered search, filters, and investment scores.',
+        'Personalized search, filters, and investment scores.',
     keywords: [
       'properties Nigeria',
       'homes for sale',
@@ -63,7 +64,8 @@ class SeoMetadata {
     },
   );
 
-  static SeoMetadata propertyDetail(String title, String description) => SeoMetadata(
+  static SeoMetadata propertyDetail(String title, String description) =>
+      SeoMetadata(
         title: '$title | HD Homes',
         description: description,
         structuredData: {
@@ -92,13 +94,53 @@ class SeoMetadata {
     },
   );
 
-  static SeoMetadata estateDetail(String name, String description) => SeoMetadata(
+  static SeoMetadata estateDetail(String name, String description) =>
+      SeoMetadata(
         title: '$name Estate | HD Homes',
         description: description,
+        keywords: [name, 'estate Nigeria', 'HD Homes estate'],
         structuredData: {
           '@context': 'https://schema.org',
-          '@type': 'Residence',
+          '@type': 'Place',
           'name': name,
+          'description': description,
+        },
+      );
+
+  static const constructionHub = SeoMetadata(
+    title: 'Construction Updates & On-Site Progress | HD Homes',
+    description:
+        'Follow HD Homes developments from foundation to completion — live site photos, '
+        'milestones, schedules, and project progress under Properties.',
+    keywords: [
+      'construction updates Nigeria',
+      'HD Homes construction progress',
+      'property development progress',
+      'on-site construction Abuja',
+    ],
+    structuredData: {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      'name': 'HD Homes Construction Updates',
+      'description':
+          'Public construction progress feed for HD Homes developments.',
+    },
+  );
+
+  static SeoMetadata constructionDetail(String name, String description) =>
+      SeoMetadata(
+        title: '$name Construction Progress | HD Homes',
+        description: description,
+        keywords: [
+          name,
+          'construction progress',
+          'HD Homes development',
+          'site updates',
+        ],
+        structuredData: {
+          '@context': 'https://schema.org',
+          '@type': 'CreativeWork',
+          'name': '$name Construction Progress',
           'description': description,
         },
       );
@@ -121,7 +163,8 @@ class SeoMetadata {
     },
   );
 
-  static SeoMetadata serviceDetail(String name, String description) => SeoMetadata(
+  static SeoMetadata serviceDetail(String name, String description) =>
+      SeoMetadata(
         title: '$name | HD Homes Services',
         description: description,
         structuredData: {
@@ -158,24 +201,20 @@ class SeoMetadata {
     List<String> tags = const [],
     String? authorName,
     DateTime? publishedAt,
-  }) =>
-      SeoMetadata(
-        title: '$title | HD Homes Knowledge Center',
-        description: description,
-        keywords: tags,
-        structuredData: {
-          '@context': 'https://schema.org',
-          '@type': 'NewsArticle',
-          'headline': title,
-          'description': description,
-          if (authorName != null) 'author': {'@type': 'Person', 'name': authorName},
-          if (publishedAt != null) 'datePublished': publishedAt.toIso8601String(),
-          'publisher': {
-            '@type': 'Organization',
-            'name': 'HD Homes Limited',
-          },
-        },
-      );
+  }) => SeoMetadata(
+    title: '$title | HD Homes Knowledge Center',
+    description: description,
+    keywords: tags,
+    structuredData: {
+      '@context': 'https://schema.org',
+      '@type': 'NewsArticle',
+      'headline': title,
+      'description': description,
+      if (authorName != null) 'author': {'@type': 'Person', 'name': authorName},
+      if (publishedAt != null) 'datePublished': publishedAt.toIso8601String(),
+      'publisher': {'@type': 'Organization', 'name': 'HD Homes Limited'},
+    },
+  );
 
   static const contactHub = SeoMetadata(
     title: 'Contact HD Homes | Book Inspections & Consultations',
@@ -192,7 +231,8 @@ class SeoMetadata {
       '@context': 'https://schema.org',
       '@type': 'ContactPage',
       'name': 'Contact HD Homes Limited',
-      'description': 'Customer engagement and lead generation hub for HD Homes Ltd.',
+      'description':
+          'Customer engagement and lead generation hub for HD Homes Ltd.',
     },
   );
 
@@ -216,7 +256,8 @@ class SeoMetadata {
     },
   );
 
-  static SeoMetadata mediaExperience(String name, String description) => SeoMetadata(
+  static SeoMetadata mediaExperience(String name, String description) =>
+      SeoMetadata(
         title: '$name — Media Experience | HD Homes',
         description: description,
         keywords: [
@@ -235,7 +276,8 @@ class SeoMetadata {
       );
 
   static const trustHub = SeoMetadata(
-    title: 'Trust Center | Legal, Compliance & Corporate Transparency | HD Homes',
+    title:
+        'Trust Center | Legal, Compliance & Corporate Transparency | HD Homes',
     description:
         'Enterprise Trust Center showcasing licenses, certifications, governance, investor protection, '
         'legal documents, ESG, CSR, transparency reports, and document verification.',
@@ -251,7 +293,8 @@ class SeoMetadata {
       '@context': 'https://schema.org',
       '@type': 'Organization',
       'name': 'HD Homes Limited',
-      'description': 'Trusted Nigerian property developer with enterprise transparency and compliance.',
+      'description':
+          'Trusted Nigerian property developer with enterprise transparency and compliance.',
       'url': 'https://hdhomes.ng/trust',
     },
   );
@@ -272,7 +315,8 @@ class SeoMetadata {
       '@context': 'https://schema.org',
       '@type': 'CollectionPage',
       'name': 'HD Homes Careers',
-      'description': 'Open positions and career opportunities at HD Homes Limited.',
+      'description':
+          'Open positions and career opportunities at HD Homes Limited.',
     },
   );
 
@@ -280,7 +324,7 @@ class SeoMetadata {
     title: 'Investment Opportunities & ROI | HD Homes',
     description:
         'Structured Nigerian real estate investments — off-plan, rental income, land banking, '
-        'and commercial products with escrow protection, transparent reporting, and AI insights.',
+        'and commercial products with escrow protection, transparent reporting, and market insights.',
     keywords: [
       'property investment Nigeria',
       'real estate ROI Lagos',
@@ -292,18 +336,19 @@ class SeoMetadata {
       '@context': 'https://schema.org',
       '@type': 'WebPage',
       'name': 'HD Homes Investment Hub',
-      'description': 'Investment products and investor resources for Nigerian real estate.',
+      'description':
+          'Investment products and investor resources for Nigerian real estate.',
     },
   );
 
   static const searchHub = SeoMetadata(
-    title: 'Property Search Intelligence | AI-Powered Discovery | HD Homes',
+    title: 'Property Search Intelligence | Personalized Discovery | HD Homes',
     description:
-        'Intelligent property search with AI recommendations, lifestyle matching, map exploration, '
+        'Intelligent property search with personalized recommendations, lifestyle matching, map exploration, '
         'saved searches, alerts, and personalized discovery.',
     keywords: [
       'property search Nigeria',
-      'AI property search',
+      'personalized property search',
       'Lekki homes search',
       'real estate filters',
       'HD Homes search',
@@ -332,25 +377,29 @@ class SeoMetadata {
 
   static const login = SeoMetadata(
     title: 'Sign In | HD Homes',
-    description: 'Secure sign-in to your HD Homes client, investor, or staff account.',
+    description:
+        'Secure sign-in to your HD Homes client, investor, or staff account.',
     robots: 'noindex, nofollow',
   );
 
   static const verifyEmail = SeoMetadata(
     title: 'Verify Your Email | HD Homes',
-    description: 'Confirm your email address to activate your HD Homes account.',
+    description:
+        'Confirm your email address to activate your HD Homes account.',
     robots: 'noindex, nofollow',
   );
 
   static const welcome = SeoMetadata(
     title: 'Welcome to HD Homes',
-    description: 'Your account is ready — continue to your personalized portal.',
+    description:
+        'Your account is ready — continue to your personalized portal.',
     robots: 'noindex, nofollow',
   );
 
   static const forgotPassword = SeoMetadata(
     title: 'Reset Password | HD Homes',
-    description: 'Request a secure password reset link for your HD Homes account.',
+    description:
+        'Request a secure password reset link for your HD Homes account.',
     robots: 'noindex, nofollow',
   );
 

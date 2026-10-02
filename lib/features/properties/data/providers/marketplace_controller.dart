@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/domain/data/hub_page_cms.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/properties/data/models/marketplace_filters.dart';
 import 'package:hdhomesproject/features/properties/data/models/marketplace_property.dart';
 import 'package:hdhomesproject/features/properties/data/providers/marketplace_listings_provider.dart';
@@ -45,7 +48,82 @@ final comparePropertiesProvider = Provider<List<MarketplaceProperty>>((ref) {
 });
 
 final marketplaceCmsProvider = Provider<MarketplaceCmsContent>((ref) {
-  return const MarketplaceCmsContent(
+  final base = _marketplaceCmsBase;
+  final listings = ref.watch(marketplaceListingsProvider);
+  ref.watch(browseCategoriesRealtimeProvider);
+  ref.watch(publishedPropertiesRealtimeProvider);
+
+  List<MarketplaceCategoryCard> withLiveCounts(
+    List<MarketplaceCategoryCard> cats,
+  ) {
+    return [
+      for (final c in cats)
+        c.copyWith(
+          count: countCategoryKey(listings, c.filterKey),
+          imageUrl: _coverForCategory(listings, c.filterKey) ?? c.imageUrl,
+        ),
+    ];
+  }
+
+  final cmsCats = ref.watch(publishedBrowseCategoriesProvider).valueOrNull;
+  final sourceCats = (cmsCats != null && cmsCats.isNotEmpty)
+      ? [
+          for (final c in cmsCats)
+            MarketplaceCategoryCard(
+              label: c.label,
+              count: 0,
+              filterKey: c.filterKey,
+              iconName: c.iconName,
+              description: c.description,
+              imageUrl: c.imageUrl,
+              isFeatured: c.isFeatured,
+            ),
+        ]
+      : base.categories;
+
+  if (!ref.watch(supabaseConfiguredProvider)) {
+    return MarketplaceCmsContent(
+      hero: base.hero,
+      categories: withLiveCounts(sourceCats),
+      searchSuggestions: const [],
+      faqs: base.faqs,
+      insights: base.insights,
+    );
+  }
+  final overlay =
+      hubHeroFromPage(ref.watch(publishedPageBySlugProvider('properties')).valueOrNull);
+  return MarketplaceCmsContent(
+    hero: MarketplaceHeroContent(
+      headline: overlay.headline ?? base.hero.headline,
+      subheadline: overlay.subheadline ?? base.hero.subheadline,
+      primaryCtaLabel: overlay.primaryCtaLabel ?? base.hero.primaryCtaLabel,
+      primaryCtaPath: base.hero.primaryCtaPath,
+      secondaryCtaLabel: overlay.secondaryCtaLabel ?? base.hero.secondaryCtaLabel,
+      secondaryCtaPath: base.hero.secondaryCtaPath,
+      tertiaryCtaLabel: base.hero.tertiaryCtaLabel,
+      tertiaryCtaPath: base.hero.tertiaryCtaPath,
+      backgroundImageUrl:
+          overlay.backgroundImageUrl ?? base.hero.backgroundImageUrl,
+      backgroundVideoUrl:
+          overlay.backgroundVideoUrl ?? base.hero.backgroundVideoUrl,
+    ),
+    categories: withLiveCounts(sourceCats),
+    searchSuggestions: const [],
+    faqs: base.faqs,
+    insights: base.insights,
+  );
+});
+
+String? _coverForCategory(List<MarketplaceProperty> listings, String key) {
+  for (final p in listings) {
+    if (!matchesCategoryKey(p, key)) continue;
+    final url = p.imageUrl?.trim();
+    if (url != null && url.isNotEmpty) return url;
+  }
+  return null;
+}
+
+const _marketplaceCmsBase = MarketplaceCmsContent(
     hero: MarketplaceHeroContent(
       headline: 'Find Your Perfect Property',
       subheadline:
@@ -63,57 +141,68 @@ final marketplaceCmsProvider = Provider<MarketplaceCmsContent>((ref) {
         count: 24,
         filterKey: 'luxury',
         iconName: 'crown',
+        isFeatured: true,
+        description:
+            'Premium residences crafted for elegance, comfort, and a lifestyle like no other.',
+        imageUrl:
+            '',
       ),
       MarketplaceCategoryCard(
         label: 'Affordable Homes',
         count: 86,
         filterKey: 'affordable',
         iconName: 'home',
+        description: 'Quality homes designed for every budget.',
+        imageUrl:
+            '',
       ),
       MarketplaceCategoryCard(
         label: 'Family Homes',
         count: 52,
         filterKey: 'family',
         iconName: 'users',
+        description: 'Spacious living for growing households.',
+        imageUrl:
+            '',
       ),
       MarketplaceCategoryCard(
         label: 'Commercial',
         count: 18,
         filterKey: 'commercial',
         iconName: 'building',
+        description: 'Offices, retail, and mixed-use spaces.',
+        imageUrl:
+            '',
       ),
       MarketplaceCategoryCard(
         label: 'Land',
         count: 31,
         filterKey: 'land',
         iconName: 'map',
+        description: 'Verified plots in high-growth corridors.',
+        imageUrl:
+            '',
       ),
       MarketplaceCategoryCard(
         label: 'Investment',
         count: 42,
         filterKey: 'investment',
         iconName: 'trending',
+        description: 'Structured opportunities with strong ROI.',
+        imageUrl:
+            '',
       ),
       MarketplaceCategoryCard(
-        label: 'New Listings',
+        label: 'New Launches',
         count: 15,
         filterKey: 'new',
         iconName: 'sparkles',
-      ),
-      MarketplaceCategoryCard(
-        label: 'Hot Deals',
-        count: 9,
-        filterKey: 'hot',
-        iconName: 'flame',
+        description: 'Fresh releases and off-plan estates.',
+        imageUrl:
+            '',
       ),
     ],
-    searchSuggestions: [
-      'Horizon Gardens Lekki',
-      '4 bedroom duplex Abuja',
-      'Off-plan investment Lagos',
-      'Commercial plot Port Harcourt',
-      'HD-H001',
-    ],
+    searchSuggestions: [],
     faqs: [
       MarketplaceFaqItem(
         question: 'How do I buy a property?',
@@ -161,4 +250,3 @@ final marketplaceCmsProvider = Provider<MarketplaceCmsContent>((ref) {
       ),
     ],
   );
-});

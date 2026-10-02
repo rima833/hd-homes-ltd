@@ -13,14 +13,18 @@ class ConsentNotifier extends Notifier<bool> {
 
   Future<void> setConsent(bool accepted) async {
     final storage = await ref.read(storageServiceProvider.future);
-    await storage.setCookieConsentAccepted(accepted);
+    await storage.setCookieConsentChoice(accepted ? 'accepted' : 'declined');
     state = accepted;
   }
 
   void hydrate(bool accepted) => state = accepted;
 }
 
-final consentGateProvider = NotifierProvider<ConsentNotifier, bool>(ConsentNotifier.new);
+final consentGateProvider = NotifierProvider<ConsentNotifier, bool>(
+  ConsentNotifier.new,
+);
 
 /// Whether analytics and personalization are allowed.
-final analyticsConsentProvider = Provider<bool>((ref) => ref.watch(consentGateProvider));
+final analyticsConsentProvider = Provider<bool>(
+  (ref) => ref.watch(consentGateProvider),
+);

@@ -1,6 +1,9 @@
 import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/widgets/placeholder_page.dart';
+import 'package:hdhomesproject/features/about/presentation/pages/about_page.dart';
+import 'package:hdhomesproject/features/careers/presentation/pages/careers_page.dart';
+import 'package:hdhomesproject/features/contact/presentation/pages/contact_page.dart';
 import 'package:hdhomesproject/features/home/presentation/pages/home_page.dart';
 
 List<RouteBase> get homeRoutes => [
@@ -12,26 +15,17 @@ List<RouteBase> get homeRoutes => [
       GoRoute(
         path: RoutePaths.about,
         name: 'about',
-        builder: (context, state) => const PlaceholderPage(
-          title: 'About HD Homes',
-          subtitle: 'Company profile — coming in a future milestone.',
-        ),
+        builder: (context, state) => const AboutPage(),
       ),
       GoRoute(
         path: RoutePaths.contact,
         name: 'contact',
-        builder: (context, state) => const PlaceholderPage(
-          title: 'Contact Us',
-          subtitle: 'Contact form — coming in a future milestone.',
-        ),
+        builder: (context, state) => const ContactPage(),
       ),
       GoRoute(
         path: RoutePaths.careers,
         name: 'careers',
-        builder: (context, state) => const PlaceholderPage(
-          title: 'Careers',
-          subtitle: 'Job listings — coming in a future milestone.',
-        ),
+        builder: (context, state) => const CareersPage(),
       ),
       GoRoute(
         path: RoutePaths.gallery,

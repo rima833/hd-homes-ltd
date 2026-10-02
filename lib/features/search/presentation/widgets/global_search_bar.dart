@@ -4,26 +4,26 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 abstract final class SearchIcons {
   static IconData resolve(String name) => switch (name) {
-        'home' => LucideIcons.home,
-        'building' => LucideIcons.building2,
-        'layers' => LucideIcons.layers,
-        'grid' => LucideIcons.grid,
-        'map' => LucideIcons.map,
-        'briefcase' => LucideIcons.briefcase,
-        'crown' => LucideIcons.crown,
-        'sparkles' => LucideIcons.sparkles,
-        'star' => LucideIcons.star,
-        'key' => LucideIcons.key,
-        'hardHat' => LucideIcons.hardHat,
-        'trending' => LucideIcons.trendingUp,
-        'users' => LucideIcons.users,
-        'graduationCap' => LucideIcons.graduationCap,
-        'trees' => LucideIcons.trees,
-        'landmark' => LucideIcons.landmark,
-        'waves' => LucideIcons.waves,
-        'heart' => LucideIcons.heart,
-        _ => LucideIcons.search,
-      };
+    'home' => LucideIcons.home,
+    'building' => LucideIcons.building2,
+    'layers' => LucideIcons.layers,
+    'grid' => LucideIcons.grid,
+    'map' => LucideIcons.map,
+    'briefcase' => LucideIcons.briefcase,
+    'crown' => LucideIcons.crown,
+    'sparkles' => LucideIcons.sparkles,
+    'star' => LucideIcons.star,
+    'key' => LucideIcons.key,
+    'hardHat' => LucideIcons.hardHat,
+    'trending' => LucideIcons.trendingUp,
+    'users' => LucideIcons.users,
+    'graduationCap' => LucideIcons.graduationCap,
+    'trees' => LucideIcons.trees,
+    'landmark' => LucideIcons.landmark,
+    'waves' => LucideIcons.waves,
+    'heart' => LucideIcons.heart,
+    _ => LucideIcons.search,
+  };
 }
 
 /// Universal search bar with autocomplete suggestions (Part 11).
@@ -64,20 +64,27 @@ class GlobalSearchBar extends StatelessWidget {
               children: [
                 if (onAiSearch != null)
                   IconButton(
-                    tooltip: 'AI Smart Search',
-                    icon: const Icon(LucideIcons.sparkles, color: AppColors.gold),
+                    tooltip: 'Smart Search',
+                    icon: const Icon(
+                      LucideIcons.sparkles,
+                      color: AppColors.gold,
+                    ),
                     onPressed: onAiSearch,
                   ),
-                IconButton(
-                  tooltip: 'Voice search (coming soon)',
-                  icon: Icon(LucideIcons.mic, color: onVoiceSearch != null ? AppColors.gold : Colors.grey),
-                  onPressed: onVoiceSearch,
-                ),
+                if (onVoiceSearch != null)
+                  IconButton(
+                    tooltip: 'Voice search',
+                    icon: const Icon(LucideIcons.mic, color: AppColors.gold),
+                    onPressed: onVoiceSearch,
+                  ),
               ],
             ),
             filled: true,
             fillColor: AppColors.charcoal.withValues(alpha: 0.5),
-            border: OutlineInputBorder(borderRadius: AppRadius.cardBorder, borderSide: BorderSide.none),
+            border: OutlineInputBorder(
+              borderRadius: AppRadius.cardBorder,
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
         if (recentSearches.isNotEmpty) ...[
@@ -107,7 +114,9 @@ class GlobalSearchBar extends StatelessWidget {
             runSpacing: AppSpacing.xs,
             children: [
               Text('Popular:', style: Theme.of(context).textTheme.labelSmall),
-              ...popularSearches.take(5).map(
+              ...popularSearches
+                  .take(5)
+                  .map(
                     (s) => ActionChip(
                       label: Text(s),
                       visualDensity: VisualDensity.compact,

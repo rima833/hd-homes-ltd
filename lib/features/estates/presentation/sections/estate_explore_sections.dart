@@ -2,9 +2,9 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
+import 'package:hdhomesproject/core/media/widgets/delivery_image.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/website/components/animated_section_title.dart';
-import 'package:hdhomesproject/core/website/components/page_container.dart';
 import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
 import 'package:hdhomesproject/features/estates/data/models/estate_detail_content.dart';
 import 'package:intl/intl.dart';
@@ -26,15 +26,14 @@ class EstateExploreSections extends HookWidget {
       children: [
         SectionWrapper(
           backgroundColor: AppColors.charcoal,
-          child: PageContainer(child: _Location(location: detail.location)),
+          child: _Location(location: detail.location),
         ),
         SectionWrapper(
-          child: PageContainer(child: _Construction(construction: detail.construction)),
+          child: _Construction(construction: detail.construction),
         ),
         SectionWrapper(
           backgroundColor: Theme.of(context).colorScheme.surface,
-          child: PageContainer(
-            child: Column(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const AnimatedSectionTitle(
@@ -63,11 +62,9 @@ class EstateExploreSections extends HookWidget {
                 ),
               ],
             ),
-          ),
         ),
         SectionWrapper(
-          child: PageContainer(
-            child: Column(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const AnimatedSectionTitle(
@@ -109,14 +106,13 @@ class EstateExploreSections extends HookWidget {
                 ),
               ],
             ),
-          ),
         ),
         SectionWrapper(
           backgroundColor: AppColors.charcoal,
-          child: PageContainer(child: _Investment(investment: detail.investment)),
+          child: _Investment(investment: detail.investment),
         ),
         SectionWrapper(
-          child: PageContainer(child: _Gallery(gallery: detail.gallery, estateName: detail.summary.name)),
+          child: _Gallery(gallery: detail.gallery, estateName: detail.summary.name),
         ),
       ],
     );
@@ -135,21 +131,27 @@ class _Location extends StatelessWidget {
         const AnimatedSectionTitle(overline: 'LOCATION', title: 'Location & connectivity'),
         const SizedBox(height: AppSpacing.xl),
         Container(
-          height: context.isMobile ? 280 : 360,
           width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
             borderRadius: AppRadius.cardBorder,
-            gradient: LinearGradient(colors: [AppColors.charcoal, AppColors.gold.withValues(alpha: 0.15)]),
+            color: AppColors.darkSurface,
+            border: Border.all(color: AppColors.gold.withValues(alpha: 0.25)),
           ),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(LucideIcons.mapPin, color: AppColors.gold, size: 40),
-                const SizedBox(height: AppSpacing.sm),
-                Text(location.address, style: const TextStyle(color: AppColors.white)),
-              ],
-            ),
+          child: Row(
+            children: [
+              const Icon(LucideIcons.mapPin, color: AppColors.gold, size: 22),
+              const SizedBox(width: AppSpacing.base),
+              Expanded(
+                child: Text(
+                  location.address,
+                  style: const TextStyle(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -267,6 +269,8 @@ class _GalleryState extends State<_Gallery> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.gallery.images.isEmpty) return const SizedBox.shrink();
+
     return Column(
       children: [
         const AnimatedSectionTitle(overline: 'GALLERY', title: 'Estate gallery'),
@@ -278,34 +282,54 @@ class _GalleryState extends State<_Gallery> {
             viewportFraction: 1,
             onPageChanged: (i, _) => setState(() => _index = i),
           ),
-          itemBuilder: (_, index, __) => Container(
-            decoration: BoxDecoration(
+          itemBuilder: (_, index, __) {
+            final src = widget.gallery.images[index];
+            final isNetwork =
+                src.startsWith('http://') || src.startsWith('https://');
+            return ClipRRect(
               borderRadius: AppRadius.cardBorder,
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.charcoal,
-                  AppColors.gold.withValues(alpha: 0.1 + index * 0.02),
-                ],
-              ),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    index.isEven ? LucideIcons.image : LucideIcons.video,
-                    color: AppColors.gold,
-                    size: 40,
-                  ),
-                  Text('${widget.estateName} — ${index + 1}/${widget.gallery.images.length}'),
-                ],
-              ),
-            ),
-          ),
+              child: isNetwork
+                  ? MediaDeliveryImage(
+                      url: src,
+                      fit: BoxFit.cover,
+                      errorWidget: _galleryPlaceholder(index),
+                    )
+                  : _galleryPlaceholder(index),
+            );
+          },
         ),
         const SizedBox(height: AppSpacing.sm),
         Text('${_index + 1} / ${widget.gallery.images.length}'),
       ],
+    );
+  }
+
+  Widget _galleryPlaceholder(int index) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: AppRadius.cardBorder,
+        gradient: LinearGradient(
+          colors: [
+            AppColors.charcoal,
+            AppColors.gold.withValues(alpha: 0.1 + index * 0.02),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              index.isEven ? LucideIcons.image : LucideIcons.video,
+              color: AppColors.gold,
+              size: 40,
+            ),
+            Text(
+              '${widget.estateName} — ${index + 1}/${widget.gallery.images.length}',
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

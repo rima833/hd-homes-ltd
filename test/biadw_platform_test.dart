@@ -1,124 +1,155 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hdhomesproject/features/biadw/domain/entities/biadw_models.dart';
-import 'package:hdhomesproject/features/biadw/domain/services/biadw_service.dart';
+import 'package:hdhomesproject/features/biadw/presentation/pages/bi_command_center_page.dart';
 import 'package:hdhomesproject/features/biadw/presentation/providers/biadw_controller.dart';
 
 void main() {
-  group('BiadwDemo', () {
-    test('snapshot is non-empty across command-center surfaces', () {
-      final snap = BiadwDemo.snapshot();
-      expect(snap.kpis, isNotEmpty);
-      expect(snap.dataSources, isNotEmpty);
-      expect(snap.datasets, isNotEmpty);
-      expect(snap.etlJobs, isNotEmpty);
-      expect(snap.dashboards, isNotEmpty);
-      expect(snap.reports, isNotEmpty);
-      expect(snap.forecasts, isNotEmpty);
-      expect(snap.scorecards, isNotEmpty);
-      expect(snap.qualityIssues, isNotEmpty);
-      expect(snap.lineage, isNotEmpty);
-      expect(snap.catalog, isNotEmpty);
-      expect(snap.aiInsights, isNotEmpty);
-      expect(snap.activities, isNotEmpty);
-      expect(snap.fromRemote, isFalse);
+  group('BiadwCommandCenterSnapshot', () {
+    test('parses an operational RPC response without fallback values', () {
+      final snapshot = BiadwCommandCenterSnapshot.fromJson({
+        'loaded_at': '2026-09-09T09:00:00Z',
+        'period_days': 30,
+        'kpis': [
+          {
+            'key': 'crm_leads',
+            'label': 'CRM Leads',
+            'value': 12,
+            'unit': 'count',
+          },
+          {
+            'key': 'revenue_mtd',
+            'label': 'Revenue MTD',
+            'value': 1250000,
+            'unit': 'currency',
+          },
+        ],
+        'daily_series': [
+          {
+            'date': '2026-09-09',
+            'leads': 3,
+            'revenue': 500000,
+            'applications': 2,
+          },
+        ],
+        'lead_statuses': [
+          {'label': 'Qualified', 'value': 4},
+        ],
+        'modules': [
+          {
+            'key': 'sales',
+            'label': 'Sales',
+            'value': 12,
+            'detail': 'Live CRM leads',
+          },
+        ],
+        'recent_activity': [
+          {
+            'type': 'lead',
+            'label': 'Lead captured',
+            'occurred_at': '2026-09-09T08:55:00Z',
+          },
+        ],
+      });
+
+      expect(snapshot.periodDays, 30);
+      expect(snapshot.kpis.first.value, 12);
+      expect(snapshot.kpis.last.displayValue, '₦1.3M');
+      expect(snapshot.dailySeries.single.applications, 2);
+      expect(snapshot.recentActivity.single.label, 'Lead captured');
+      expect(snapshot.isEmpty, isFalse);
     });
 
-    test('KPI strip includes BI command-center labels', () {
-      final snap = BiadwDemo.snapshot();
-      expect(
-        snap.kpis.map((k) => k.label),
-        containsAll([
-          'Revenue MTD',
-          'Conversion Rate',
-          'Construction %',
-          'ETL Success 7d',
-          'Open DQ Issues',
-        ]),
-      );
-    });
+    test('keeps a genuinely empty RPC response empty', () {
+      final snapshot = BiadwCommandCenterSnapshot.fromJson({
+        'loaded_at': '2026-09-09T09:00:00Z',
+        'period_days': 7,
+      });
 
-    test('AI insights carry editable advisory disclaimer', () {
-      final snap = BiadwDemo.snapshot();
-      expect(snap.aiDisclaimer.toLowerCase(), contains('ai-generated'));
-      expect(snap.aiDisclaimer.toLowerCase(), contains('editable'));
-      expect(snap.aiDisclaimer.toLowerCase(), contains('advisory'));
-      for (final insight in snap.aiInsights) {
-        expect(insight.disclaimer.toLowerCase(), contains('ai-generated'));
-        expect(insight.editable, isTrue);
-        expect(insight.confidencePct, isNotNull);
-      }
-    });
-
-    test('register spans sources etl forecasts quality scorecards', () {
-      final snap = BiadwDemo.snapshot();
-      expect(snap.dataSources.length, greaterThanOrEqualTo(4));
-      expect(snap.etlJobs.any((j) => j.isFailed), isTrue);
-      expect(snap.etlJobs.any((j) => j.isSuccess), isTrue);
-      expect(snap.forecasts.any((f) => f.confidencePct > 0), isTrue);
-      expect(snap.qualityIssues.any((q) => q.isOpen), isTrue);
-      expect(snap.scorecards.any((s) => s.audience == 'ceo'), isTrue);
-      expect(snap.scorecards.any((s) => s.audience == 'cfo'), isTrue);
-      expect(snap.dashboards.any((d) => d.status == 'published'), isTrue);
+      expect(snapshot.isEmpty, isTrue);
+      expect(snapshot.kpis, isEmpty);
+      expect(snapshot.modules, isEmpty);
     });
   });
 
-  group('BiadwService', () {
-    test('offline client returns demo command center', () async {
-      final service = BiadwService();
-      final snap = await service.loadCommandCenter();
-      expect(snap.fromRemote, isFalse);
-      expect(snap.kpis.length, greaterThanOrEqualTo(5));
-      expect(snap.dataSources, isNotEmpty);
-    });
+  group('BiCommandCenterPage responsive layout', () {
+    for (final size in const [
+      Size(1440, 900),
+      Size(768, 700),
+      Size(390, 700),
+    ]) {
+      testWidgets('renders without overflow at ${size.width}', (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
 
-    test('AI executive briefing stub includes disclaimer and signals', () {
-      final service = BiadwService();
-      final snap = BiadwDemo.snapshot();
-      final briefing = service.generateExecutiveBriefing(snap);
-      expect(briefing.toLowerCase(), contains('briefing'));
-      expect(briefing.toLowerCase(), contains('advisory'));
-      expect(briefing.toLowerCase(), contains('etl'));
-    });
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              biadwSnapshotProvider.overrideWith((ref) async => _snapshot),
+              biadwRealtimeConnectedProvider.overrideWith((ref) => true),
+              biadwLastSyncProvider.overrideWith(
+                (ref) => DateTime.utc(2026, 9, 9, 9),
+              ),
+            ],
+            child: const MaterialApp(home: BiCommandCenterPage()),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-    test('BI signals flag etl quality kpis and forecasts', () {
-      final snap = BiadwDemo.snapshot();
-      final signals = BiadwService.detectBiSignals(snap);
-      expect(signals, isNotEmpty);
-      expect(
-        signals.any((s) => s.toLowerCase().contains('etl')),
-        isTrue,
-      );
-      expect(
-        signals.any((s) => s.toLowerCase().contains('quality')),
-        isTrue,
-      );
-      expect(
-        signals.any((s) => s.toLowerCase().contains('kpi')),
-        isTrue,
-      );
-    });
-  });
-
-  group('BiadwController contract', () {
-    test('tabs cover required BI surfaces without state-in-build', () {
-      expect(BiadwCommandTab.values.map((t) => t.name), containsAll([
-        'overview',
-        'warehouse',
-        'etl',
-        'kpis',
-        'dashboards',
-        'reports',
-        'forecasts',
-        'scorecards',
-        'quality',
-        'governance',
-        'analytics',
-        'ai',
-      ]));
-      const initial = BiadwUiState();
-      expect(initial.selectedTab, BiadwCommandTab.overview);
-      expect(initial.tickerIndex, 0);
-      expect(initial.copyWith(tickerIndex: 1).tickerIndex, 1);
-    });
+        expect(find.text('Admin Analytics'), findsOneWidget);
+        expect(find.text('CRM Leads'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 }
+
+final _snapshot = BiadwCommandCenterSnapshot(
+  loadedAt: DateTime.utc(2026, 9, 9, 9),
+  periodDays: 30,
+  kpis: const [
+    BiadwKpi(key: 'crm_leads', label: 'CRM Leads', value: 12, unit: 'count'),
+    BiadwKpi(
+      key: 'revenue_mtd',
+      label: 'Revenue MTD',
+      value: 1250000,
+      unit: 'currency',
+    ),
+  ],
+  dailySeries: [
+    BiadwDailyPoint(
+      date: DateTime.utc(2026, 9, 8),
+      leads: 2,
+      revenue: 250000,
+      applications: 1,
+    ),
+    BiadwDailyPoint(
+      date: DateTime.utc(2026, 9, 9),
+      leads: 3,
+      revenue: 500000,
+      applications: 2,
+    ),
+  ],
+  leadStatuses: const [
+    BiadwLeadStatus(label: 'Qualified', value: 4),
+    BiadwLeadStatus(label: 'New', value: 8),
+  ],
+  modules: const [
+    BiadwModuleMetric(
+      key: 'sales',
+      label: 'Sales',
+      value: 12,
+      detail: 'Live CRM leads',
+    ),
+  ],
+  recentActivity: [
+    BiadwActivity(
+      type: 'lead',
+      label: 'Lead captured',
+      occurredAt: DateTime.utc(2026, 9, 9, 8, 55),
+    ),
+  ],
+);

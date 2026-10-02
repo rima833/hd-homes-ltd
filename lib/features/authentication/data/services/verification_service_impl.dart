@@ -252,7 +252,21 @@ class VerificationServiceImpl implements VerificationService {
     }
 
     _otpVerifyAttempts = 0;
-    await _markPhoneVerified(userId: userId, phoneE164: phoneE164);
+    try {
+      await _markPhoneVerified(userId: userId, phoneE164: phoneE164);
+    } catch (e) {
+      _audit(
+        action: 'otp_verify_failed',
+        userId: userId,
+        success: false,
+        metadata: {'reason': 'profile_update_failed'},
+      );
+      return PhoneOtpVerifyResult(
+        success: false,
+        message:
+            'Code accepted, but we could not save phone verification. Try again.',
+      );
+    }
     _audit(
       action: 'otp_verified',
       userId: userId,
@@ -355,19 +369,24 @@ class VerificationServiceImpl implements VerificationService {
   }) async {
     final client = _client;
     final id = userId ?? client?.auth.currentUser?.id;
-    if (client == null || id == null) return;
+    if (client == null || id == null) {
+      throw StateError('Sign in required to save phone verification.');
+    }
+    await client.from('profiles').update({
+      'phone': phoneE164,
+      'phone_verified': true,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', id);
     try {
-      await client.from('profiles').update({
-        'phone': phoneE164,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', id);
       await client.from('phone_change_requests').upsert({
         'user_id': id,
         'new_phone': phoneE164,
         'status': 'verified',
         'verified_at': DateTime.now().toUtc().toIso8601String(),
       }, onConflict: 'user_id');
-    } catch (_) {}
+    } catch (_) {
+      // Optional audit table — profile flag is the source of truth.
+    }
   }
 
   void _audit({

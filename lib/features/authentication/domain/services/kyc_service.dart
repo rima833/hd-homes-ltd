@@ -105,16 +105,18 @@ class KycService {
     );
   }
 
-  Future<List<KycDocument>> listDocuments(String userId) async {
+  Future<List<KycDocument>> listDocuments(
+    String userId, {
+    bool includeReplaced = false,
+  }) async {
     final client = _client;
     if (client == null) return const [];
     try {
-      final rows = await client
-          .from('kyc_documents')
-          .select()
-          .eq('user_id', userId)
-          .neq('status', 'replaced')
-          .order('created_at', ascending: false);
+      var query = client.from('kyc_documents').select().eq('user_id', userId);
+      if (!includeReplaced) {
+        query = query.neq('status', 'replaced');
+      }
+      final rows = await query.order('created_at', ascending: false);
       final docs = <KycDocument>[];
       for (final raw in rows as List) {
         final map = Map<String, dynamic>.from(raw as Map);
@@ -268,60 +270,139 @@ class KycService {
       'status': KycStatus.underReview.slug,
     });
 
+    await _syncInvestorKycStatus(
+      userId: userId,
+      status: KycStatus.underReview.slug,
+      notes: 'Submitted identity documents for review',
+    );
+
     await _audit(userId, 'submitted_for_review', {'target_level': target.rank});
   }
 
   Future<List<KycReviewQueueItem>> loadReviewQueue() async {
     final client = _client;
-    if (client == null) return const [];
-    try {
-      final rows = await client
-          .from('kyc_profiles')
-          .select(
-            'user_id, status, current_level, target_level, submitted_at, priority, '
-            'profiles!inner(email, first_name, last_name)',
-          )
-          .inFilter('status', [
-            KycStatus.underReview.slug,
-            KycStatus.awaitingDocuments.slug,
-            KycStatus.needsResubmission.slug,
-          ])
-          .order('priority', ascending: false)
-          .order('submitted_at', ascending: true);
-      final items = <KycReviewQueueItem>[];
-      for (final raw in rows as List) {
-        final map = Map<String, dynamic>.from(raw as Map);
-        final profile = Map<String, dynamic>.from(map['profiles'] as Map? ?? {});
-        final docs = await client
-            .from('kyc_documents')
-            .select('id')
-            .eq('user_id', map['user_id'])
-            .neq('status', 'replaced');
-        final name = [
-          profile['first_name'],
-          profile['last_name'],
-        ].whereType<String>().join(' ');
-        items.add(
-          KycReviewQueueItem(
-            userId: map['user_id'] as String,
-            status: KycStatus.fromSlug(map['status'] as String?),
-            level: KycLevel.fromRank(
-              (map['target_level'] as int?) ?? (map['current_level'] as int?),
-            ),
-            email: profile['email'] as String?,
-            displayName: name.isEmpty ? null : name,
-            submittedAt: map['submitted_at'] != null
-                ? DateTime.tryParse(map['submitted_at'] as String)
-                : null,
-            documentCount: (docs as List).length,
-            priority: map['priority'] as int? ?? 0,
-          ),
-        );
-      }
-      return items;
-    } catch (_) {
-      return const [];
+    if (client == null) {
+      throw const AuthenticationException('Authentication is not configured.');
     }
+    final rows = await client
+        .from('kyc_profiles')
+        .select(
+          'user_id, status, current_level, target_level, submitted_at, priority, '
+          'profiles(email, first_name, last_name)',
+        )
+        .order('priority', ascending: false)
+        .order('submitted_at', ascending: false);
+    final items = <KycReviewQueueItem>[];
+    for (final raw in rows as List) {
+      final map = Map<String, dynamic>.from(raw as Map);
+      final profile = Map<String, dynamic>.from(map['profiles'] as Map? ?? {});
+      final docs = await client
+          .from('kyc_documents')
+          .select('id')
+          .eq('user_id', map['user_id'])
+          .neq('status', 'replaced');
+      final name = [
+        profile['first_name'],
+        profile['last_name'],
+      ].whereType<String>().join(' ');
+      items.add(
+        KycReviewQueueItem(
+          userId: map['user_id'] as String,
+          status: KycStatus.fromSlug(map['status'] as String?),
+          level: KycLevel.fromRank(
+            (map['target_level'] as int?) ?? (map['current_level'] as int?),
+          ),
+          email: profile['email'] as String?,
+          displayName: name.isEmpty ? null : name,
+          submittedAt: map['submitted_at'] != null
+              ? DateTime.tryParse(map['submitted_at'] as String)
+              : null,
+          documentCount: (docs as List).length,
+          priority: map['priority'] as int? ?? 0,
+        ),
+      );
+    }
+    return items;
+  }
+
+  /// Identity, uploads, declarations, and history for one applicant.
+  Future<KycReviewCase> loadReviewCase(String userId) async {
+    final client = _client;
+    if (client == null) {
+      throw const AuthenticationException('Authentication is not configured.');
+    }
+
+    final kyc = await client
+        .from('kyc_profiles')
+        .select()
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (kyc == null) {
+      throw const ValidationException('This KYC submission is no longer available.');
+    }
+    final profile = Map<String, dynamic>.from(kyc);
+
+    Map<String, dynamic> person = {};
+    try {
+      final row = await client
+          .from('profiles')
+          .select(
+            'email, first_name, middle_name, last_name, preferred_name, gender, '
+            'date_of_birth, nationality, occupation, phone, country, state, city, '
+            'address, postal_code, phone_verified, account_status',
+          )
+          .eq('id', userId)
+          .maybeSingle();
+      if (row != null) person = Map<String, dynamic>.from(row);
+    } catch (_) {}
+
+    final name = [
+      person['first_name'],
+      person['middle_name'],
+      person['last_name'],
+    ].whereType<String>().where((part) => part.trim().isNotEmpty).join(' ');
+    final address = [
+      person['address'],
+      person['city'],
+      person['state'],
+      person['postal_code'],
+      person['country'],
+    ].whereType<String>().where((part) => part.trim().isNotEmpty).join(', ');
+
+    final docs = await listDocuments(userId, includeReplaced: true);
+    final compliance = await _fetchCompliance(userId);
+    final timeline = await _fetchEvents(userId);
+
+    return KycReviewCase(
+      identity: KycApplicantIdentity(
+        userId: userId,
+        email: person['email'] as String?,
+        displayName: name.isEmpty
+            ? (person['preferred_name'] as String?)
+            : name,
+        phone: person['phone'] as String?,
+        dateOfBirth: person['date_of_birth']?.toString(),
+        nationality: person['nationality'] as String?,
+        occupation: person['occupation'] as String?,
+        gender: person['gender'] as String?,
+        addressLine: address.isEmpty ? null : address,
+        phoneVerified: person['phone_verified'] as bool? ?? false,
+        accountStatus: person['account_status'] as String?,
+      ),
+      status: KycStatus.fromSlug(profile['status'] as String?),
+      currentLevel: KycLevel.fromRank(profile['current_level'] as int?),
+      targetLevel: KycLevel.fromRank(profile['target_level'] as int?),
+      reviewerNotes: profile['reviewer_notes'] as String?,
+      submittedAt: profile['submitted_at'] != null
+          ? DateTime.tryParse(profile['submitted_at'] as String)
+          : null,
+      reviewedAt: profile['reviewed_at'] != null
+          ? DateTime.tryParse(profile['reviewed_at'] as String)
+          : null,
+      documents: docs,
+      compliance: compliance,
+      timeline: timeline,
+    );
   }
 
   Future<void> reviewSubmission({
@@ -383,10 +464,47 @@ class KycService {
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('user_id', userId);
 
+    await _syncInvestorKycStatus(
+      userId: userId,
+      status: newStatus.slug,
+      notes: notes,
+    );
+
     await _audit(userId, 'review_${decision.slug}', {
       'notes': notes,
       'reviewer_id': reviewerId,
     });
+  }
+
+  /// Keep investor portal KYC status in sync with identity KYC reviews.
+  Future<void> _syncInvestorKycStatus({
+    required String userId,
+    required String status,
+    required String notes,
+  }) async {
+    final client = _client;
+    if (client == null) return;
+    try {
+      final investor = await client
+          .from('investors')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('is_deleted', false)
+          .maybeSingle();
+      if (investor == null) return;
+      final investorId = investor['id'] as String?;
+      if (investorId == null || investorId.isEmpty) return;
+      await client.rpc(
+        'admin_verify_investor_kyc',
+        params: {
+          'p_investor_id': investorId,
+          'p_status': status,
+          'p_notes': notes,
+        },
+      );
+    } catch (_) {
+      // Non-investor users or missing RPC permissions — ignore.
+    }
   }
 
   Future<Map<String, dynamic>> _ensureKycProfile(

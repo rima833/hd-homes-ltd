@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/website/components/animated_section_title.dart';
-import 'package:hdhomesproject/core/website/components/page_container.dart';
 import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
+import 'package:hdhomesproject/features/client/presentation/providers/marketplace_favorites_bridge.dart';
 import 'package:hdhomesproject/features/estates/data/models/estate_detail_content.dart';
 import 'package:hdhomesproject/features/estates/data/providers/estate_detail_provider.dart';
 import 'package:hdhomesproject/features/properties/data/providers/marketplace_controller.dart';
@@ -28,8 +28,7 @@ class EstatePropertiesSections extends ConsumerWidget {
       children: [
         SectionWrapper(
           backgroundColor: Theme.of(context).colorScheme.surface,
-          child: PageContainer(
-            child: Column(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const AnimatedSectionTitle(
@@ -56,7 +55,11 @@ class EstatePropertiesSections extends ConsumerWidget {
                             isFavorite: favorites.contains(p.id),
                             isCompared: compare.contains(p.id),
                             onTap: () => context.go('/properties/${p.id}'),
-                            onFavorite: () {},
+                            onFavorite: () => toggleMarketplaceFavorite(
+                              ref,
+                              propertyId: p.id,
+                              title: p.title,
+                            ),
                             showMatchScore: false,
                           ),
                         );
@@ -65,17 +68,16 @@ class EstatePropertiesSections extends ConsumerWidget {
                   ),
               ],
             ),
-          ),
         ),
         SectionWrapper(
-          child: PageContainer(child: _PropertyTypes(categories: detail.propertyTypeCategories)),
+          child: _PropertyTypes(categories: detail.propertyTypeCategories),
         ),
         SectionWrapper(
           backgroundColor: AppColors.charcoal,
-          child: PageContainer(child: _Amenities(amenities: detail.amenities)),
+          child: _Amenities(amenities: detail.amenities),
         ),
         SectionWrapper(
-          child: PageContainer(child: _Infrastructure(items: detail.infrastructure)),
+          child: _Infrastructure(items: detail.infrastructure),
         ),
       ],
     );

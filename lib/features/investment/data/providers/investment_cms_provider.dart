@@ -1,7 +1,28 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/domain/data/hub_page_cms.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/investment/data/models/investment_hub_content.dart';
 
-final investmentHubCmsProvider = Provider<InvestmentHubCms>((ref) => _cms);
+final investmentHubCmsProvider = Provider<InvestmentHubCms>((ref) {
+  final base = _cms;
+  if (!ref.watch(supabaseConfiguredProvider)) return base;
+  final overlay = hubHeroFromPage(
+    ref.watch(publishedPageBySlugProvider('investment')).valueOrNull,
+  );
+  return InvestmentHubCms(
+    heroHeadline: overlay.headline ?? base.heroHeadline,
+    heroSubheadline: overlay.subheadline ?? base.heroSubheadline,
+    backgroundImageUrl: overlay.backgroundImageUrl ?? base.backgroundImageUrl,
+    backgroundVideoUrl: overlay.backgroundVideoUrl ?? base.backgroundVideoUrl,
+    pillars: base.pillars,
+    statistics: const [],
+    processSteps: base.processSteps,
+    testimonials: const [],
+    protectionSummary: base.protectionSummary,
+    faqs: base.faqs,
+  );
+});
 
 final _cms = InvestmentHubCms(
   heroHeadline: 'Grow Your Wealth Through Nigerian Real Estate.',
@@ -11,175 +32,104 @@ final _cms = InvestmentHubCms(
   pillars: const [
     InvestmentPillar(
       title: 'Proven Track Record',
-      description: '15+ years delivering premium estates across Lagos, Abuja, and Port Harcourt.',
+      description:
+          'Estate developments across Lagos, Abuja, and Port Harcourt.',
       iconName: 'trendingUp',
+      imageUrl: '',
     ),
     InvestmentPillar(
       title: 'Transparent Reporting',
-      description: 'Quarterly updates, construction milestones, and audited financial summaries.',
+      description:
+          'Quarterly updates, construction milestones, and audited financial summaries.',
       iconName: 'fileBarChart',
+      imageUrl: '',
     ),
     InvestmentPillar(
       title: 'Escrow Protection',
-      description: 'Milestone-linked payments through regulated banking partners.',
+      description:
+          'Milestone-linked payments through regulated banking partners.',
       iconName: 'shield',
+      imageUrl: '',
     ),
     InvestmentPillar(
       title: 'Strong ROI Potential',
-      description: 'Target 15–22% returns across off-plan and rental income products.',
+      description:
+          'Each product has its own offering. Returns are not guaranteed.',
       iconName: 'percent',
+      imageUrl: '',
     ),
     InvestmentPillar(
       title: 'Diversified Portfolio',
-      description: 'Residential, commercial, land banking, and fractional opportunities.',
+      description:
+          'Residential, commercial, land banking, and fractional opportunities.',
       iconName: 'pieChart',
+      imageUrl: '',
     ),
     InvestmentPillar(
       title: 'Investor Support',
-      description: 'Dedicated investor relations team and digital portfolio access.',
+      description:
+          'Dedicated investor relations team and digital portfolio access.',
       iconName: 'headphones',
+      imageUrl: '',
     ),
   ],
   statistics: const [
-    InvestmentStatistic(value: '₦45B', suffix: '+', label: 'Assets Under Management'),
+    InvestmentStatistic(
+      value: '₦45B',
+      suffix: '+',
+      label: 'Assets Under Management',
+    ),
     InvestmentStatistic(value: '850', suffix: '+', label: 'Active Investors'),
     InvestmentStatistic(value: '18', label: 'Investment Products'),
-    InvestmentStatistic(value: '96', suffix: '%', label: 'Investor Satisfaction'),
+    InvestmentStatistic(
+      value: '96',
+      suffix: '%',
+      label: 'Investor Satisfaction',
+    ),
     InvestmentStatistic(value: '15', suffix: '+', label: 'Years Track Record'),
-  ],
-  opportunities: const [
-    InvestmentOpportunity(
-      id: 'inv-hg',
-      title: 'Horizon Gardens — Phase 1',
-      location: 'Lekki, Lagos',
-      type: InvestmentProductType.offPlan,
-      roi: '18–22%',
-      duration: '3–5 years',
-      risk: 'Moderate',
-      minInvestment: '₦15M',
-      status: 'Open',
-      summary: 'Flagship lifestyle estate with strong rental demand and capital appreciation.',
-      estateSlug: 'horizon-gardens',
-    ),
-    InvestmentOpportunity(
-      id: 'inv-eh',
-      title: 'Emerald Heights Estate',
-      location: 'Abuja, FCT',
-      type: InvestmentProductType.capitalGrowth,
-      roi: '15–18%',
-      duration: '4–6 years',
-      risk: 'Low–Moderate',
-      minInvestment: '₦20M',
-      status: 'Open',
-      summary: 'Premium Abuja development in a high-growth government corridor.',
-      estateSlug: 'emerald-heights',
-    ),
-    InvestmentOpportunity(
-      id: 'inv-rental',
-      title: 'Lekki Rental Income Fund',
-      location: 'Lekki Corridor',
-      type: InvestmentProductType.rentalIncome,
-      roi: '12–14% yield',
-      duration: 'Ongoing',
-      risk: 'Low',
-      minInvestment: '₦10M',
-      status: 'Limited',
-      summary: 'Stabilized rental portfolio with quarterly distributions.',
-    ),
-    InvestmentOpportunity(
-      id: 'inv-land',
-      title: 'Green Valley Land Banking',
-      location: 'Port Harcourt',
-      type: InvestmentProductType.landBanking,
-      roi: '20–25%',
-      duration: '2–4 years',
-      risk: 'Moderate–High',
-      minInvestment: '₦8M',
-      status: 'Open',
-      summary: 'Strategic land parcels in emerging growth corridors.',
-      estateSlug: 'green-valley',
-    ),
-    InvestmentOpportunity(
-      id: 'inv-commercial',
-      title: 'Chevron Commercial Plots',
-      location: 'Lekki, Lagos',
-      type: InvestmentProductType.commercial,
-      roi: '16–20%',
-      duration: '5+ years',
-      risk: 'Moderate',
-      minInvestment: '₦25M',
-      status: 'Waitlist',
-      summary: 'Commercial plots within HD Homes mixed-use developments.',
-    ),
-    InvestmentOpportunity(
-      id: 'inv-fractional',
-      title: 'Fractional Estate Shares',
-      location: 'Nationwide',
-      type: InvestmentProductType.fractional,
-      roi: '14–16%',
-      duration: 'Flexible',
-      risk: 'Moderate',
-      minInvestment: '₦2M',
-      status: 'Coming Soon',
-      summary: 'Lower entry point into premium developments — Investor Portal integration.',
-    ),
   ],
   processSteps: const [
     InvestmentProcessStep(
       step: 1,
       title: 'Discover & Research',
-      description: 'Explore opportunities, download investment packs, and use ROI tools.',
+      description:
+          'Explore opportunities, review live market insights, and use ROI tools to make informed decisions.',
+      iconName: 'search',
     ),
     InvestmentProcessStep(
       step: 2,
       title: 'Consultation',
-      description: 'Book a session with Investor Relations to align goals and risk appetite.',
+      description:
+          'Book a session with Investor Relations to align your goals and risk appetite.',
+      iconName: 'users',
     ),
     InvestmentProcessStep(
       step: 3,
       title: 'Due Diligence',
-      description: 'Review title documents, feasibility studies, and legal agreements.',
+      description:
+          'Review title documents, feasibility studies, and legal agreements for complete clarity.',
+      iconName: 'fileCheck',
     ),
     InvestmentProcessStep(
       step: 4,
       title: 'Investment & Escrow',
-      description: 'Sign agreements and fund through regulated escrow accounts.',
+      description:
+          'Sign agreements and fund through regulated escrow accounts for maximum security.',
+      iconName: 'shieldLock',
     ),
     InvestmentProcessStep(
       step: 5,
       title: 'Monitor & Report',
-      description: 'Track construction, receive quarterly reports, and access Investor Portal.',
+      description:
+          'Track construction progress, receive quarterly reports, and access your Investor Portal.',
+      iconName: 'lineChart',
     ),
     InvestmentProcessStep(
       step: 6,
       title: 'Returns & Exit',
-      description: 'Receive distributions, resale support, or handover upon completion.',
-    ),
-  ],
-  marketInsights: const [
-    InvestmentMarketInsight(
-      title: 'Lekki corridor demand',
-      value: '+18% YoY',
-      trend: 'Rising',
-      summary: 'Strong buyer and rental demand driven by infrastructure expansion.',
-    ),
-    InvestmentMarketInsight(
-      title: 'Abuja premium segment',
-      value: '+12% YoY',
-      trend: 'Stable growth',
-      summary: 'Government relocation and diaspora investment sustaining prices.',
-    ),
-    InvestmentMarketInsight(
-      title: 'Off-plan premium',
-      value: '22% avg uplift',
-      trend: 'At completion',
-      summary: 'Early investors in HD Homes estates historically outperform market.',
-    ),
-    InvestmentMarketInsight(
-      title: 'Rental yield — Lagos',
-      value: '8–12%',
-      trend: 'Stable',
-      summary: 'Institutional rental demand in gated estates remains strong.',
+      description:
+          'Receive distributions, resale support, or handover upon project completion.',
+      iconName: 'returns',
     ),
   ],
   testimonials: const [
@@ -208,36 +158,36 @@ final _cms = InvestmentHubCms(
   protectionSummary:
       'HD Homes investor protection includes due diligence, segregated escrow accounts, contractual investor rights, '
       'quarterly transparency reporting, and dispute resolution. Full details in our Trust Center.',
-  downloads: const [
-    InvestmentDownload(title: 'Investment Overview Pack', type: 'PDF', size: '4.8 MB'),
-    InvestmentDownload(title: 'Horizon Gardens Investment Brief', type: 'PDF', size: '2.4 MB'),
-    InvestmentDownload(title: 'Risk Disclosure Statement', type: 'PDF', size: '680 KB'),
-    InvestmentDownload(title: 'Sample Investment Agreement', type: 'PDF', size: '1.1 MB'),
-  ],
   faqs: const [
     InvestmentFaq(
       question: 'What is the minimum investment amount?',
-      answer: 'Minimums vary by product — from ₦2M (fractional, coming soon) to ₦25M for commercial plots. Most estates start at ₦15M.',
+      answer:
+          'Minimums are set on each product. The listing and the offering documents state the amount for that opportunity.',
     ),
     InvestmentFaq(
       question: 'How are my funds protected?',
-      answer: 'Payments flow through regulated escrow accounts with milestone-based release. See our Trust Center for full safeguards.',
+      answer:
+          'Payments flow through regulated escrow accounts with milestone-based release. See our Trust Center for full safeguards.',
     ),
     InvestmentFaq(
       question: 'Can diaspora investors participate?',
-      answer: 'Yes. We support international transfers, virtual consultations, and digital document signing with dedicated IR support.',
+      answer:
+          'Yes. We support international transfers, virtual consultations, and digital document signing with dedicated IR support.',
     ),
     InvestmentFaq(
       question: 'How do I track my investment?',
-      answer: 'Investors receive quarterly reports and will access the Investor Portal (Volume 3) for live construction and financial updates.',
+      answer:
+          'Signed-in investors use the Investor Portal for documents, reports, and payment history.',
     ),
     InvestmentFaq(
       question: 'What returns can I expect?',
-      answer: 'Returns vary by product and market. Off-plan targets 18–22% ROI; rental income 12–14% yield. Past performance is not a guarantee.',
+      answer:
+          'Returns depend on the product, the project, and the market. HD Homes does not guarantee a return. Read the offering documents before you commit.',
     ),
     InvestmentFaq(
       question: 'How do I book an investor consultation?',
-      answer: 'Use the consultation form below or contact Investor Relations via the Contact Hub.',
+      answer:
+          'Use the consultation form below or contact Investor Relations via the Contact Hub.',
     ),
   ],
 );

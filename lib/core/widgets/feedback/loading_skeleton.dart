@@ -37,30 +37,49 @@ class PropertyCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: AppRadius.cardBorder,
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LoadingSkeleton(height: 200, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-          Padding(
-            padding: EdgeInsets.all(AppSpacing.base),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LoadingSkeleton(width: 120, height: 24),
-                SizedBox(height: AppSpacing.sm),
-                LoadingSkeleton(width: 200),
-                SizedBox(height: AppSpacing.sm),
-                LoadingSkeleton(width: 160),
-              ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tight = constraints.maxHeight.isFinite &&
+            constraints.maxHeight > 0 &&
+            constraints.maxHeight < 280;
+        if (tight) {
+          return ColoredBox(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: const Center(
+              child: LoadingSkeleton(width: 120, height: 16),
             ),
+          );
+        }
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.cardBorder,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
           ),
-        ],
-      ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LoadingSkeleton(
+                height: 200,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              Padding(
+                padding: EdgeInsets.all(AppSpacing.base),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LoadingSkeleton(width: 120, height: 24),
+                    SizedBox(height: AppSpacing.sm),
+                    LoadingSkeleton(width: 200),
+                    SizedBox(height: AppSpacing.sm),
+                    LoadingSkeleton(width: 160),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

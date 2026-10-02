@@ -43,6 +43,7 @@ class EstateSummary {
     required this.heroImageUrl,
     required this.heroVideoUrl,
     required this.tagline,
+    this.galleryUrls = const [],
   });
 
   final String id;
@@ -62,6 +63,7 @@ class EstateSummary {
   final String? heroImageUrl;
   final String? heroVideoUrl;
   final String tagline;
+  final List<String> galleryUrls;
 }
 
 class EstateDetailContent {

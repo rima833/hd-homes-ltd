@@ -18,6 +18,7 @@ class StorageService {
   static const _themeModeKey = 'theme_mode';
   static const _rememberMeKey = 'remember_me';
   static const _cookieConsentKey = 'cookie_consent_accepted';
+  static const _cookieChoiceKey = 'cookie_consent_choice';
 
   String? getThemeMode() => _prefs.getString(_themeModeKey);
 
@@ -29,11 +30,20 @@ class StorageService {
   Future<void> setRememberMe(bool value) =>
       _prefs.setBool(_rememberMeKey, value);
 
-  bool get cookieConsentAccepted =>
-      _prefs.getBool(_cookieConsentKey) ?? false;
+  bool get cookieConsentAccepted => _prefs.getBool(_cookieConsentKey) ?? false;
+
+  String? get cookieConsentChoice => _prefs.getString(_cookieChoiceKey);
+
+  bool get cookieConsentAnswered =>
+      cookieConsentChoice != null || cookieConsentAccepted;
 
   Future<void> setCookieConsentAccepted(bool value) =>
       _prefs.setBool(_cookieConsentKey, value);
+
+  Future<void> setCookieConsentChoice(String choice) async {
+    await _prefs.setString(_cookieChoiceKey, choice);
+    await setCookieConsentAccepted(choice == 'accepted');
+  }
 
   Future<void> writeSecure(String key, String value) =>
       _secureStorage.write(key: key, value: value);

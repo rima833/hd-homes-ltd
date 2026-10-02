@@ -109,4 +109,70 @@ void main() {
       expect(recs, anyElement(contains('4+')));
     });
   });
+
+  group('personalization analytics', () {
+    test('parses the aggregate RPC response without user-level data', () {
+      final snapshot = PersonalizationAnalyticsSnapshot.fromJson({
+        'loaded_at': '2026-09-09T08:30:00Z',
+        'period_days': 30,
+        'preference_profiles': 42,
+        'accessibility_adoption_pct': 16.7,
+        'saved_searches': 18,
+        'favorites': 73,
+        'dashboard_layouts': 24,
+        'workspace_switches_today': 9,
+        'theme_distribution': [
+          {'label': 'dark', 'count': 25},
+          {'label': 'system', 'count': 17},
+        ],
+        'events_by_type': [
+          {'label': 'layout_updated', 'count': 12},
+          {'label': 'favorite_added', 'count': 8},
+        ],
+        'favorite_types': [
+          {'label': 'property', 'count': 3},
+        ],
+        'daily_series': [
+          {'date': '2026-09-08', 'events': 7},
+          {'date': '2026-09-09', 'events': 13},
+        ],
+      });
+
+      expect(snapshot.periodDays, 30);
+      expect(snapshot.preferenceProfiles, 42);
+      expect(snapshot.accessibilityAdoptionPct, 16.7);
+      expect(snapshot.totalEvents, 20);
+      expect(snapshot.dailySeries.last.events, 13);
+      expect(snapshot.isEmpty, isFalse);
+      expect(snapshot.eventsByType.first.displayLabel, 'Layout Updated');
+      expect(snapshot.favoriteTypes.single.displayLabel, 'Property');
+    });
+
+    test('recognizes an empty aggregate response', () {
+      final snapshot = PersonalizationAnalyticsSnapshot.fromJson({
+        'period_days': 7,
+        'theme_distribution': <Object>[],
+        'events_by_type': <Object>[],
+        'daily_series': [
+          {'date': '2026-09-09', 'events': 0},
+        ],
+      });
+
+      expect(snapshot.isEmpty, isTrue);
+    });
+
+    test('event metric values match the constrained RPC contract', () {
+      expect(
+        PersonalizationEventMetric.values.map((metric) => metric.rpcValue),
+        {
+          'theme_changed',
+          'accessibility_updated',
+          'layout_updated',
+          'workspace_switched',
+          'saved_search_created',
+          'favorite_added',
+        },
+      );
+    });
+  });
 }

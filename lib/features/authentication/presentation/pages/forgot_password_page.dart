@@ -48,7 +48,7 @@ class ForgotPasswordPage extends HookConsumerWidget {
                   Text(
                     sent.value
                         ? (ui.message ??
-                            'If an account exists for that email, we sent a secure reset link.')
+                            'If an account exists for that email, we sent a secure reset link. Open it in this same browser where HD Homes is running.')
                         : 'Enter the email associated with your HD Homes account and we will send a secure reset link.',
                     textAlign: TextAlign.center,
                   ),

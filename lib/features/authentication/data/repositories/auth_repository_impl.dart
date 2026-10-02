@@ -181,6 +181,14 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<UserProfile?> refreshEmailVerificationStatus() async {
+    try {
+      await _dataSource.refreshAuthUser();
+    } catch (_) {}
+    return fetchCurrentProfile();
+  }
+
+  @override
   Future<UserProfile?> fetchCurrentProfile() async {
     final user = _dataSource.currentUser;
     if (user == null) {

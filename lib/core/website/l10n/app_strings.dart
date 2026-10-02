@@ -5,6 +5,7 @@ abstract final class AppStrings {
 
   // Navigation
   static const String navBookInspection = 'Book Inspection';
+  static const String navContactHub = 'Contact Hub';
   static const String navLogin = 'Login';
   static const String navRegister = 'Register';
   static const String navInvest = 'Invest With Us';

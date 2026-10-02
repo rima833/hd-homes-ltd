@@ -4,7 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Whether Supabase has been initialized with valid credentials.
 final supabaseConfiguredProvider = Provider<bool>((ref) {
-  return SupabaseConfig.isConfigured;
+  if (!SupabaseConfig.isConfigured) return false;
+  try {
+    return Supabase.instance.isInitialized;
+  } catch (_) {
+    return false;
+  }
 });
 
 /// Injected Supabase client. Throws if Supabase is not initialized.

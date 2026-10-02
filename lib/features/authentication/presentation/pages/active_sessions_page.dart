@@ -4,6 +4,7 @@ import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/login_models.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/auth_controller.dart';
+import 'package:hdhomesproject/features/authentication/presentation/widgets/account_portal_scaffold.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -44,19 +45,19 @@ class ActiveSessionsPage extends HookConsumerWidget {
       return null;
     }, const []);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Active sessions'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: loading.value ? null : load,
-            icon: const Icon(LucideIcons.refreshCw),
-          ),
-        ],
-      ),
+    return AccountPortalScaffold(
+      title: 'Active sessions',
+      actions: [
+        IconButton(
+          tooltip: 'Refresh',
+          onPressed: loading.value ? null : load,
+          icon: const Icon(LucideIcons.refreshCw),
+        ),
+      ],
       body: loading.value
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.gold),
+            )
           : RefreshIndicator(
               onRefresh: load,
               child: ListView(
@@ -64,7 +65,9 @@ class ActiveSessionsPage extends HookConsumerWidget {
                 children: [
                   Text(
                     'Manage where you are signed in. Ending a session signs that device out.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.slate400,
+                        ),
                   ),
                   if (error.value != null) ...[
                     const SizedBox(height: AppSpacing.base),
@@ -72,8 +75,8 @@ class ActiveSessionsPage extends HookConsumerWidget {
                   ],
                   const SizedBox(height: AppSpacing.lg),
                   ...(sessions.value ?? const []).map((s) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    return AccountPortalCard(
+                      padding: EdgeInsets.zero,
                       child: ListTile(
                         leading: Icon(
                           s.isCurrent ? LucideIcons.monitorSmartphone : LucideIcons.monitor,

@@ -97,30 +97,30 @@ enum DashboardWidgetId {
   String get slug => name;
 
   String get label => switch (this) {
-        DashboardWidgetId.savedProperties => 'Saved Properties',
-        DashboardWidgetId.recentlyViewed => 'Recently Viewed',
-        DashboardWidgetId.recommendations => 'Recommendations',
-        DashboardWidgetId.upcomingBookings => 'Upcoming Bookings',
-        DashboardWidgetId.messages => 'Messages',
-        DashboardWidgetId.notifications => 'Notifications',
-        DashboardWidgetId.portfolioValue => 'Portfolio Value',
-        DashboardWidgetId.roi => 'ROI',
-        DashboardWidgetId.investmentPerformance => 'Investment Performance',
-        DashboardWidgetId.marketUpdates => 'Market Updates',
-        DashboardWidgetId.financialReports => 'Financial Reports',
-        DashboardWidgetId.documents => 'Documents',
-        DashboardWidgetId.assignedTasks => 'Assigned Tasks',
-        DashboardWidgetId.leads => 'Leads',
-        DashboardWidgetId.calendar => 'Calendar',
-        DashboardWidgetId.teamActivity => 'Team Activity',
-        DashboardWidgetId.performance => 'Performance',
-        DashboardWidgetId.executiveKpis => 'Executive KPIs',
-        DashboardWidgetId.sales => 'Sales',
-        DashboardWidgetId.revenue => 'Revenue',
-        DashboardWidgetId.activeProjects => 'Active Projects',
-        DashboardWidgetId.investorActivity => 'Investor Activity',
-        DashboardWidgetId.organizationHealth => 'Organization Health',
-      };
+    DashboardWidgetId.savedProperties => 'Saved Properties',
+    DashboardWidgetId.recentlyViewed => 'Recently Viewed',
+    DashboardWidgetId.recommendations => 'Recommendations',
+    DashboardWidgetId.upcomingBookings => 'Upcoming Bookings',
+    DashboardWidgetId.messages => 'Messages',
+    DashboardWidgetId.notifications => 'Notifications',
+    DashboardWidgetId.portfolioValue => 'Portfolio Value',
+    DashboardWidgetId.roi => 'ROI',
+    DashboardWidgetId.investmentPerformance => 'Investment Performance',
+    DashboardWidgetId.marketUpdates => 'Market Updates',
+    DashboardWidgetId.financialReports => 'Financial Reports',
+    DashboardWidgetId.documents => 'Documents',
+    DashboardWidgetId.assignedTasks => 'Assigned Tasks',
+    DashboardWidgetId.leads => 'Leads',
+    DashboardWidgetId.calendar => 'Calendar',
+    DashboardWidgetId.teamActivity => 'Team Activity',
+    DashboardWidgetId.performance => 'Performance',
+    DashboardWidgetId.executiveKpis => 'Executive KPIs',
+    DashboardWidgetId.sales => 'Sales',
+    DashboardWidgetId.revenue => 'Revenue',
+    DashboardWidgetId.activeProjects => 'Active Projects',
+    DashboardWidgetId.investorActivity => 'Investor Activity',
+    DashboardWidgetId.organizationHealth => 'Organization Health',
+  };
 
   static DashboardWidgetId fromSlug(String? raw) {
     return DashboardWidgetId.values.firstWhere(
@@ -171,14 +171,14 @@ class AccessibilitySettings {
   }
 
   Map<String, dynamic> toJson() => {
-        'high_contrast': highContrast,
-        'reduced_motion': reducedMotion,
-        'larger_fonts': largerFonts,
-        'keyboard_navigation': keyboardNavigation,
-        'screen_reader_optimized': screenReaderOptimized,
-        'focus_highlighting': focusHighlighting,
-        'font_scale': fontScale,
-      };
+    'high_contrast': highContrast,
+    'reduced_motion': reducedMotion,
+    'larger_fonts': largerFonts,
+    'keyboard_navigation': keyboardNavigation,
+    'screen_reader_optimized': screenReaderOptimized,
+    'focus_highlighting': focusHighlighting,
+    'font_scale': fontScale,
+  };
 
   factory AccessibilitySettings.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const AccessibilitySettings();
@@ -226,12 +226,12 @@ class AppearancePreferences {
   }
 
   Map<String, dynamic> toJson() => {
-        'theme': theme.slug,
-        'accent_color': accentColor,
-        'density': density.slug,
-        'animation_level': animationLevel.slug,
-        'card_style': cardStyle,
-      };
+    'theme': theme.slug,
+    'accent_color': accentColor,
+    'density': density.slug,
+    'animation_level': animationLevel.slug,
+    'card_style': cardStyle,
+  };
 
   factory AppearancePreferences.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const AppearancePreferences();
@@ -239,7 +239,9 @@ class AppearancePreferences {
       theme: AppThemeMode.fromSlug(json['theme'] as String?),
       accentColor: json['accent_color'] as String? ?? 'gold',
       density: UiDensity.fromSlug(json['density'] as String?),
-      animationLevel: AnimationLevel.fromSlug(json['animation_level'] as String?),
+      animationLevel: AnimationLevel.fromSlug(
+        json['animation_level'] as String?,
+      ),
       cardStyle: json['card_style'] as String? ?? 'elevated',
     );
   }
@@ -280,13 +282,13 @@ class DashboardWidgetConfig {
   }
 
   Map<String, dynamic> toJson() => {
-        'widget_id': widgetId.slug,
-        'visible': visible,
-        'pinned': pinned,
-        'order': order,
-        'width': width,
-        'height': height,
-      };
+    'widget_id': widgetId.slug,
+    'visible': visible,
+    'pinned': pinned,
+    'order': order,
+    'width': width,
+    'height': height,
+  };
 
   factory DashboardWidgetConfig.fromJson(Map<String, dynamic> json) {
     return DashboardWidgetConfig(
@@ -320,12 +322,12 @@ class DashboardLayout {
         ..sort((a, b) => a.order.compareTo(b.order));
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'is_default': isDefault,
-        'workspace_slug': workspaceSlug,
-        'widgets': widgets.map((w) => w.toJson()).toList(),
-      };
+    'id': id,
+    'name': name,
+    'is_default': isDefault,
+    'workspace_slug': workspaceSlug,
+    'widgets': widgets.map((w) => w.toJson()).toList(),
+  };
 
   factory DashboardLayout.fromJson(Map<String, dynamic> json) {
     final rawWidgets = (json['widgets'] as List?) ?? const [];
@@ -335,9 +337,11 @@ class DashboardLayout {
       isDefault: json['is_default'] as bool? ?? false,
       workspaceSlug: json['workspace_slug'] as String?,
       widgets: rawWidgets
-          .map((e) => DashboardWidgetConfig.fromJson(
-                Map<String, dynamic>.from(e as Map),
-              ))
+          .map(
+            (e) => DashboardWidgetConfig.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ),
+          )
           .toList(),
     );
   }
@@ -491,15 +495,15 @@ class PropertyInterestProfile {
   final List<String> investmentTypes;
 
   Map<String, dynamic> toJson() => {
-        'property_types': propertyTypes,
-        'cities': cities,
-        'estates': estates,
-        'min_price': minPrice,
-        'max_price': maxPrice,
-        'min_bedrooms': minBedrooms,
-        'amenities': amenities,
-        'investment_types': investmentTypes,
-      };
+    'property_types': propertyTypes,
+    'cities': cities,
+    'estates': estates,
+    'min_price': minPrice,
+    'max_price': maxPrice,
+    'min_bedrooms': minBedrooms,
+    'amenities': amenities,
+    'investment_types': investmentTypes,
+  };
 
   factory PropertyInterestProfile.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const PropertyInterestProfile();
@@ -574,48 +578,191 @@ class PersonalizationSnapshot {
   final List<String> recommendations;
 }
 
+class PersonalizationMetricBreakdown {
+  const PersonalizationMetricBreakdown({
+    required this.label,
+    required this.count,
+  });
+
+  final String label;
+  final int count;
+
+  String get displayLabel => label
+      .split('_')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+
+  factory PersonalizationMetricBreakdown.fromJson(Map<String, dynamic> json) {
+    return PersonalizationMetricBreakdown(
+      label: json['label']?.toString() ?? 'Unknown',
+      count: (json['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class PersonalizationDailyMetric {
+  const PersonalizationDailyMetric({required this.date, required this.events});
+
+  final DateTime date;
+  final int events;
+
+  factory PersonalizationDailyMetric.fromJson(Map<String, dynamic> json) {
+    return PersonalizationDailyMetric(
+      date:
+          DateTime.tryParse(json['date']?.toString() ?? '')?.toLocal() ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      events: (json['events'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+/// Metrics accepted by `record_personalization_event`.
+///
+/// Keeping this list typed prevents feature code from submitting arbitrary
+/// metric names to the anonymous aggregate store.
+enum PersonalizationEventMetric {
+  themeChanged('theme_changed'),
+  accessibilityUpdated('accessibility_updated'),
+  layoutUpdated('layout_updated'),
+  workspaceSwitched('workspace_switched'),
+  savedSearchCreated('saved_search_created'),
+  favoriteAdded('favorite_added');
+
+  const PersonalizationEventMetric(this.rpcValue);
+
+  final String rpcValue;
+}
+
+/// Anonymous aggregate data returned by `get_admin_personalization_analytics`.
+class PersonalizationAnalyticsSnapshot {
+  const PersonalizationAnalyticsSnapshot({
+    required this.loadedAt,
+    required this.periodDays,
+    required this.preferenceProfiles,
+    required this.accessibilityAdoptionPct,
+    required this.savedSearches,
+    required this.favorites,
+    required this.dashboardLayouts,
+    required this.workspaceSwitchesToday,
+    required this.themeDistribution,
+    required this.eventsByType,
+    required this.dailySeries,
+    this.favoriteTypes = const [],
+  });
+
+  final DateTime loadedAt;
+  final int periodDays;
+  final int preferenceProfiles;
+  final double accessibilityAdoptionPct;
+  final int savedSearches;
+  final int favorites;
+  final int dashboardLayouts;
+  final int workspaceSwitchesToday;
+  final List<PersonalizationMetricBreakdown> themeDistribution;
+  final List<PersonalizationMetricBreakdown> eventsByType;
+  final List<PersonalizationDailyMetric> dailySeries;
+  final List<PersonalizationMetricBreakdown> favoriteTypes;
+
+  int get totalEvents =>
+      eventsByType.fold(0, (total, item) => total + item.count);
+
+  bool get isEmpty =>
+      preferenceProfiles == 0 &&
+      savedSearches == 0 &&
+      favorites == 0 &&
+      dashboardLayouts == 0 &&
+      workspaceSwitchesToday == 0 &&
+      totalEvents == 0 &&
+      themeDistribution.every((item) => item.count == 0) &&
+      dailySeries.every((item) => item.events == 0);
+
+  factory PersonalizationAnalyticsSnapshot.fromJson(Map<String, dynamic> json) {
+    List<PersonalizationMetricBreakdown> breakdown(String key) {
+      final value = json[key];
+      if (value is! List) return const [];
+      return value
+          .whereType<Map>()
+          .map(
+            (item) => PersonalizationMetricBreakdown.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
+          .toList(growable: false);
+    }
+
+    final rawDaily = json['daily_series'];
+    return PersonalizationAnalyticsSnapshot(
+      loadedAt:
+          DateTime.tryParse(json['loaded_at']?.toString() ?? '')?.toLocal() ??
+          DateTime.now(),
+      periodDays: (json['period_days'] as num?)?.toInt() ?? 30,
+      preferenceProfiles: (json['preference_profiles'] as num?)?.toInt() ?? 0,
+      accessibilityAdoptionPct:
+          (json['accessibility_adoption_pct'] as num?)?.toDouble() ?? 0,
+      savedSearches: (json['saved_searches'] as num?)?.toInt() ?? 0,
+      favorites: (json['favorites'] as num?)?.toInt() ?? 0,
+      dashboardLayouts: (json['dashboard_layouts'] as num?)?.toInt() ?? 0,
+      workspaceSwitchesToday:
+          (json['workspace_switches_today'] as num?)?.toInt() ?? 0,
+      themeDistribution: breakdown('theme_distribution'),
+      eventsByType: breakdown('events_by_type'),
+      favoriteTypes: breakdown('favorite_types'),
+      dailySeries: rawDaily is List
+          ? rawDaily
+                .whereType<Map>()
+                .map(
+                  (item) => PersonalizationDailyMetric.fromJson(
+                    Map<String, dynamic>.from(item),
+                  ),
+                )
+                .toList(growable: false)
+          : const [],
+    );
+  }
+}
+
 /// Preference Engine — role templates, greetings, adaptive suggestions.
 abstract final class PreferenceEngine {
   static List<DashboardWidgetConfig> defaultWidgetsForRole(AppRole? role) {
     final ids = switch (role) {
       AppRole.investor => const [
-          DashboardWidgetId.portfolioValue,
-          DashboardWidgetId.roi,
-          DashboardWidgetId.investmentPerformance,
-          DashboardWidgetId.marketUpdates,
-          DashboardWidgetId.financialReports,
-          DashboardWidgetId.documents,
-          DashboardWidgetId.notifications,
-        ],
+        DashboardWidgetId.portfolioValue,
+        DashboardWidgetId.roi,
+        DashboardWidgetId.investmentPerformance,
+        DashboardWidgetId.marketUpdates,
+        DashboardWidgetId.financialReports,
+        DashboardWidgetId.documents,
+        DashboardWidgetId.notifications,
+      ],
       AppRole.superAdmin || AppRole.admin => const [
-          DashboardWidgetId.executiveKpis,
-          DashboardWidgetId.sales,
-          DashboardWidgetId.revenue,
-          DashboardWidgetId.activeProjects,
-          DashboardWidgetId.investorActivity,
-          DashboardWidgetId.organizationHealth,
-          DashboardWidgetId.notifications,
-        ],
+        DashboardWidgetId.executiveKpis,
+        DashboardWidgetId.sales,
+        DashboardWidgetId.revenue,
+        DashboardWidgetId.activeProjects,
+        DashboardWidgetId.investorActivity,
+        DashboardWidgetId.organizationHealth,
+        DashboardWidgetId.notifications,
+      ],
       AppRole.salesTeam ||
       AppRole.finance ||
       AppRole.marketing ||
-      AppRole.constructionManager =>
-        const [
-          DashboardWidgetId.assignedTasks,
-          DashboardWidgetId.leads,
-          DashboardWidgetId.calendar,
-          DashboardWidgetId.notifications,
-          DashboardWidgetId.teamActivity,
-          DashboardWidgetId.performance,
-        ],
+      AppRole.constructionManager => const [
+        DashboardWidgetId.assignedTasks,
+        DashboardWidgetId.leads,
+        DashboardWidgetId.calendar,
+        DashboardWidgetId.notifications,
+        DashboardWidgetId.teamActivity,
+        DashboardWidgetId.performance,
+      ],
       _ => const [
-          DashboardWidgetId.savedProperties,
-          DashboardWidgetId.recentlyViewed,
-          DashboardWidgetId.recommendations,
-          DashboardWidgetId.upcomingBookings,
-          DashboardWidgetId.messages,
-          DashboardWidgetId.notifications,
-        ],
+        DashboardWidgetId.savedProperties,
+        DashboardWidgetId.recentlyViewed,
+        DashboardWidgetId.recommendations,
+        DashboardWidgetId.upcomingBookings,
+        DashboardWidgetId.messages,
+        DashboardWidgetId.notifications,
+      ],
     };
     return [
       for (var i = 0; i < ids.length; i++)
@@ -651,13 +798,14 @@ abstract final class PreferenceEngine {
     final salutation = hour < 12
         ? 'Good morning'
         : hour < 17
-            ? 'Good afternoon'
-            : 'Good evening';
+        ? 'Good afternoon'
+        : 'Good evening';
     final first = displayName.trim().split(RegExp(r'\s+')).first;
     final highlights = <String>[
       if (newMatches > 0) '$newMatches new property matches',
       if (unreadMessages > 0) '$unreadMessages unread messages',
-      if (upcomingInspections > 0) '$upcomingInspections upcoming inspection(s)',
+      if (upcomingInspections > 0)
+        '$upcomingInspections upcoming inspection(s)',
     ];
     if (highlights.isEmpty) {
       highlights.add('Welcome back — your workspace is ready.');
@@ -699,8 +847,7 @@ abstract final class PreferenceEngine {
       out.add(
         const AdaptiveSuggestion(
           id: 'hide-stale-widget',
-          message:
-              "You haven't used this widget in 60 days. Hide it?",
+          message: "You haven't used this widget in 60 days. Hide it?",
           actionKey: 'hide_stale_widget',
         ),
       );
@@ -710,8 +857,9 @@ abstract final class PreferenceEngine {
 
   static List<String> recommendProperties(PropertyInterestProfile interests) {
     final city = interests.cities.isNotEmpty ? interests.cities.first : 'Lagos';
-    final type =
-        interests.propertyTypes.isNotEmpty ? interests.propertyTypes.first : 'apartment';
+    final type = interests.propertyTypes.isNotEmpty
+        ? interests.propertyTypes.first
+        : 'apartment';
     return [
       'Featured $type in $city',
       if (interests.minBedrooms != null)
@@ -753,21 +901,8 @@ abstract final class PreferenceEngine {
       isDefault: layout.isDefault,
       workspaceSlug: layout.workspaceSlug,
       widgets: [
-        for (var i = 0; i < widgets.length; i++)
-          widgets[i].copyWith(order: i),
+        for (var i = 0; i < widgets.length; i++) widgets[i].copyWith(order: i),
       ],
     );
-  }
-
-  /// Demo anonymized metrics for Executive Personalization Analytics.
-  static List<({String label, String value})> executiveAnalyticsDemo() {
-    return const [
-      (label: 'Most-used theme', value: 'System / Light'),
-      (label: 'Top dashboard widget', value: 'Saved Properties'),
-      (label: 'Accessibility adoption', value: '12%'),
-      (label: 'Saved searches / week', value: '184'),
-      (label: 'Workspace switches / day', value: '46'),
-      (label: 'Favorite property category', value: 'Apartments · Lagos'),
-    ];
   }
 }

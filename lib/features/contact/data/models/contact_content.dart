@@ -13,6 +13,21 @@ enum ContactChannelId {
   virtualMeeting,
 }
 
+/// Deep-link / scroll targets for the Contact Hub page.
+enum ContactScrollTarget {
+  options,
+  offices,
+  inspection,
+  consultation,
+  callback,
+  liveChat,
+  whatsapp,
+  support,
+  careers,
+  partnerships,
+  newsletter,
+}
+
 enum OfficeType { headOffice, regional, salesCenter, construction }
 
 enum DepartmentId {
@@ -161,9 +176,13 @@ class ContactHubCms {
   const ContactHubCms({
     required this.heroHeadline,
     required this.heroSubheadline,
+    this.backgroundImageUrl,
+    this.backgroundVideoUrl,
     required this.phone,
     required this.whatsapp,
     required this.email,
+    this.supportHours = 'Mon–Fri 8:00 AM – 5:00 PM',
+    this.officeLabel = 'Abuja, Nigeria',
     required this.contactOptions,
     required this.offices,
     required this.departments,
@@ -180,9 +199,15 @@ class ContactHubCms {
 
   final String heroHeadline;
   final String heroSubheadline;
+  final String? backgroundImageUrl;
+  final String? backgroundVideoUrl;
   final String phone;
   final String whatsapp;
   final String email;
+  /// Public support hours from Platform Control Center (contact.support_hours).
+  final String supportHours;
+  /// Short office label for footers (city / address from admin).
+  final String officeLabel;
   final List<ContactOption> contactOptions;
   final List<OfficeLocation> offices;
   final List<DepartmentInfo> departments;
@@ -195,6 +220,54 @@ class ContactHubCms {
   final List<String> whatsappDepartments;
   final List<String> crmPipelineStages;
   final List<String> popularFaqCategories;
+
+  ContactHubCms copyWith({
+    String? heroHeadline,
+    String? heroSubheadline,
+    String? backgroundImageUrl,
+    String? backgroundVideoUrl,
+    String? phone,
+    String? whatsapp,
+    String? email,
+    String? supportHours,
+    String? officeLabel,
+    List<ContactOption>? contactOptions,
+    List<OfficeLocation>? offices,
+    List<DepartmentInfo>? departments,
+    List<String>? inspectionProperties,
+    List<String>? inspectionEstates,
+    List<String>? consultationTypes,
+    List<CalendarSlot>? calendarSlots,
+    List<ContactFaqItem>? faqs,
+    List<EmergencyContact>? emergencyContacts,
+    List<String>? whatsappDepartments,
+    List<String>? crmPipelineStages,
+    List<String>? popularFaqCategories,
+  }) {
+    return ContactHubCms(
+      heroHeadline: heroHeadline ?? this.heroHeadline,
+      heroSubheadline: heroSubheadline ?? this.heroSubheadline,
+      backgroundImageUrl: backgroundImageUrl ?? this.backgroundImageUrl,
+      backgroundVideoUrl: backgroundVideoUrl ?? this.backgroundVideoUrl,
+      phone: phone ?? this.phone,
+      whatsapp: whatsapp ?? this.whatsapp,
+      email: email ?? this.email,
+      supportHours: supportHours ?? this.supportHours,
+      officeLabel: officeLabel ?? this.officeLabel,
+      contactOptions: contactOptions ?? this.contactOptions,
+      offices: offices ?? this.offices,
+      departments: departments ?? this.departments,
+      inspectionProperties: inspectionProperties ?? this.inspectionProperties,
+      inspectionEstates: inspectionEstates ?? this.inspectionEstates,
+      consultationTypes: consultationTypes ?? this.consultationTypes,
+      calendarSlots: calendarSlots ?? this.calendarSlots,
+      faqs: faqs ?? this.faqs,
+      emergencyContacts: emergencyContacts ?? this.emergencyContacts,
+      whatsappDepartments: whatsappDepartments ?? this.whatsappDepartments,
+      crmPipelineStages: crmPipelineStages ?? this.crmPipelineStages,
+      popularFaqCategories: popularFaqCategories ?? this.popularFaqCategories,
+    );
+  }
 }
 
 class LeadQualificationInput {

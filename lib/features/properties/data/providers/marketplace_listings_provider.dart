@@ -1,9 +1,174 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/domain/entities/cms_models.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/properties/data/models/marketplace_property.dart';
 
+/// Public properties marketplace — backed by published CMS properties when
+/// Supabase is configured, falling back to the curated sample list
+/// otherwise (or while the CMS has no published properties yet).
 final marketplaceListingsProvider = Provider<List<MarketplaceProperty>>((ref) {
-  return _sampleListings;
+  final configured = ref.watch(supabaseConfiguredProvider);
+  if (!configured) return _sampleListings;
+
+  ref.watch(publishedPropertiesRealtimeProvider);
+  final publishedAsync = ref.watch(publishedPropertiesCatalogProvider);
+  return publishedAsync.when(
+    skipLoadingOnReload: true,
+    skipLoadingOnRefresh: true,
+    data: (properties) => properties.map(toMarketplaceProperty).toList(),
+    loading: () => const [],
+    error: (_, _) => const [],
+  );
 });
+
+/// True while the live catalog has never resolved (first paint).
+final marketplaceListingsLoadingProvider = Provider<bool>((ref) {
+  if (!ref.watch(supabaseConfiguredProvider)) return false;
+  final async = ref.watch(publishedPropertiesCatalogProvider);
+  return async.isLoading && async.valueOrNull == null;
+});
+
+MarketplaceProperty toMarketplaceProperty(CmsPropertyFeatured p) {
+  final statusText = '${p.marketingStatus ?? ''} ${p.displayStatus}'.toLowerCase();
+  final typeRaw = (p.propertyType ?? p.homepageBadge ?? '').toLowerCase();
+  final titleRaw = p.title.toLowerCase();
+  final amenityHay = p.amenities.join(' ').toLowerCase();
+  final investHay = (p.investmentPotential ?? '').toLowerCase();
+  final hay = '$typeRaw $titleRaw $statusText $amenityHay $investHay';
+
+  final completionStatus = hay.contains('off-plan') || hay.contains('off plan')
+      ? CompletionStatus.offPlan
+      : hay.contains('construction') || hay.contains('building')
+          ? CompletionStatus.underConstruction
+          : CompletionStatus.readyToMove;
+
+  final typeLabel = (p.propertyType ?? 'Property').replaceAll('_', ' ');
+  final capitalizedType = typeLabel.isEmpty
+      ? 'Property'
+      : '${typeLabel[0].toUpperCase()}${typeLabel.substring(1)}';
+
+  final category = hay.contains('land') || hay.contains('plot')
+      ? PropertyCategory.land
+      : hay.contains('commercial') ||
+              hay.contains('retail') ||
+              hay.contains('office') ||
+              hay.contains('plaza')
+          ? PropertyCategory.commercial
+          : hay.contains('invest') ||
+                  hay.contains('off-plan') ||
+                  hay.contains('off plan')
+              ? PropertyCategory.investment
+              : PropertyCategory.residential;
+
+  final purpose = hay.contains('rent') || hay.contains('lease')
+      ? PropertyPurpose.rent
+      : hay.contains('invest') ||
+              category == PropertyCategory.commercial ||
+              category == PropertyCategory.land ||
+              category == PropertyCategory.investment
+          ? PropertyPurpose.invest
+          : PropertyPurpose.buy;
+
+  final created = p.createdAt ?? p.updatedAt ?? DateTime.now();
+  final isNew = p.homepageBadge?.toLowerCase().contains('new') ?? false;
+  final availability = statusText.contains('sold')
+      ? AvailabilityLevel.soldOut
+      : statusText.contains('reserved') || statusText.contains('limited')
+          ? AvailabilityLevel.limited
+          : AvailabilityLevel.available;
+
+  final priceValue = p.listingPrice?.round() ?? 0;
+  final bedrooms = p.bedrooms?.round() ?? 0;
+  final lifestyleTags = p.amenities
+      .map((a) => a.trim())
+      .where((a) => a.isNotEmpty)
+      .take(6)
+      .toList();
+
+  final hasPaymentPlan = p.detailExtras?.paymentPlans.any(
+        (plan) => plan.name.trim().isNotEmpty && plan.months > 0,
+      ) ??
+      false;
+
+  // Scores are not admin-entered. Keep them off the public listing.
+  const matchScore = 0;
+  const investmentScore = 0;
+
+  final geo = _approxGeo(p.city, p.state);
+
+  return MarketplaceProperty(
+    id: p.id,
+    title: p.title,
+    slug: p.slug,
+    price: p.displayPrice,
+    priceValue: priceValue,
+    location: p.location,
+    city: p.city ?? '',
+    state: p.state ?? '',
+    estate: p.estateName ?? '',
+    type: capitalizedType,
+    category: category,
+    purpose: purpose,
+    bedrooms: bedrooms,
+    bathrooms: p.bathrooms?.round() ?? 0,
+    landSize: p.landSizeLabel,
+    buildingSize: p.buildingSizeLabel,
+    status: p.displayStatus,
+    completionStatus: completionStatus,
+    amenities: p.amenities,
+    paymentOptions: hasPaymentPlan
+        ? const ['Installment', 'Outright']
+        : const ['Outright'],
+    developer: 'HD Homes',
+    isFeatured: p.isFeatured,
+    isNew: isNew,
+    isVerified: false,
+    hasPaymentPlan: hasPaymentPlan,
+    matchScore: matchScore,
+    investmentScore: investmentScore,
+    availability: availability,
+    roiEstimate: p.investmentPotential ?? '',
+    rentalYield: '',
+    capitalAppreciation: p.detailExtras?.appreciationEstimate ?? '',
+    riskLevel: '',
+    lifestyleTags: lifestyleTags,
+    imageUrl: p.coverImageUrl,
+    galleryUrls: p.galleryUrls.isNotEmpty
+        ? p.galleryUrls
+        : (p.coverImageUrl != null ? [p.coverImageUrl!] : const []),
+    lat: geo.$1,
+    lng: geo.$2,
+    createdAt: created,
+    popularity: p.isFeatured ? 80 : (isNew ? 65 : 40),
+    toilets: p.toilets?.round(),
+    kitchens: p.kitchens?.round(),
+    parkingSpaces: p.parkingSpaces,
+    floors: p.floors,
+    yearBuilt: p.yearBuilt,
+    powerSupply: p.powerSupply,
+    waterSupply: p.waterSupply,
+    internetConnectivity: p.internetConnectivity,
+    overviewSummary: p.overviewText.isEmpty ? null : p.overviewText,
+    architecturalConcept: p.architecturalConcept,
+    investmentPotentialText: p.investmentPotential,
+    propertyCodeOverride: p.propertyCode,
+    detailExtras: p.detailExtras,
+    promoPrice: p.promoPrice,
+  );
+}
+
+(double, double) _approxGeo(String? city, String? state) {
+  final hay = '${city ?? ''} ${state ?? ''}'.toLowerCase();
+  if (hay.contains('abuja') || hay.contains('fct')) return (9.0765, 7.3986);
+  if (hay.contains('port harcourt') || hay.contains('rivers')) {
+    return (4.8156, 7.0498);
+  }
+  if (hay.contains('enugu')) return (6.4413, 7.4983);
+  if (hay.contains('ibadan') || hay.contains('oyo')) return (7.3775, 3.9470);
+  // Default Lagos corridor
+  return (6.4474, 3.5562);
+}
 
 final _sampleListings = [
   MarketplaceProperty(

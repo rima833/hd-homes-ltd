@@ -45,7 +45,16 @@ class AuthSessionSnapshot {
 
   bool get isStaff => profile?.isStaff ?? false;
 
+  /// Canonical People/Attendance identity for the authenticated staff member.
+  String? get employeeId => profile?.employeeId;
+
   bool get isInvestor => profile?.isInvestor ?? false;
+
+  bool get canAccessInvestorPortal {
+    final role = primaryRole;
+    if (role != null && role.canAccessInvestorPortal) return true;
+    return roles.any((r) => r.canAccessInvestorPortal);
+  }
 
   AuthSessionSnapshot copyWith({
     AuthStatus? status,

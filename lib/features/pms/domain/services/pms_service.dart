@@ -1,16 +1,15 @@
 import 'package:hdhomesproject/features/pms/domain/entities/pms_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Loads Property Command Center snapshot from Supabase (falls back to demo).
+/// Loads the Property Command Center from Supabase.
 class PmsService {
   PmsService({SupabaseClient? client}) : _client = client;
 
   final SupabaseClient? _client;
 
   Future<PmsCommandCenterSnapshot> loadCommandCenter() async {
-    final demo = PmsDemo.snapshot();
     final client = _client;
-    if (client == null) return demo;
+    if (client == null) return _emptySnapshot();
 
     try {
       final propertyRows = await client.from('properties').select(
@@ -38,13 +37,15 @@ class PmsService {
         properties.add(PmsProperty.fromJson(map));
       }
 
-      if (properties.isEmpty) return demo;
+      if (properties.isEmpty) return _emptySnapshot(fromRemote: true);
 
-      List<PmsInspection> inspections = demo.inspections;
+      List<PmsInspection> inspections = const [];
       try {
         final inspRows = await client
             .from('property_inspections')
-            .select()
+            .select(
+              '*, properties(title, city, state)',
+            )
             .order('scheduled_at', ascending: true)
             .limit(20);
         if (inspRows.isNotEmpty) {
@@ -58,7 +59,7 @@ class PmsService {
         }
       } catch (_) {}
 
-      List<PmsLifecycleEvent> lifecycle = demo.lifecycle;
+      List<PmsLifecycleEvent> lifecycle = const [];
       try {
         final lifeRows = await client
             .from('property_lifecycle_events')
@@ -76,7 +77,7 @@ class PmsService {
         }
       } catch (_) {}
 
-      List<PmsApprovalStep> approvals = demo.approvalsPending;
+      List<PmsApprovalStep> approvals = const [];
       try {
         final approvalRows = await client
             .from('property_approvals')
@@ -143,7 +144,18 @@ class PmsService {
         }
       } catch (_) {}
 
-      var estateTwin = demo.estateTwin;
+      var estateTwin = PmsEstateTwin(
+        estateName: properties.first.estateName ?? 'Portfolio',
+        availableUnits: properties
+            .where((p) => p.inventoryStatus == InventoryStatus.available)
+            .length,
+        reservedUnits: properties
+            .where((p) => p.inventoryStatus == InventoryStatus.reserved)
+            .length,
+        soldUnits: properties
+            .where((p) => p.inventoryStatus == InventoryStatus.sold)
+            .length,
+      );
       try {
         final estateRows = await client
             .from('estates')
@@ -151,7 +163,7 @@ class PmsService {
             .limit(5);
         if (estateRows.isNotEmpty) {
           final first = Map<String, dynamic>.from(estateRows.first as Map);
-          final name = first['name'] as String? ?? demo.estateTwin.estateName;
+          final name = first['name'] as String? ?? estateTwin.estateName;
           estateTwin = PmsEstateTwin(
             estateName: name,
             availableUnits: properties
@@ -163,8 +175,8 @@ class PmsService {
             soldUnits: properties
                 .where((p) => p.inventoryStatus == InventoryStatus.sold)
                 .length,
-            constructionLabel: demo.estateTwin.constructionLabel,
-            hierarchySample: demo.estateTwin.hierarchySample,
+            constructionLabel: '',
+            hierarchySample: const [],
           );
         }
       } catch (_) {}
@@ -175,15 +187,36 @@ class PmsService {
         inspections: inspections,
         lifecycle: lifecycle,
         approvalsPending: approvals,
-        aiInsights: demo.aiInsights,
+        aiInsights: const [],
         estateTwin: estateTwin,
-        inventoryIntelligence: demo.inventoryIntelligence,
+        inventoryIntelligence: const [],
         fromRemote: true,
         loadedAt: DateTime.now(),
       );
     } catch (_) {
-      return demo;
+      return _emptySnapshot(fromRemote: true);
     }
+  }
+
+  PmsCommandCenterSnapshot _emptySnapshot({bool fromRemote = false}) {
+    return PmsCommandCenterSnapshot(
+      kpis: PmsDemo.aggregateKpis(const []),
+      properties: const [],
+      inspections: const [],
+      lifecycle: const [],
+      approvalsPending: const [],
+      aiInsights: const [],
+      estateTwin: const PmsEstateTwin(
+        estateName: 'Portfolio',
+        availableUnits: 0,
+        reservedUnits: 0,
+        soldUnits: 0,
+        constructionLabel: '',
+      ),
+      inventoryIntelligence: const [],
+      fromRemote: fromRemote,
+      loadedAt: DateTime.now(),
+    );
   }
 
   String generateAiSummary(PmsProperty property) {

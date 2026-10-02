@@ -1,3 +1,4 @@
+import 'package:hdhomesproject/core/email/email_config.dart';
 import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/features/authentication/data/models/user_profile_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +8,7 @@ class AuthRemoteDataSource {
   AuthRemoteDataSource(this._client);
 
   final SupabaseClient _client;
+  late final EmailConfig _emailConfig = EmailConfig(_client);
 
   GoTrueClient get _auth => _client.auth;
 
@@ -29,17 +31,20 @@ class AuthRemoteDataSource {
     String? firstName,
     String? lastName,
     Map<String, dynamic>? metadata,
-  }) {
+  }) async {
     final data = <String, dynamic>{
       ...?metadata,
     };
     if (firstName != null) data['first_name'] = firstName;
     if (lastName != null) data['last_name'] = lastName;
 
+    final emailRedirectTo = await _emailConfig.authRedirect('/verify-email');
+
     return _auth.signUp(
       email: email,
       password: password,
       data: data,
+      emailRedirectTo: emailRedirectTo,
     );
   }
 
@@ -47,23 +52,52 @@ class AuthRemoteDataSource {
     return _auth.signOut(scope: scope);
   }
 
-  Future<void> resetPassword(String email) {
-    return _auth.resetPasswordForEmail(email);
+  Future<void> resetPassword(String email) async {
+    final redirectTo = await _emailConfig.authRedirect('/reset-password');
+    return _auth.resetPasswordForEmail(email, redirectTo: redirectTo);
   }
 
   Future<UserResponse> updatePassword(String newPassword) {
     return _auth.updateUser(UserAttributes(password: newPassword));
   }
 
-  Future<void> resendSignupEmail(String email) {
-    return _auth.resend(type: OtpType.signup, email: email);
+  Future<void> resendSignupEmail(String email) async {
+    final emailRedirectTo = await _emailConfig.authRedirect('/verify-email');
+    await _auth.resend(
+      type: OtpType.signup,
+      email: email,
+      emailRedirectTo: emailRedirectTo,
+    );
+  }
+
+  /// Forces a fresh Auth user payload (includes `email_confirmed_at`).
+  Future<User?> refreshAuthUser() async {
+    try {
+      final response = await _auth.getUser();
+      return response.user;
+    } catch (_) {
+      try {
+        final refreshed = await _auth.refreshSession();
+        return refreshed.user ?? _auth.currentUser;
+      } catch (_) {
+        return _auth.currentUser;
+      }
+    }
+  }
+
+  Future<UserResponse> updateEmail(String newEmail) async {
+    final emailRedirectTo = await _emailConfig.authRedirect('/verify-email');
+    return _auth.updateUser(
+      UserAttributes(email: newEmail),
+      emailRedirectTo: emailRedirectTo,
+    );
   }
 
   Future<UserProfileModel?> fetchProfile(String userId, {bool emailConfirmed = true}) async {
     final response = await _client
         .from('profiles')
         .select('''
-          id, email, first_name, last_name, phone, avatar_url, account_status,
+          id, email, first_name, last_name, phone, phone_verified, avatar_url, account_status,
           address, preferred_language, last_login_at,
           user_roles (
             is_primary,
@@ -74,6 +108,21 @@ class AuthRemoteDataSource {
         .maybeSingle();
 
     if (response == null) return null;
+
+    // `employees.user_id` is the canonical staff link. Resolve it into the
+    // session profile so Attendance/HCM and module ownership can share identity.
+    try {
+      final employee = await _client
+          .from('employees')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('is_deleted', false)
+          .maybeSingle();
+      if (employee != null) response['employee_id'] = employee['id'];
+    } catch (_) {
+      // Non-staff users and deployments without employee self-read still sign in.
+    }
+
     return UserProfileModel.fromJson(response, emailConfirmed: emailConfirmed);
   }
 
@@ -102,29 +151,6 @@ class AuthRemoteDataSource {
   }
 
   AppException mapAuthError(Object error) {
-    if (error is AuthException) {
-      return AuthenticationException(_friendlyAuthMessage(error.message), cause: error);
-    }
-    if (error is PostgrestException) {
-      return DatabaseException(error.message, cause: error);
-    }
-    return const AuthenticationException('Authentication failed. Please try again.');
-  }
-
-  String _friendlyAuthMessage(String raw) {
-    final lower = raw.toLowerCase();
-    if (lower.contains('invalid login') || lower.contains('invalid credentials')) {
-      return 'Incorrect email or password.';
-    }
-    if (lower.contains('email not confirmed')) {
-      return 'Please verify your email before signing in.';
-    }
-    if (lower.contains('user already registered')) {
-      return 'An account with this email already exists.';
-    }
-    if (lower.contains('rate limit') || lower.contains('too many')) {
-      return 'Too many attempts. Please wait and try again.';
-    }
-    return 'Unable to complete authentication. Please try again.';
+    return mapToAppException(error);
   }
 }

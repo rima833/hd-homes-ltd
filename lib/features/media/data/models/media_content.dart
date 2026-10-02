@@ -58,12 +58,14 @@ class MediaGalleryImage {
     required this.category,
     required this.caption,
     required this.alt,
+    this.imageUrl,
   });
 
   final String id;
   final MediaGalleryCategory category;
   final String caption;
   final String alt;
+  final String? imageUrl;
 }
 
 class VirtualTourRoom {
@@ -216,6 +218,8 @@ class MediaExperience {
     required this.openHouses,
     required this.timeline,
     required this.relatedSlugs,
+    this.imageUrl,
+    this.listingPath,
   });
 
   final String slug;
@@ -238,12 +242,16 @@ class MediaExperience {
   final List<VirtualOpenHouse> openHouses;
   final List<MediaTimelineEvent> timeline;
   final List<String> relatedSlugs;
+  final String? imageUrl;
+  final String? listingPath;
 }
 
 class MediaHubCms {
   const MediaHubCms({
     required this.heroHeadline,
     required this.heroSubheadline,
+    this.backgroundImageUrl,
+    this.backgroundVideoUrl,
     required this.featuredExperiences,
     required this.pressKitItems,
     required this.brandAssets,
@@ -252,6 +260,8 @@ class MediaHubCms {
 
   final String heroHeadline;
   final String heroSubheadline;
+  final String? backgroundImageUrl;
+  final String? backgroundVideoUrl;
   final List<MediaExperienceSummary> featuredExperiences;
   final List<String> pressKitItems;
   final List<String> brandAssets;
@@ -265,6 +275,7 @@ class MediaExperienceSummary {
     required this.estateName,
     required this.thumbnailLabel,
     required this.mediaCount,
+    this.imageUrl,
   });
 
   final String slug;
@@ -272,6 +283,7 @@ class MediaExperienceSummary {
   final String estateName;
   final String thumbnailLabel;
   final int mediaCount;
+  final String? imageUrl;
 }
 
 extension MediaGalleryCategoryLabel on MediaGalleryCategory {

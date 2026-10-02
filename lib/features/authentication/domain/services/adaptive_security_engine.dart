@@ -41,7 +41,9 @@ abstract final class AdaptiveSecurityEngine {
       );
     }
 
-    if (trustedDevice && policy.requirement != MfaRequirement.mandatory) {
+    // Mandatory roles (super admin) always complete MFA. A remembered
+    // device only skips the challenge for optional or recommended roles.
+    if (trustedDevice && !policy.isMandatory) {
       return AdaptiveSecurityDecision(
         requireMfa: false,
         reason: 'trusted_device',

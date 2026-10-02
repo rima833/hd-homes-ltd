@@ -8,7 +8,6 @@ import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/features/properties/data/models/marketplace_property.dart';
 import 'package:hdhomesproject/features/properties/data/providers/marketplace_controller.dart';
 import 'package:hdhomesproject/features/properties/data/providers/marketplace_listings_provider.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 /// Section 8 — Property comparison + estate explorer.
 class MarketplaceComparisonSection extends ConsumerWidget {
@@ -29,7 +28,7 @@ class MarketplaceComparisonSection extends ConsumerWidget {
                 child: AnimatedSectionTitle(
                   overline: 'COMPARE',
                   title: 'Side-by-side comparison',
-                  subtitle: 'Compare up to 4 properties. Export PDF coming soon.',
+                  subtitle: 'Compare up to 4 properties side by side.',
                   alignment: TextAlign.start,
                 ),
               ),
@@ -70,16 +69,6 @@ class MarketplaceComparisonSection extends ConsumerWidget {
                 _row('Invest Score', properties.map((p) => '${p.investmentScore}').toList()),
               ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          PrimaryButton(
-            label: 'Export PDF',
-            icon: LucideIcons.download,
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('PDF export coming soon')),
-              );
-            },
           ),
         ],
       ),

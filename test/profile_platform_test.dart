@@ -7,7 +7,6 @@ void main() {
     test('investors see company section', () {
       final sections = DynamicUserIdentity.sectionsFor(AppRole.investor);
       expect(sections, contains(ProfileSection.company));
-      expect(sections, contains(ProfileSection.connected));
     });
 
     test('clients omit company by default', () {

@@ -15,20 +15,82 @@ class WelcomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final type = RegistrationAccountType.fromId(accountTypeId) ?? RegistrationAccountType.client;
+    final type =
+        RegistrationAccountType.fromId(accountTypeId) ?? RegistrationAccountType.client;
     final isInvestor = type == RegistrationAccountType.investor;
+    final isStaff = accountTypeId == 'staff';
 
-    final actions = isInvestor
+    final actions = isStaff
         ? const [
-            (LucideIcons.trendingUp, 'Explore investment opportunities', RoutePaths.investment),
-            (LucideIcons.shield, 'Review Trust Center safeguards', RoutePaths.trust),
-            (LucideIcons.bookOpen, 'Read investment guides', RoutePaths.blog),
+            (
+              LucideIcons.layoutDashboard,
+              'Open admin dashboard',
+              RoutePaths.dashboard,
+            ),
+            (
+              LucideIcons.users,
+              'Organization & staff',
+              RoutePaths.dashboardOrganization,
+            ),
+            (
+              LucideIcons.shield,
+              'Security center',
+              RoutePaths.securityCenter,
+            ),
           ]
-        : const [
-            (LucideIcons.search, 'Browse properties', RoutePaths.properties),
-            (LucideIcons.building2, 'Explore estates', RoutePaths.estates),
-            (LucideIcons.calendar, 'Book an inspection', RoutePaths.bookInspection),
-          ];
+        : isInvestor
+            ? const [
+                (
+                  LucideIcons.layoutDashboard,
+                  'Open investor portal',
+                  RoutePaths.investor,
+                ),
+                (
+                  LucideIcons.trendingUp,
+                  'Explore investment opportunities',
+                  RoutePaths.investment,
+                ),
+                (
+                  LucideIcons.shield,
+                  'Review Trust Center safeguards',
+                  RoutePaths.trust,
+                ),
+              ]
+            : const [
+                (
+                  LucideIcons.layoutDashboard,
+                  'Open client portal',
+                  RoutePaths.client,
+                ),
+                (
+                  LucideIcons.search,
+                  'Browse properties',
+                  RoutePaths.properties,
+                ),
+                (
+                  LucideIcons.calendar,
+                  'Book an inspection',
+                  RoutePaths.bookInspection,
+                ),
+              ];
+
+    final subtitle = isStaff
+        ? 'Your staff account is ready. Sign in to open the HD Homes admin dashboard.'
+        : isInvestor
+            ? 'Your investor account is ready. Complete KYC when prompted, explore opportunities, and access your portal after sign-in.'
+            : 'Your client account is ready. Save favorites, book inspections, and track your property journey.';
+
+    final primaryPath = isStaff
+        ? RoutePaths.staffOnboarding
+        : isInvestor
+            ? RoutePaths.investor
+            : RoutePaths.client;
+
+    final primaryLabel = isStaff
+        ? 'Complete staff profile'
+        : isInvestor
+            ? 'Open Investor Portal'
+            : 'Open Client Dashboard';
 
     return Scaffold(
       body: SafeArea(
@@ -47,12 +109,7 @@ class WelcomePage extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    isInvestor
-                        ? 'Your investor account is ready. Complete KYC when prompted, explore opportunities, and access your portal after sign-in.'
-                        : 'Your client account is ready. Save favorites, book inspections, and track your property journey.',
-                    textAlign: TextAlign.center,
-                  ),
+                  Text(subtitle, textAlign: TextAlign.center),
                   const SizedBox(height: AppSpacing.xl),
                   ...actions.map(
                     (a) => Card(
@@ -67,10 +124,10 @@ class WelcomePage extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   PrimaryButton(
-                    label: isInvestor ? 'Open Investor Portal' : 'Open Client Dashboard',
+                    label: primaryLabel,
                     expand: true,
                     icon: LucideIcons.layoutDashboard,
-                    onPressed: () => context.go(isInvestor ? RoutePaths.investor : RoutePaths.client),
+                    onPressed: () => context.go(primaryPath),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   PrimaryButton(

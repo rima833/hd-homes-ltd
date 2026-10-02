@@ -2,7 +2,7 @@
 abstract final class SeoConfig {
   static const siteUrl = String.fromEnvironment(
     'SITE_URL',
-    defaultValue: 'https://hdhomes.ng',
+    defaultValue: 'https://hdhomesltd.com',
   );
 
   static String canonicalFor(String path) {

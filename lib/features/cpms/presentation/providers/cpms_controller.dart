@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/core/utils/provider_lifecycle.dart';
 import 'package:hdhomesproject/features/cpms/domain/entities/cpms_models.dart';
 import 'package:hdhomesproject/features/cpms/domain/services/cpms_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,68 +14,169 @@ final cpmsServiceProvider = Provider<CpmsService>((ref) {
   );
 });
 
-final cpmsSnapshotProvider =
-    FutureProvider<CpmsCommandCenterSnapshot>((ref) async {
+final cpmsSnapshotProvider = FutureProvider<CpmsCommandCenterSnapshot>((
+  ref,
+) async {
   return ref.watch(cpmsServiceProvider).loadCommandCenter();
 });
+
+final cpmsRealtimeStatusProvider = StateProvider<bool>((ref) => false);
 
 /// Invalidates snapshot when CPMS live tables change (after SQL apply + Realtime).
 final cpmsRealtimeProvider = Provider<void>((ref) {
   if (!ref.watch(supabaseConfiguredProvider)) return;
   final client = ref.watch(supabaseClientProvider);
+  deferProviderMutation(
+    () => ref.read(cpmsRealtimeStatusProvider.notifier).state = false,
+  );
+
+  void bump() {
+    deferProviderMutation(() {
+      ref.invalidate(cpmsSnapshotProvider);
+      ref.read(cpmsRealtimeStatusProvider.notifier).state = true;
+    });
+  }
+
   final channel = client.channel('cpms-command-center')
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'construction_projects',
-      callback: (_) => ref.invalidate(cpmsSnapshotProvider),
+      callback: (_) => bump(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'project_milestones',
-      callback: (_) => ref.invalidate(cpmsSnapshotProvider),
+      callback: (_) => bump(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'project_tasks',
-      callback: (_) => ref.invalidate(cpmsSnapshotProvider),
+      callback: (_) => bump(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'project_change_orders',
-      callback: (_) => ref.invalidate(cpmsSnapshotProvider),
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'project_defects',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'project_contractors',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'project_budget_lines',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'project_procurement_requests',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'project_quality_checks',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'project_inspections',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'project_risk_register',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'project_notifications',
+      callback: (_) => bump(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'project_safety_incidents',
-      callback: (_) => ref.invalidate(cpmsSnapshotProvider),
+      callback: (_) => bump(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'project_site_diaries',
-      callback: (_) => ref.invalidate(cpmsSnapshotProvider),
+      callback: (_) => bump(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'project_activity_logs',
-      callback: (_) => ref.invalidate(cpmsSnapshotProvider),
+      callback: (_) => bump(),
     )
-    ..subscribe();
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'website_construction_updates',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'construction_updates',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'construction_photos',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'construction_progress_updates',
+      callback: (_) => bump(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'construction_update_media',
+      callback: (_) => bump(),
+    )
+    ..subscribe((status, [error]) {
+      final live = status == RealtimeSubscribeStatus.subscribed;
+      deferProviderMutation(() {
+        ref.read(cpmsRealtimeStatusProvider.notifier).state = live;
+      });
+    });
 
   ref.onDispose(() {
     unawaited(client.removeChannel(channel));
+    deferProviderMutation(() {
+      ref.read(cpmsRealtimeStatusProvider.notifier).state = false;
+    });
   });
 });
 
 enum CpmsCommandTab {
   overview,
   projects,
+  liveFeed,
   milestones,
   tasks,
   procurement,
@@ -86,18 +188,19 @@ enum CpmsCommandTab {
   wizard;
 
   String get label => switch (this) {
-        CpmsCommandTab.overview => 'Overview',
-        CpmsCommandTab.projects => 'Projects',
-        CpmsCommandTab.milestones => 'Milestones',
-        CpmsCommandTab.tasks => 'Tasks',
-        CpmsCommandTab.procurement => 'Procurement',
-        CpmsCommandTab.budget => 'Budget',
-        CpmsCommandTab.quality => 'Quality',
-        CpmsCommandTab.safety => 'Safety',
-        CpmsCommandTab.diary => 'Site Diary',
-        CpmsCommandTab.ai => 'AI Twin',
-        CpmsCommandTab.wizard => 'Wizard',
-      };
+    CpmsCommandTab.overview => 'Overview',
+    CpmsCommandTab.projects => 'Projects',
+    CpmsCommandTab.liveFeed => 'Updates',
+    CpmsCommandTab.milestones => 'Milestones',
+    CpmsCommandTab.tasks => 'Tasks',
+    CpmsCommandTab.procurement => 'Procurement',
+    CpmsCommandTab.budget => 'Budget',
+    CpmsCommandTab.quality => 'Quality',
+    CpmsCommandTab.safety => 'Safety',
+    CpmsCommandTab.diary => 'Site Diary',
+    CpmsCommandTab.ai => 'AI Twin',
+    CpmsCommandTab.wizard => 'Wizard',
+  };
 }
 
 class CpmsUiState {
@@ -133,8 +236,9 @@ class CpmsUiState {
   }) {
     return CpmsUiState(
       searchQuery: searchQuery ?? this.searchQuery,
-      statusFilter:
-          clearStatusFilter ? null : (statusFilter ?? this.statusFilter),
+      statusFilter: clearStatusFilter
+          ? null
+          : (statusFilter ?? this.statusFilter),
       selectedTab: selectedTab ?? this.selectedTab,
       selectedProjectId: clearSelectedProject
           ? null
@@ -243,7 +347,43 @@ class CpmsController extends Notifier<CpmsUiState> {
     }
     return snap.projects.isEmpty ? null : snap.projects.first;
   }
+
+  bool tabUsesProjectScope(CpmsCommandTab tab) => switch (tab) {
+    CpmsCommandTab.liveFeed ||
+    CpmsCommandTab.milestones ||
+    CpmsCommandTab.tasks ||
+    CpmsCommandTab.procurement ||
+    CpmsCommandTab.budget ||
+    CpmsCommandTab.quality ||
+    CpmsCommandTab.safety ||
+    CpmsCommandTab.diary => true,
+    _ => false,
+  };
+
+  void setProjectScope(String? projectId) {
+    if (projectId == null) {
+      state = state.copyWith(clearSelectedProject: true);
+    } else {
+      state = state.copyWith(selectedProjectId: projectId);
+    }
+  }
+
+  List<T> scopedByProject<T>(List<T> items, String? Function(T) projectId) {
+    final id = state.selectedProjectId;
+    if (id == null) return items;
+    return items.where((item) => projectId(item) == id).toList();
+  }
+
+  List<CpmsBudgetSummary> scopedBudgetSummaries(
+    CpmsCommandCenterSnapshot snap,
+  ) {
+    final summaries = snap.budgetSummaries();
+    final id = state.selectedProjectId;
+    if (id == null) return summaries;
+    return summaries.where((s) => s.projectId == id).toList();
+  }
 }
 
-final cpmsControllerProvider =
-    NotifierProvider<CpmsController, CpmsUiState>(CpmsController.new);
+final cpmsControllerProvider = NotifierProvider<CpmsController, CpmsUiState>(
+  CpmsController.new,
+);

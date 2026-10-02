@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
+import 'package:hdhomesproject/core/navigation/deferred_navigation.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/core/validators/phone_validator.dart';
 import 'package:hdhomesproject/core/website/l10n/app_strings.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
+import 'package:hdhomesproject/features/live_chat/presentation/providers/live_chat_providers.dart';
+import 'package:hdhomesproject/features/live_chat/presentation/widgets/public_live_chat_panel.dart';
+import 'package:hdhomesproject/features/settings/presentation/providers/platform_settings_providers.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -131,12 +137,12 @@ class _SearchSheetState extends State<_SearchSheet> {
 
   void _go(String path) {
     Navigator.pop(context);
-    context.go(path);
+    goDeferred(context, path);
   }
 
   void _goProperties() {
     Navigator.pop(context);
-    context.go(RoutePaths.properties);
+    goDeferred(context, RoutePaths.properties);
   }
 }
 
@@ -161,12 +167,51 @@ class _QuickLink extends StatelessWidget {
   }
 }
 
-/// WhatsApp, live chat, call, and book inspection FABs.
-class PublicFloatingActions extends StatelessWidget {
+/// WhatsApp, live chat, call, and book inspection FABs (bottom-right).
+class PublicFloatingActions extends ConsumerWidget {
   const PublicFloatingActions({super.key});
 
+  Future<void> _openWhatsApp(String? rawNumber) async {
+    final uri = PhoneValidator.whatsappUri(
+      rawNumber,
+      prefillText: 'Hello HD Homes',
+    );
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _call(String? rawPhone) async {
+    final digits = PhoneValidator.whatsappDigits(rawPhone);
+    if (digits == null || digits.isEmpty) return;
+    await launchUrl(Uri.parse('tel:+$digits'));
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(publishedPlatformSettingsProvider).valueOrNull;
+    final whatsapp = settings?.supportWhatsapp.trim() ?? '';
+    final phone = settings?.supportPhone.trim() ?? '';
+    final path = GoRouterState.of(context).uri.path;
+    final onContactHub = path == RoutePaths.contact;
+
+    final chatOpen = ref.watch(liveChatPanelOpenProvider);
+    // Contact Hub already has QuickRail + Live Chat section — never show the
+    // yellow/charcoal FAB stack there (it freezes taps over embedded wizards).
+    // Still allow the floating panel when an in-page CTA opens chat.
+    final showLiveChatFab =
+        (settings?.showLiveChatFab ?? true) && !onContactHub;
+    final showWhatsapp = !onContactHub &&
+        (settings?.showWhatsappFab ?? true) &&
+        whatsapp.isNotEmpty;
+    final showCall = !onContactHub &&
+        (settings?.showCallFabMobile ?? true) &&
+        phone.isNotEmpty;
+    final showBook = !onContactHub && (settings?.showBookFabMobile ?? true);
+
+    if (onContactHub && !(chatOpen && (settings?.showLiveChatFab ?? true))) {
+      return const SizedBox.shrink();
+    }
+
     return Positioned(
       right: AppSpacing.base,
       bottom: AppSpacing.base,
@@ -174,39 +219,64 @@ class PublicFloatingActions extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          FloatingActionButton.small(
-            heroTag: 'live_chat',
-            backgroundColor: AppColors.charcoal,
-            tooltip: 'Live chat',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Open HD Homes AI Concierge™ using the gold chat button')),
-              );
-            },
-            child: const Icon(LucideIcons.messageCircle, color: AppColors.white),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          FloatingActionButton.small(
-            heroTag: 'whatsapp',
-            backgroundColor: const Color(0xFF25D366),
-            tooltip: 'WhatsApp',
-            onPressed: () => launchUrl(Uri.parse('https://wa.me/')),
-            child: const Icon(LucideIcons.messageCircle, color: AppColors.white),
-          ),
-          if (context.isMobile) ...[
-            const SizedBox(height: AppSpacing.sm),
+          if (chatOpen && (settings?.showLiveChatFab ?? true)) ...[
+            const PublicLiveChatPanel(),
+            if (showLiveChatFab) const SizedBox(height: AppSpacing.sm),
+          ],
+          if (showLiveChatFab) ...[
             FloatingActionButton.small(
-              heroTag: 'call',
-              backgroundColor: AppColors.charcoal,
-              onPressed: () => launchUrl(Uri.parse('tel:')),
-              child: const Icon(LucideIcons.phone, color: AppColors.white),
+              heroTag: 'live_chat',
+              backgroundColor: chatOpen ? AppColors.gold : AppColors.charcoal,
+              tooltip: chatOpen ? 'Close live chat' : 'Live chat',
+              onPressed: () {
+                // Defer so we don't rebuild mid-gesture over a heavy page.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  ref.read(liveChatPanelOpenProvider.notifier).state = !chatOpen;
+                });
+              },
+              child: Icon(
+                chatOpen ? LucideIcons.x : LucideIcons.messageCircle,
+                color: chatOpen ? AppColors.deepBlack : AppColors.white,
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            PrimaryButton(
-              label: 'Book',
-              icon: LucideIcons.calendar,
-              onPressed: () => context.go(RoutePaths.bookInspection),
+          ],
+          if (showWhatsapp) ...[
+            FloatingActionButton.small(
+              heroTag: 'whatsapp',
+              backgroundColor: const Color(0xFF25D366),
+              tooltip: 'WhatsApp',
+              onPressed: () => _openWhatsApp(whatsapp),
+              child: const Icon(
+                LucideIcons.messageCircle,
+                color: AppColors.white,
+              ),
             ),
+          ],
+          if (context.isMobile) ...[
+            if (showCall) ...[
+              const SizedBox(height: AppSpacing.sm),
+              FloatingActionButton.small(
+                heroTag: 'call',
+                backgroundColor: AppColors.charcoal,
+                onPressed: () => _call(phone),
+                child: const Icon(LucideIcons.phone, color: AppColors.white),
+              ),
+            ],
+            if (showBook) ...[
+              const SizedBox(height: AppSpacing.sm),
+              PrimaryButton(
+                label: 'Book',
+                icon: LucideIcons.calendar,
+                onPressed: () {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (context.mounted) {
+                      goDeferred(context, RoutePaths.bookInspection);
+                    }
+                  });
+                },
+              ),
+            ],
           ],
         ],
       ),

@@ -77,29 +77,31 @@ class VerificationPolicy {
 }
 
 /// Default HD Homes policies (editable later from Admin without code changes via JSON).
+///
+/// Phone is collected at registration / profile — SMS OTP is not required.
 abstract final class VerificationPolicyCatalog {
   static const client = VerificationPolicy(
     role: AppRole.client,
     emailRequired: true,
-    phoneRequirement: PhoneVerificationRequirement.optional,
+    phoneRequirement: PhoneVerificationRequirement.disabled,
   );
 
   static const investor = VerificationPolicy(
     role: AppRole.investor,
     emailRequired: true,
-    phoneRequirement: PhoneVerificationRequirement.required,
+    phoneRequirement: PhoneVerificationRequirement.disabled,
   );
 
   static const staff = VerificationPolicy(
     role: AppRole.salesTeam,
     emailRequired: true,
-    phoneRequirement: PhoneVerificationRequirement.required,
+    phoneRequirement: PhoneVerificationRequirement.disabled,
   );
 
   static const superAdmin = VerificationPolicy(
     role: AppRole.superAdmin,
     emailRequired: true,
-    phoneRequirement: PhoneVerificationRequirement.required,
+    phoneRequirement: PhoneVerificationRequirement.disabled,
     mfaRecommended: true,
   );
 

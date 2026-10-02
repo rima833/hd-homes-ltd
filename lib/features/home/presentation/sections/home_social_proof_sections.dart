@@ -1,40 +1,147 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
-import 'package:hdhomesproject/core/website/components/animated_section_title.dart';
-import 'package:hdhomesproject/core/website/components/digital_trust_center.dart';
+import 'package:hdhomesproject/core/website/components/awards_recognitions_section.dart';
+import 'package:hdhomesproject/core/website/components/partners_affiliations_section.dart';
 import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
 import 'package:hdhomesproject/features/home/data/models/home_cms_content.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-/// Section 18 — Client success stories.
-class HomeTestimonialsSection extends StatelessWidget {
-  const HomeTestimonialsSection({super.key, required this.items});
+export 'package:hdhomesproject/features/home/presentation/sections/home_testimonials_section.dart';
 
-  final List<HomeTestimonialItem> items;
+/// Section 19 — Partners & affiliations (mockup).
+class HomePartnersSection extends StatelessWidget {
+  const HomePartnersSection({super.key, required this.partners});
+
+  final List<HomePartnerItem> partners;
+
+  @override
+  Widget build(BuildContext context) {
+    return PartnersAffiliationsSection(
+      partners: [
+        for (final p in partners)
+          PartnerAffiliationItem(
+            name: p.name,
+            category: p.category,
+            tagline: p.tagline,
+            logoUrl: p.logoUrl,
+            iconName: p.iconName,
+          ),
+      ],
+    );
+  }
+}
+
+/// Section 19b — Trust Center grid (mockup).
+class HomeTrustCenterSection extends StatelessWidget {
+  const HomeTrustCenterSection({super.key});
+
+  static const _items = [
+    (
+      LucideIcons.shieldCheck,
+      'Registered Developer',
+      'Corporate Affairs Commission verified',
+    ),
+    (
+      LucideIcons.shield,
+      'Licensed & Insured',
+      'Full regulatory compliance',
+    ),
+    (
+      LucideIcons.award,
+      'Industry Awards',
+      'Recognized excellence in development',
+    ),
+    (
+      LucideIcons.hardHat,
+      'Construction Milestones',
+      'Transparent project delivery',
+    ),
+    (
+      LucideIcons.quote,
+      'Verified Testimonials',
+      'Real clients, real results',
+    ),
+    (
+      LucideIcons.heartHandshake,
+      'Partner Network',
+      'Trusted institutional partners',
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return SectionWrapper(
+      backgroundColor: AppColors.deepBlack,
       child: Column(
         children: [
-          const AnimatedSectionTitle(
-            overline: 'CLIENT STORIES',
-            title: 'Success stories',
-            subtitle: 'Verified experiences from homeowners and investors.',
+          Text(
+            'TRUST CENTER',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.gold,
+                  letterSpacing: 2.4,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Built on transparency and proven delivery',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.playfairDisplay(
+              fontSize: context.isMobile ? 26 : 36,
+              fontWeight: FontWeight.w700,
+              color: AppColors.white,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.base),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Text(
+              'Every HD Homes project is backed by verifiable credentials, milestones, and partnerships.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondaryDark,
+                    height: 1.55,
+                  ),
+            ),
           ),
           const SizedBox(height: AppSpacing.xxl),
-          SizedBox(
-            height: context.isMobile ? 260 : 220,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.base),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return SizedBox(
-                  width: 360,
-                  child: _TestimonialCard(item: item),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.xl),
+              border: Border.all(
+                color: AppColors.white.withValues(alpha: 0.1),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = context.isMobile
+                    ? 1
+                    : context.isTablet
+                        ? 2
+                        : 3;
+                return Table(
+                  border: TableBorder.symmetric(
+                    inside: BorderSide(
+                      color: AppColors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  children: [
+                    for (var row = 0; row < (_items.length / columns).ceil(); row++)
+                      TableRow(
+                        children: [
+                          for (var col = 0; col < columns; col++)
+                            _TrustCell(
+                              item: row * columns + col < _items.length
+                                  ? _items[row * columns + col]
+                                  : null,
+                            ),
+                        ],
+                      ),
+                  ],
                 );
               },
             ),
@@ -45,99 +152,47 @@ class HomeTestimonialsSection extends StatelessWidget {
   }
 }
 
-class _TestimonialCard extends StatelessWidget {
-  const _TestimonialCard({required this.item});
+class _TrustCell extends StatelessWidget {
+  const _TrustCell({required this.item});
 
-  final HomeTestimonialItem item;
+  final (IconData, String, String)? item;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: AppRadius.cardBorder,
-        boxShadow: AppShadows.md,
-      ),
+    if (item == null) {
+      return const SizedBox.shrink();
+    }
+
+    final (icon, title, subtitle) = item!;
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              ...List.generate(
-                5,
-                (i) => Icon(
-                  i < item.rating.round() ? Icons.star_rounded : Icons.star_outline_rounded,
-                  color: AppColors.gold,
-                  size: 18,
+          Icon(icon, color: AppColors.gold, size: 22),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w700,
                 ),
-              ),
-              const Spacer(),
-              if (item.verified)
-                const Row(
-                  children: [
-                    Icon(LucideIcons.badgeCheck, size: 14, color: AppColors.gold),
-                    SizedBox(width: 4),
-                    Text('Verified', style: TextStyle(fontSize: 12)),
-                  ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondaryDark,
+                  height: 1.45,
                 ),
-            ],
           ),
-          const SizedBox(height: AppSpacing.base),
-          Expanded(
-            child: Text(
-              '"${item.quote}"',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.base),
-          Text(item.name, style: Theme.of(context).textTheme.titleSmall),
-          Text(item.role, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );
   }
 }
 
-/// Section 19 — Partners (wraps trust center partners strip).
-class HomePartnersSection extends StatelessWidget {
-  const HomePartnersSection({super.key, required this.partners});
-
-  final List<HomePartnerItem> partners;
-
-  @override
-  Widget build(BuildContext context) {
-    return SectionWrapper(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      child: Column(
-        children: [
-          const AnimatedSectionTitle(
-            overline: 'PARTNERS & CERTIFICATIONS',
-            title: 'Trusted partnerships',
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Wrap(
-            spacing: AppSpacing.base,
-            runSpacing: AppSpacing.base,
-            alignment: WrapAlignment.center,
-            children: partners
-                .map(
-                  (p) => Chip(
-                    avatar: const Icon(LucideIcons.building2, size: 16),
-                    label: Text('${p.name} · ${p.category}'),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: AppSpacing.section),
-          const DigitalTrustCenter(),
-        ],
-      ),
-    );
-  }
-}
-
-/// Section 20 — Company awards.
+/// Section 20 — Awards & recognition (mockup).
 class HomeAwardsSection extends StatelessWidget {
   const HomeAwardsSection({super.key, required this.awards});
 
@@ -145,25 +200,17 @@ class HomeAwardsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SectionWrapper(
-      child: Column(
-        children: [
-          const AnimatedSectionTitle(
-            overline: 'RECOGNITION',
-            title: 'Awards & achievements',
+    return AwardsRecognitionsSection(
+      awards: [
+        for (final a in awards)
+          AwardRecognitionItem(
+            title: a.title,
+            year: a.year,
+            issuer: a.issuer,
+            description: a.description,
+            iconName: a.iconName,
           ),
-          const SizedBox(height: AppSpacing.xxl),
-          for (final award in awards)
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: AppColors.gold,
-                child: Icon(LucideIcons.award, color: AppColors.deepBlack, size: 18),
-              ),
-              title: Text(award.title),
-              subtitle: Text('${award.issuer} · ${award.year}'),
-            ),
-        ],
-      ),
+      ],
     );
   }
 }

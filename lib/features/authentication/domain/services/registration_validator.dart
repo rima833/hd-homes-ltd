@@ -29,19 +29,21 @@ abstract final class PasswordStrengthEvaluator {
   }
 
   static Map<String, bool> checklist(String password) => {
-        'At least ${AuthSecurityPolicy.passwordMinLength} characters':
-            password.length >= AuthSecurityPolicy.passwordMinLength,
-        'Uppercase letter': RegExp(r'[A-Z]').hasMatch(password),
-        'Lowercase letter': RegExp(r'[a-z]').hasMatch(password),
-        'Number': RegExp(r'[0-9]').hasMatch(password),
-        'Special character':
-            RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\;/`~]').hasMatch(password),
-      };
+    'At least ${AuthSecurityPolicy.passwordMinLength} characters':
+        password.length >= AuthSecurityPolicy.passwordMinLength,
+    'Uppercase letter': RegExp(r'[A-Z]').hasMatch(password),
+    'Lowercase letter': RegExp(r'[a-z]').hasMatch(password),
+    'Number': RegExp(r'[0-9]').hasMatch(password),
+    'Special character': RegExp(
+      r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\;/`~]',
+    ).hasMatch(password),
+  };
 }
 
 /// Step and full-draft validation for Progressive Registration™.
 abstract final class RegistrationValidator {
   static String? validateAccountType(RegistrationDraft draft) {
+    if ((draft.invitationToken ?? '').trim().isNotEmpty) return null;
     if (draft.accountType == null || !draft.accountType!.enabled) {
       return 'Please select an account type';
     }
@@ -50,12 +52,36 @@ abstract final class RegistrationValidator {
 
   static Map<String, String?> validatePersonalInfo(RegistrationDraft draft) {
     return {
-      'firstName': NameValidator.validate(draft.firstName, fieldName: 'First name'),
-      'lastName': NameValidator.validate(draft.lastName, fieldName: 'Last name'),
+      'firstName': NameValidator.validate(
+        draft.firstName,
+        fieldName: 'First name',
+      ),
+      'lastName': NameValidator.validate(
+        draft.lastName,
+        fieldName: 'Last name',
+      ),
       'email': EmailValidator.validate(draft.email),
       'phone': PhoneValidator.validate(draft.phone),
       'country': draft.country.trim().isEmpty ? 'Country is required' : null,
       'state': draft.state.trim().isEmpty ? 'State is required' : null,
+    };
+  }
+
+  /// Staff invite acceptance: name, locked email, phone, and password.
+  /// Country and account type belong to the client/investor wizard.
+  static Map<String, String?> validateStaffAccess(RegistrationDraft draft) {
+    return {
+      'firstName': NameValidator.validate(
+        draft.firstName,
+        fieldName: 'First name',
+      ),
+      'lastName': NameValidator.validate(
+        draft.lastName,
+        fieldName: 'Last name',
+      ),
+      'email': EmailValidator.validate(draft.email),
+      'phone': PhoneValidator.validate(draft.phone),
+      ...validateCredentials(draft),
     };
   }
 
@@ -67,10 +93,7 @@ abstract final class RegistrationValidator {
     } else if (draft.password != draft.confirmPassword) {
       confirmError = 'Passwords do not match';
     }
-    return {
-      'password': passwordError,
-      'confirmPassword': confirmError,
-    };
+    return {'password': passwordError, 'confirmPassword': confirmError};
   }
 
   static String? validateLegal(RegistrationDraft draft) {
@@ -83,17 +106,29 @@ abstract final class RegistrationValidator {
   static bool stepIsValid(RegistrationStep step, RegistrationDraft draft) {
     return switch (step) {
       RegistrationStep.accountType => validateAccountType(draft) == null,
-      RegistrationStep.personalInfo =>
-        validatePersonalInfo(draft).values.every((e) => e == null),
-      RegistrationStep.credentials =>
-        validateCredentials(draft).values.every((e) => e == null),
+      RegistrationStep.personalInfo => validatePersonalInfo(
+        draft,
+      ).values.every((e) => e == null),
+      RegistrationStep.credentials => validateCredentials(
+        draft,
+      ).values.every((e) => e == null),
       RegistrationStep.legal => validateLegal(draft) == null,
-      RegistrationStep.review =>
-        validateAccountType(draft) == null &&
-            validatePersonalInfo(draft).values.every((e) => e == null) &&
-            validateCredentials(draft).values.every((e) => e == null) &&
-            validateLegal(draft) == null,
+      RegistrationStep.review => _reviewIsValid(draft),
     };
+  }
+
+  /// Staff invites use the staff form. They do not collect country, state,
+  /// or an account type. Client and investor signup still require every step.
+  static bool _reviewIsValid(RegistrationDraft draft) {
+    final invited = (draft.invitationToken ?? '').trim().isNotEmpty;
+    if (invited) {
+      return validateStaffAccess(draft).values.every((e) => e == null) &&
+          validateLegal(draft) == null;
+    }
+    return validateAccountType(draft) == null &&
+        validatePersonalInfo(draft).values.every((e) => e == null) &&
+        validateCredentials(draft).values.every((e) => e == null) &&
+        validateLegal(draft) == null;
   }
 
   static String? validateReferralCode(String? code) {

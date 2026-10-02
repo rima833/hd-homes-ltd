@@ -1,197 +1,274 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/constants/route_paths.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/domain/data/hub_page_cms.dart';
+import 'package:hdhomesproject/features/cms/domain/entities/cms_models.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/media/data/models/media_content.dart';
 
-final mediaHubCmsProvider = Provider<MediaHubCms>((ref) => _hubCms);
-
-final mediaExperienceProvider = Provider.family<MediaExperience?, String>((ref, slug) {
-  return _experiences[slug];
-});
-
-final mediaExperiencesProvider = Provider<List<MediaExperience>>((ref) => _experiences.values.toList());
-
-final _hubCms = MediaHubCms(
+const _hubFallback = MediaHubCms(
   heroHeadline: 'Experience Properties Before You Visit.',
   heroSubheadline:
-      'Immersive galleries, 360° tours, drone footage, floor plans, construction progress, and virtual open houses.',
-  featuredExperiences: const [
-    MediaExperienceSummary(
-      slug: 'horizon-gardens',
-      title: 'Horizon Gardens Estate',
-      estateName: 'Horizon Gardens',
-      thumbnailLabel: 'Estate Showcase',
-      mediaCount: 142,
-    ),
-    MediaExperienceSummary(
-      slug: 'h001',
-      title: 'Horizon Gardens 3BR Terrace',
-      estateName: 'Horizon Gardens',
-      thumbnailLabel: 'Property Tour',
-      mediaCount: 48,
-    ),
-    MediaExperienceSummary(
-      slug: 'emerald-heights',
-      title: 'Emerald Heights',
-      estateName: 'Emerald Heights',
-      thumbnailLabel: 'Construction Progress',
-      mediaCount: 86,
-    ),
-  ],
-  pressKitItems: const [
-    'HD Homes logo pack (PNG, SVG)',
-    'Brand guidelines PDF',
-    'Executive headshots',
-    'Award certificates',
-    'Press releases archive',
-    'Media contact directory',
-  ],
-  brandAssets: const [
-    'Primary logo — dark',
-    'Primary logo — light',
-    'Wordmark',
-    'Brand colors',
-    'Typography guide',
-  ],
-  analytics: const MediaAnalyticsSnapshot(
-    topPhoto: 'Horizon Gardens aerial dusk',
-    topVideo: 'Estate launch drone tour',
-    avgViewDuration: '4m 32s',
-    tourCompletionRate: '68%',
-    downloadCount: 1240,
-    shareCount: 890,
+      'Immersive galleries from published estates and properties — photos update live as the team publishes media.',
+  featuredExperiences: [],
+  pressKitItems: [],
+  brandAssets: [],
+  analytics: MediaAnalyticsSnapshot(
+    topPhoto: '—',
+    topVideo: '—',
+    avgViewDuration: '—',
+    tourCompletionRate: '—',
+    downloadCount: 0,
+    shareCount: 0,
   ),
 );
 
-final _experiences = <String, MediaExperience>{
-  'horizon-gardens': _horizonGardens,
-  'h001': _horizonTerrace,
-  'emerald-heights': _emeraldHeights,
-};
+final mediaGalleryCatalogProvider = Provider<List<MediaExperience>>((ref) {
+  ref.watch(publishedPropertiesRealtimeProvider);
+  ref.watch(publishedEstatesRealtimeProvider);
 
-MediaExperience get defaultMediaExperience => _horizonGardens;
+  final estates =
+      ref.watch(publishedEstatesCatalogProvider).valueOrNull ?? const [];
+  final properties =
+      ref.watch(publishedPropertiesCatalogProvider).valueOrNull ?? const [];
+  return buildMediaGalleryCatalog(
+    estates: estates,
+    properties: properties,
+  );
+});
 
-final _horizonGardens = MediaExperience(
-  slug: 'horizon-gardens',
-  propertyName: 'Horizon Gardens Estate',
-  estateName: 'Horizon Gardens',
-  mediaCount: 142,
-  heroHeadline: 'Horizon Gardens — Digital Showroom',
-  featuredCards: const [
-    MediaFeaturedCard(type: MediaAssetType.photo, title: 'Photos', iconName: 'image', count: 64, lastUpdated: 'Apr 2026', cta: 'View gallery'),
-    MediaFeaturedCard(type: MediaAssetType.video, title: 'Videos', iconName: 'video', count: 12, lastUpdated: 'Mar 2026', cta: 'Watch'),
-    MediaFeaturedCard(type: MediaAssetType.virtualTour, title: '360° Tour', iconName: 'rotate3d', count: 1, lastUpdated: 'Feb 2026', cta: 'Start tour'),
-    MediaFeaturedCard(type: MediaAssetType.drone, title: 'Drone Tour', iconName: 'plane', count: 4, lastUpdated: 'Apr 2026', cta: 'Fly over'),
-    MediaFeaturedCard(type: MediaAssetType.floorPlan, title: 'Floor Plans', iconName: 'layout', count: 8, lastUpdated: 'Jan 2026', cta: 'Explore'),
-    MediaFeaturedCard(type: MediaAssetType.construction, title: 'Construction', iconName: 'hardHat', count: 24, lastUpdated: 'Weekly', cta: 'View progress'),
-    MediaFeaturedCard(type: MediaAssetType.brochure, title: 'Brochures', iconName: 'fileText', count: 3, lastUpdated: 'Mar 2026', cta: 'Download'),
-    MediaFeaturedCard(type: MediaAssetType.masterplan, title: 'Masterplan', iconName: 'map', count: 1, lastUpdated: 'Dec 2025', cta: 'View plan'),
-  ],
-  galleryImages: const [
-    MediaGalleryImage(id: 'g1', category: MediaGalleryCategory.exterior, caption: 'Main entrance at dusk', alt: 'Horizon Gardens entrance'),
-    MediaGalleryImage(id: 'g2', category: MediaGalleryCategory.landscape, caption: 'Central park and water feature', alt: 'Estate park'),
-    MediaGalleryImage(id: 'g3', category: MediaGalleryCategory.amenities, caption: 'Clubhouse and pool', alt: 'Clubhouse'),
-    MediaGalleryImage(id: 'g4', category: MediaGalleryCategory.construction, caption: 'Phase 1 structure progress', alt: 'Construction'),
-    MediaGalleryImage(id: 'g5', category: MediaGalleryCategory.neighborhood, caption: 'Lekki corridor aerial', alt: 'Neighborhood'),
-    MediaGalleryImage(id: 'g6', category: MediaGalleryCategory.interior, caption: 'Show unit living area', alt: 'Interior'),
-  ],
-  virtualTourRooms: const [
-    VirtualTourRoom(name: 'Living Room', description: 'Open-plan living with premium finishes.', hotspots: ['Kitchen', 'Balcony', 'Dining']),
-    VirtualTourRoom(name: 'Master Bedroom', description: 'En-suite with walk-in closet.', hotspots: ['Bathroom', 'Closet']),
-    VirtualTourRoom(name: 'Kitchen', description: 'Fitted kitchen with island.', hotspots: ['Living Room', 'Utility']),
-  ],
-  droneChapters: const [
-    DroneChapter(title: 'Estate overview', duration: '2:15'),
-    DroneChapter(title: 'Infrastructure & roads', duration: '1:40'),
-    DroneChapter(title: 'Amenities flyover', duration: '1:55'),
-    DroneChapter(title: 'Neighborhood context', duration: '2:30'),
-  ],
-  videos: const [
-    MediaVideoItem(title: 'Horizon Gardens launch film', category: 'Marketing', duration: '3:42', quality: '4K'),
-    MediaVideoItem(title: 'Construction update — Week 14', category: 'Construction', duration: '4:10', quality: '1080p'),
-    MediaVideoItem(title: 'Customer testimonial — The Okafor Family', category: 'Testimonial', duration: '2:08', quality: '1080p'),
-  ],
-  floorPlans: const [
-    FloorPlanItem(label: '3BR Terrace', floor: 'Ground', dimensions: '180 sqm', rooms: ['Living', 'Kitchen', '3 Beds', '3 Baths']),
-    FloorPlanItem(label: '4BR Duplex', floor: 'Ground + First', dimensions: '320 sqm', rooms: ['Living', 'Dining', '4 Beds', '4 Baths', 'Study']),
-  ],
-  masterplanDescription: '240-unit lifestyle estate with parks, clubhouse, and commercial strip.',
-  masterplanLegend: const ['Available', 'Reserved', 'Sold', 'Amenities', 'Roads', 'Parks'],
-  constructionMilestones: const [
-    ConstructionMilestone(phase: ConstructionPhase.planning, label: 'Planning', completionPercent: 100, date: 'Q3 2025', completed: true),
-    ConstructionMilestone(phase: ConstructionPhase.foundation, label: 'Foundation', completionPercent: 100, date: 'Q4 2025', completed: true),
-    ConstructionMilestone(phase: ConstructionPhase.structure, label: 'Structure', completionPercent: 85, date: 'Apr 2026', completed: false),
-    ConstructionMilestone(phase: ConstructionPhase.roofing, label: 'Roofing', completionPercent: 40, date: 'May 2026', completed: false),
-    ConstructionMilestone(phase: ConstructionPhase.finishing, label: 'Finishing', completionPercent: 10, date: 'Q3 2026', completed: false),
-    ConstructionMilestone(phase: ConstructionPhase.inspection, label: 'Inspection', completionPercent: 0, date: 'Q4 2026', completed: false),
-    ConstructionMilestone(phase: ConstructionPhase.completed, label: 'Completed', completionPercent: 0, date: 'Q1 2027', completed: false),
-  ],
-  completionPercent: 62,
-  expectedCompletion: 'Q1 2027',
-  downloads: const [
-    MediaDownloadItem(title: 'Horizon Gardens Brochure', type: 'PDF', size: '4.2 MB', category: 'Brochure'),
-    MediaDownloadItem(title: 'Estate Masterplan', type: 'PDF', size: '8.1 MB', category: 'Masterplan'),
-    MediaDownloadItem(title: 'Investment Pack', type: 'PDF', size: '2.8 MB', category: 'Investment'),
-    MediaDownloadItem(title: 'Price List — Phase 1', type: 'PDF', size: '1.1 MB', category: 'Pricing'),
-  ],
-  openHouses: const [
-    VirtualOpenHouse(
-      title: 'Horizon Gardens Virtual Open House',
-      date: 'Sat, 18 Apr 2026 · 11:00 AM WAT',
-      host: 'Tunde Bakare, Senior Property Advisor',
-      registeredCount: 84,
-      status: 'Registration open',
+final mediaHubCmsProvider = Provider<MediaHubCms>((ref) {
+  final catalog = ref.watch(mediaGalleryCatalogProvider);
+  var heroHeadline = _hubFallback.heroHeadline;
+  var heroSubheadline = _hubFallback.heroSubheadline;
+  String? backgroundImageUrl = _hubFallback.backgroundImageUrl;
+  String? backgroundVideoUrl = _hubFallback.backgroundVideoUrl;
+
+  if (ref.watch(supabaseConfiguredProvider)) {
+    final overlay = hubHeroFromPage(
+      ref.watch(publishedPageBySlugProvider('gallery')).valueOrNull,
+    );
+    heroHeadline = overlay.headline ?? heroHeadline;
+    heroSubheadline = overlay.subheadline ?? heroSubheadline;
+    backgroundImageUrl = overlay.backgroundImageUrl ?? backgroundImageUrl;
+    backgroundVideoUrl = overlay.backgroundVideoUrl ?? backgroundVideoUrl;
+  }
+
+  final photoCount = catalog.fold<int>(0, (sum, e) => sum + e.galleryImages.length);
+  final estateCount = catalog.where((e) => e.slug.startsWith('estate-')).length;
+  final propertyCount = catalog.where((e) => e.slug.startsWith('property-')).length;
+
+  return MediaHubCms(
+    heroHeadline: heroHeadline,
+    heroSubheadline: heroSubheadline,
+    backgroundImageUrl: backgroundImageUrl,
+    backgroundVideoUrl: backgroundVideoUrl,
+    featuredExperiences: [
+      for (final item in catalog)
+        MediaExperienceSummary(
+          slug: item.slug,
+          title: item.propertyName,
+          estateName: item.estateName,
+          thumbnailLabel: item.slug.startsWith('estate-') ? 'Estate' : 'Property',
+          mediaCount: item.mediaCount,
+          imageUrl: item.imageUrl,
+        ),
+    ],
+    pressKitItems: const [],
+    brandAssets: const [],
+    analytics: MediaAnalyticsSnapshot(
+      topPhoto: photoCount == 0 ? 'No published photos yet' : '$photoCount published photos',
+      topVideo: '—',
+      avgViewDuration: '—',
+      tourCompletionRate: '—',
+      downloadCount: estateCount,
+      shareCount: propertyCount,
     ),
-  ],
-  timeline: const [
-    MediaTimelineEvent(date: 'Dec 2025', title: 'Concept renders published', type: 'Render', description: 'Initial architectural visualization.'),
-    MediaTimelineEvent(date: 'Jan 2026', title: 'Groundbreaking ceremony', type: 'Event', description: 'Official launch with drone coverage.'),
-    MediaTimelineEvent(date: 'Mar 2026', title: 'Phase 1 marketing launch', type: 'Marketing', description: 'Full media kit and virtual tour live.'),
-    MediaTimelineEvent(date: 'Apr 2026', title: 'Weekly construction drone update', type: 'Construction', description: 'Structure 85% complete.'),
-  ],
-  relatedSlugs: const ['h001', 'emerald-heights'],
+  );
+});
+
+final mediaExperienceProvider =
+    Provider.family<MediaExperience?, String>((ref, slug) {
+  final catalog = ref.watch(mediaGalleryCatalogProvider);
+  final key = slug.trim().toLowerCase();
+  for (final item in catalog) {
+    if (item.slug.toLowerCase() == key) return item;
+  }
+  for (final item in catalog) {
+    final raw = item.slug.contains('-')
+        ? item.slug.substring(item.slug.indexOf('-') + 1)
+        : item.slug;
+    if (raw.toLowerCase() == key) return item;
+  }
+  return null;
+});
+
+final mediaExperiencesProvider = Provider<List<MediaExperience>>(
+  (ref) => ref.watch(mediaGalleryCatalogProvider),
 );
 
-final _horizonTerrace = MediaExperience(
-  slug: 'h001',
-  propertyName: 'Horizon Gardens 3BR Terrace',
-  estateName: 'Horizon Gardens',
-  mediaCount: 48,
-  heroHeadline: '3BR Terrace — Virtual Showroom',
-  featuredCards: _horizonGardens.featuredCards,
-  galleryImages: _horizonGardens.galleryImages.take(4).toList(),
-  virtualTourRooms: _horizonGardens.virtualTourRooms,
-  droneChapters: _horizonGardens.droneChapters.take(2).toList(),
-  videos: _horizonGardens.videos.take(2).toList(),
-  floorPlans: _horizonGardens.floorPlans.take(1).toList(),
-  masterplanDescription: 'Unit within Horizon Gardens Phase 1.',
-  masterplanLegend: _horizonGardens.masterplanLegend,
-  constructionMilestones: _horizonGardens.constructionMilestones,
-  completionPercent: 62,
-  expectedCompletion: 'Q1 2027',
-  downloads: _horizonGardens.downloads.take(2).toList(),
-  openHouses: _horizonGardens.openHouses,
-  timeline: _horizonGardens.timeline.take(3).toList(),
-  relatedSlugs: const ['horizon-gardens', 'emerald-heights'],
-);
+List<MediaExperience> buildMediaGalleryCatalog({
+  required List<CmsEstateSummary> estates,
+  required List<CmsPropertyFeatured> properties,
+}) {
+  final out = <MediaExperience>[];
+  final used = <String>{};
 
-final _emeraldHeights = MediaExperience(
-  slug: 'emerald-heights',
-  propertyName: 'Emerald Heights Estate',
-  estateName: 'Abuja',
-  mediaCount: 86,
-  heroHeadline: 'Emerald Heights — Construction Showcase',
-  featuredCards: _horizonGardens.featuredCards,
-  galleryImages: _horizonGardens.galleryImages,
-  virtualTourRooms: _horizonGardens.virtualTourRooms.take(2).toList(),
-  droneChapters: _horizonGardens.droneChapters,
-  videos: _horizonGardens.videos,
-  floorPlans: _horizonGardens.floorPlans,
-  masterplanDescription: 'Premium Abuja development with smart city features.',
-  masterplanLegend: _horizonGardens.masterplanLegend,
-  constructionMilestones: _horizonGardens.constructionMilestones,
-  completionPercent: 45,
-  expectedCompletion: 'Q2 2027',
-  downloads: _horizonGardens.downloads,
-  openHouses: const [],
-  timeline: _horizonGardens.timeline,
-  relatedSlugs: const ['horizon-gardens'],
-);
+  final propertiesByEstate = <String, List<CmsPropertyFeatured>>{};
+  for (final property in properties) {
+    final estateKey = (property.estateName ?? '').trim().toLowerCase();
+    if (estateKey.isEmpty) continue;
+    propertiesByEstate.putIfAbsent(estateKey, () => []).add(property);
+  }
+
+  final featuredEstates = [...estates]
+    ..sort((a, b) {
+      if (a.isFeatured != b.isFeatured) return a.isFeatured ? -1 : 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+
+  for (final estate in featuredEstates) {
+    final linked = propertiesByEstate[estate.name.trim().toLowerCase()] ?? const [];
+    final urls = _uniqueUrls([
+      ...estate.galleryUrls,
+      if (estate.coverImageUrl != null) estate.coverImageUrl!,
+      for (final property in linked) ...[
+        ...property.galleryUrls,
+        if (property.coverImageUrl != null) property.coverImageUrl!,
+      ],
+    ]);
+    if (urls.isEmpty) continue;
+    final slug = 'estate-${_slugOrId(estate.slug, estate.id)}';
+    if (!used.add(slug)) continue;
+    out.add(
+      _experience(
+        slug: slug,
+        title: estate.name,
+        estateName: estate.location.isEmpty ? estate.name : estate.location,
+        urls: urls,
+        cover: estate.coverImageUrl ?? urls.first,
+        listingPath: estate.slug.isEmpty
+            ? RoutePaths.estates
+            : '${RoutePaths.estates}/${estate.slug}',
+        description: estate.description ?? estate.tagline ?? '',
+        related: [
+          for (final property in linked.take(4))
+            'property-${_slugOrId(property.slug, property.id)}',
+        ],
+      ),
+    );
+  }
+
+  final featuredProperties = [...properties]
+    ..sort((a, b) {
+      if (a.isFeatured != b.isFeatured) return a.isFeatured ? -1 : 1;
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+
+  for (final property in featuredProperties) {
+    final urls = _uniqueUrls([
+      ...property.galleryUrls,
+      if (property.coverImageUrl != null) property.coverImageUrl!,
+    ]);
+    if (urls.isEmpty) continue;
+    final slug = 'property-${_slugOrId(property.slug, property.id)}';
+    if (!used.add(slug)) continue;
+    out.add(
+      _experience(
+        slug: slug,
+        title: property.title,
+        estateName: (property.estateName?.trim().isNotEmpty ?? false)
+            ? property.estateName!.trim()
+            : [
+                property.city,
+                property.state,
+              ].whereType<String>().where((s) => s.trim().isNotEmpty).join(', '),
+        urls: urls,
+        cover: property.coverImageUrl ?? urls.first,
+        listingPath: '/properties/${property.slug.isNotEmpty ? property.slug : property.id}',
+        description: property.summary ?? property.description ?? '',
+        related: [
+          for (final other in featuredProperties)
+            if (other.id != property.id &&
+                (other.estateName ?? '').trim().toLowerCase() ==
+                    (property.estateName ?? '').trim().toLowerCase())
+              'property-${_slugOrId(other.slug, other.id)}',
+        ].take(4).toList(),
+      ),
+    );
+  }
+
+  return out;
+}
+
+MediaExperience _experience({
+  required String slug,
+  required String title,
+  required String estateName,
+  required List<String> urls,
+  required String cover,
+  required String listingPath,
+  required String description,
+  required List<String> related,
+}) {
+  final images = [
+    for (var i = 0; i < urls.length; i++)
+      MediaGalleryImage(
+        id: '$slug-$i',
+        category: MediaGalleryCategory.exterior,
+        caption: i == 0 ? title : '$title · ${i + 1}',
+        alt: title,
+        imageUrl: urls[i],
+      ),
+  ];
+
+  return MediaExperience(
+    slug: slug,
+    propertyName: title,
+    estateName: estateName.isEmpty ? title : estateName,
+    mediaCount: images.length,
+    heroHeadline: title,
+    featuredCards: [
+      MediaFeaturedCard(
+        type: MediaAssetType.photo,
+        title: 'Photos',
+        iconName: 'image',
+        count: images.length,
+        lastUpdated: 'Ready',
+        cta: 'View gallery',
+      ),
+    ],
+    galleryImages: images,
+    virtualTourRooms: const [],
+    droneChapters: const [],
+    videos: const [],
+    floorPlans: const [],
+    masterplanDescription: description,
+    masterplanLegend: const [],
+    constructionMilestones: const [],
+    completionPercent: 0,
+    expectedCompletion: '',
+    downloads: const [],
+    openHouses: const [],
+    timeline: const [],
+    relatedSlugs: related,
+    imageUrl: cover,
+    listingPath: listingPath,
+  );
+}
+
+List<String> _uniqueUrls(List<String> raw) {
+  final out = <String>[];
+  final seen = <String>{};
+  for (final value in raw) {
+    final url = value.trim();
+    if (url.isEmpty || !seen.add(url)) continue;
+    out.add(url);
+  }
+  return out;
+}
+
+String _slugOrId(String slug, String id) {
+  final trimmed = slug.trim();
+  return trimmed.isEmpty ? id : trimmed;
+}

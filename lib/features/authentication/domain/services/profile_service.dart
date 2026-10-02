@@ -2,20 +2,25 @@ import 'package:flutter/foundation.dart';
 import 'package:hdhomesproject/core/auth/models/security_event.dart';
 import 'package:hdhomesproject/core/auth/services/security_service.dart';
 import 'package:hdhomesproject/core/errors/app_exception.dart';
+import 'package:hdhomesproject/core/media/media_models.dart';
+import 'package:hdhomesproject/core/media/media_service.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/app_role.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/profile_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Enterprise User Profile Platform — PostgreSQL profile hub + Storage avatars.
+/// Enterprise User Profile Platform — PostgreSQL profile hub + Cloudinary avatars.
 class ProfileService {
   ProfileService({
     required SecurityService security,
     SupabaseClient? client,
+    MediaService? mediaService,
   })  : _security = security,
-        _client = client;
+        _client = client,
+        _media = mediaService;
 
   final SecurityService _security;
   final SupabaseClient? _client;
+  final MediaService? _media;
 
   bool get isConfigured => _client != null;
 
@@ -53,6 +58,7 @@ class ProfileService {
     final communication = await _fetchCommunication(userId);
     final prefs = await _fetchAppPreferences(userId);
     final activity = await _fetchActivity(userId);
+    final kycCompleted = await _fetchKycCompleted(userId);
 
     final completion = ProfileCompletionEngine.evaluate(
       profile: profile,
@@ -60,6 +66,7 @@ class ProfileService {
       communication: communication,
       mfaEnabled: mfaEnabled,
       isInvestor: role == AppRole.investor,
+      kycCompleted: kycCompleted,
     );
     final health = AccountHealthScore.compute(
       profileCompletionPercent: completion.percent,
@@ -88,7 +95,11 @@ class ProfileService {
       throw const AuthenticationException('Unable to update profile.');
     }
     try {
-      await client.from('profiles').update(details.toUpdateMap()).eq('id', userId);
+      await client.from('profiles').update({
+        ...details.toUpdateMap(),
+        if ((details.phone?.trim().isNotEmpty ?? false)) 'phone_verified': true,
+        if ((details.phone?.trim().isEmpty ?? true)) 'phone_verified': false,
+      }).eq('id', userId);
       await _audit('profile_updated', {'section': 'personal'});
       return details;
     } catch (e) {
@@ -97,6 +108,7 @@ class ProfileService {
         'first_name': details.firstName?.trim(),
         'last_name': details.lastName?.trim(),
         'phone': details.phone?.trim(),
+        'phone_verified': details.phone?.trim().isNotEmpty ?? false,
         'address': details.address?.trim(),
         'country': details.country?.trim(),
         'state': details.state?.trim(),
@@ -164,43 +176,78 @@ class ProfileService {
     if (client == null) {
       throw const AuthenticationException('Authentication is not configured.');
     }
-    final ext = contentType.contains('png')
-        ? 'png'
-        : contentType.contains('webp')
-            ? 'webp'
-            : 'jpg';
-    final path = '$userId/avatar.$ext';
-    await client.storage.from('avatars').uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(
-            upsert: true,
-            contentType: contentType,
-          ),
-        );
-    final publicUrl = client.storage.from('avatars').getPublicUrl(path);
-    // Cache-bust so UI refreshes immediately.
-    final url = '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+    final media = _media;
+    if (media == null || !media.isCloudinaryEnabled) {
+      throw const AuthenticationException(
+        'Cloudinary media service is required for avatar uploads.',
+      );
+    }
+    if (!contentType.startsWith('image/')) {
+      throw const AuthenticationException('Avatar must be an image.');
+    }
+
+    final existing = await client
+        .from('media')
+        .select('id')
+        .eq('entity_type', 'user')
+        .eq('entity_id', userId)
+        .eq('is_deleted', false)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    final request = UploadMediaRequest(
+      bytes: bytes,
+      contentType: contentType,
+      originalFilename: 'avatar',
+      entityType: MediaEntityType.user,
+      entityId: userId,
+      role: 'avatar',
+      isCover: true,
+      isPublished: true,
+      title: 'Avatar',
+    );
+
+    final MediaAsset asset;
+    final existingId = existing?['id']?.toString();
+    if (existingId != null && existingId.isNotEmpty) {
+      asset = await media.replace(mediaId: existingId, request: request);
+    } else {
+      asset = await media.uploadImage(request);
+    }
+
+    final url =
+        '${asset.deliveryUrl}?v=${DateTime.now().millisecondsSinceEpoch}';
     await client.from('profiles').update({
       'avatar_url': url,
+      'media_id': asset.id,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', userId);
-    await _audit('photo_changed', {'action': 'upload'});
+    await _audit('photo_changed', {'action': 'upload', 'provider': 'cloudinary'});
     return url;
   }
 
   Future<void> removeAvatar(String userId) async {
     final client = _client;
     if (client == null) return;
+    final media = _media;
     try {
-      await client.storage.from('avatars').remove([
-        '$userId/avatar.jpg',
-        '$userId/avatar.png',
-        '$userId/avatar.webp',
-      ]);
+      final rows = await client
+          .from('media')
+          .select('id')
+          .eq('entity_type', 'user')
+          .eq('entity_id', userId)
+          .eq('is_deleted', false);
+      if (media != null) {
+        for (final row in rows) {
+          final id = row['id']?.toString();
+          if (id != null) await media.delete(id);
+        }
+      }
     } catch (_) {}
     await client.from('profiles').update({
       'avatar_url': null,
+      'media_id': null,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', userId);
     await _audit('photo_changed', {'action': 'remove'});
@@ -319,6 +366,22 @@ class ProfileService {
           .toList();
     } catch (_) {
       return const [];
+    }
+  }
+
+  Future<bool> _fetchKycCompleted(String userId) async {
+    final client = _client!;
+    try {
+      final row = await client
+          .from('kyc_profiles')
+          .select('status')
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (row == null) return false;
+      final status = (row['status'] as String?)?.toLowerCase() ?? '';
+      return status == 'approved' || status == 'partially_approved';
+    } catch (_) {
+      return false;
     }
   }
 

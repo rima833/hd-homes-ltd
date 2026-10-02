@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/media/data/providers/media_cms_provider.dart';
 import 'package:hdhomesproject/features/media/presentation/sections/media_hero_section.dart';
 import 'package:hdhomesproject/features/media/presentation/sections/media_hub_sections.dart';
@@ -11,16 +12,18 @@ class MediaCenterHubPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cms = ref.watch(mediaHubCmsProvider);
+    final loading = ref.watch(publishedEstatesCatalogProvider).isLoading ||
+        ref.watch(publishedPropertiesCatalogProvider).isLoading;
 
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: MediaHubHeroSection(
-            headline: cms.heroHeadline,
-            subheadline: cms.heroSubheadline,
-          ),
+    return Column(
+      children: [
+        MediaHubHeroSection(
+          headline: cms.heroHeadline,
+          subheadline: cms.heroSubheadline,
+          imageUrl: cms.backgroundImageUrl,
+          videoUrl: cms.backgroundVideoUrl,
         ),
-        SliverToBoxAdapter(child: MediaHubSections(cms: cms)),
+        MediaHubSections(cms: cms, isLoading: loading),
       ],
     );
   }

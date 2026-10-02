@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/app_theme.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/core/website/components/cms_hero_media_background.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/features/properties/data/models/marketplace_property.dart';
 
@@ -22,14 +23,14 @@ class MarketplaceHeroSection extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.deepBlack, AppColors.charcoal, Color(0xFF1A1510)],
-              ),
-            ),
+          CmsHeroMediaBackground(
+            imageUrl: content.backgroundImageUrl,
+            videoUrl: content.backgroundVideoUrl,
+            fallbackColors: const [
+              AppColors.deepBlack,
+              AppColors.charcoal,
+              Color(0xFF1A1510),
+            ],
           ),
           Container(
             decoration: BoxDecoration(

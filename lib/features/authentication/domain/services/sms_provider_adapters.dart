@@ -1,4 +1,94 @@
+import 'package:flutter/foundation.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/phone_otp_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// SMS OTP via Supabase Auth (`updateUser` + `verifyOTP` phone_change).
+///
+/// Requires Phone provider / SMS to be enabled in Supabase Auth settings.
+class SupabaseAuthPhoneOtpService implements PhoneOtpService {
+  SupabaseAuthPhoneOtpService(this._client);
+
+  final SupabaseClient _client;
+
+  @override
+  PhoneOtpProviderId get providerId => PhoneOtpProviderId.supabaseAuth;
+
+  @override
+  Future<PhoneOtpSendResult> sendOtp({
+    required String phoneE164,
+    String? userId,
+  }) async {
+    try {
+      await _client.auth.updateUser(UserAttributes(phone: phoneE164));
+      return PhoneOtpSendResult(
+        success: true,
+        requestId: phoneE164,
+        message: 'We sent a verification code by SMS.',
+      );
+    } on AuthException catch (e) {
+      return PhoneOtpSendResult(
+        success: false,
+        message: _friendly(e.message),
+      );
+    } catch (e) {
+      return PhoneOtpSendResult(
+        success: false,
+        message: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+      );
+    }
+  }
+
+  @override
+  Future<PhoneOtpVerifyResult> verifyOtp({
+    required String phoneE164,
+    required String code,
+    String? requestId,
+  }) async {
+    try {
+      await _client.auth.verifyOTP(
+        phone: phoneE164,
+        token: code.trim(),
+        type: OtpType.phoneChange,
+      );
+      return const PhoneOtpVerifyResult(success: true);
+    } on AuthException catch (e) {
+      // Some projects use sms type for phone updates.
+      try {
+        await _client.auth.verifyOTP(
+          phone: phoneE164,
+          token: code.trim(),
+          type: OtpType.sms,
+        );
+        return const PhoneOtpVerifyResult(success: true);
+      } catch (_) {
+        return PhoneOtpVerifyResult(
+          success: false,
+          message: _friendly(e.message),
+        );
+      }
+    } catch (e) {
+      return PhoneOtpVerifyResult(
+        success: false,
+        message: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+      );
+    }
+  }
+
+  String _friendly(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('phone') && lower.contains('provider')) {
+      return 'SMS is not enabled yet. In local development use code 123456, '
+          'or enable Phone Auth in Supabase Dashboard.';
+    }
+    if (lower.contains('rate') || lower.contains('limit')) {
+      return 'Too many SMS requests. Please wait and try again.';
+    }
+    if (lower.contains('invalid') || lower.contains('token')) {
+      return 'Invalid or expired code. Request a new one.';
+    }
+    return raw;
+  }
+}
 
 /// Provider Failover Architecture — try primary, then backups.
 class FailoverPhoneOtpService implements PhoneOtpService {
@@ -10,13 +100,17 @@ class FailoverPhoneOtpService implements PhoneOtpService {
 
   final PhoneOtpService primary;
   final List<PhoneOtpService> fallbacks;
-  final void Function(PhoneOtpProviderId from, PhoneOtpProviderId to, String reason)?
-      onFailover;
+  final void Function(
+    PhoneOtpProviderId from,
+    PhoneOtpProviderId to,
+    String reason,
+  )? onFailover;
 
-  PhoneOtpProviderId _lastUsed = PhoneOtpProviderId.mock;
+  PhoneOtpService? _lastSuccessfulSend;
 
   @override
-  PhoneOtpProviderId get providerId => _lastUsed;
+  PhoneOtpProviderId get providerId =>
+      _lastSuccessfulSend?.providerId ?? primary.providerId;
 
   Iterable<PhoneOtpService> get _chain sync* {
     yield primary;
@@ -44,7 +138,7 @@ class FailoverPhoneOtpService implements PhoneOtpService {
               'primary_failed',
             );
           }
-          _lastUsed = provider.providerId;
+          _lastSuccessfulSend = provider;
           return result;
         }
         lastError = result.message;
@@ -66,9 +160,8 @@ class FailoverPhoneOtpService implements PhoneOtpService {
     required String code,
     String? requestId,
   }) {
-    // Verification always goes through the last successful send provider;
-    // for Phase 1 mock + future Edge Function, primary owns validation.
-    return primary.verifyOtp(
+    final provider = _lastSuccessfulSend ?? primary;
+    return provider.verifyOtp(
       phoneE164: phoneE164,
       code: code,
       requestId: requestId,
@@ -76,7 +169,7 @@ class FailoverPhoneOtpService implements PhoneOtpService {
   }
 }
 
-/// Stub adapters — swap to Edge Function HTTP when credentials are configured.
+/// Stub adapters — configure Edge Functions when credentials are available.
 class TermiiPhoneOtpService implements PhoneOtpService {
   const TermiiPhoneOtpService();
 
@@ -90,7 +183,8 @@ class TermiiPhoneOtpService implements PhoneOtpService {
   }) async {
     return const PhoneOtpSendResult(
       success: false,
-      message: 'Termii provider not configured. Use mock or configure Edge Function.',
+      message:
+          'Termii provider not configured. Use mock or configure Edge Function.',
     );
   }
 
@@ -120,7 +214,8 @@ class TwilioPhoneOtpService implements PhoneOtpService {
   }) async {
     return const PhoneOtpSendResult(
       success: false,
-      message: 'Twilio provider not configured. Use mock or configure Edge Function.',
+      message:
+          'Twilio provider not configured. Use mock or configure Edge Function.',
     );
   }
 
@@ -166,3 +261,6 @@ class AfricasTalkingPhoneOtpService implements PhoneOtpService {
     );
   }
 }
+
+/// Whether mock OTP (code 123456) is allowed in this build.
+bool get allowMockPhoneOtp => kDebugMode;

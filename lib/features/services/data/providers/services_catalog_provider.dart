@@ -1,9 +1,119 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/domain/data/hub_page_cms.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/services/data/models/service_models.dart';
+import 'package:hdhomesproject/features/services/data/providers/services_cms_admin_provider.dart';
 
-final servicesCatalogProvider = Provider<List<ServiceSummary>>((ref) => _allServices);
+final servicesCatalogProvider = Provider<List<ServiceSummary>>((ref) {
+  // Keep realtime channel alive on any catalog consumer (featured, grid, detail).
+  ref.watch(servicesCmsRealtimeProvider);
+  if (!ref.watch(supabaseConfiguredProvider)) return _allServices;
+  final items = ref.watch(publishedWebsiteServiceItemsProvider).valueOrNull;
+  if (items == null || items.isEmpty) return const [];
+  return [
+    for (final item in items)
+      ServiceSummary(
+        id: item.id,
+        slug: item.slug,
+        name: item.name,
+        shortDescription: item.shortDescription,
+        categoryId: categoryIdFromSlug(item.categorySlug),
+        iconName: item.iconName,
+        badges: _badgesFromStrings(item.badges),
+        keyBenefits: item.keyBenefits,
+        isFeatured: item.isFeatured,
+        ctaLabel: item.ctaLabel,
+        ctaHref: item.ctaHref,
+      ),
+  ];
+});
 
-final servicesCmsProvider = Provider<ServicesPageCms>((ref) => _pageCms);
+final servicesCmsProvider = Provider<ServicesPageCms>((ref) {
+  final base = _pageCms;
+  ref.watch(servicesCmsRealtimeProvider);
+  ref.watch(publishedPagesRealtimeProvider);
+  if (!ref.watch(supabaseConfiguredProvider)) return base;
+
+  final overlay = hubHeroFromPage(
+    ref.watch(publishedPageBySlugProvider('services')).valueOrNull,
+  );
+  final categories = ref
+      .watch(publishedWebsiteServiceCategoriesProvider)
+      .valueOrNull;
+  final caseStudies = ref
+      .watch(publishedWebsiteServiceCaseStudiesProvider)
+      .valueOrNull;
+
+  return ServicesPageCms(
+    heroHeadline: overlay.headline ?? base.heroHeadline,
+    heroSubheadline: overlay.subheadline ?? base.heroSubheadline,
+    primaryCtaLabel: overlay.primaryCtaLabel ?? base.primaryCtaLabel,
+    secondaryCtaLabel: overlay.secondaryCtaLabel ?? base.secondaryCtaLabel,
+    tertiaryCtaLabel: base.tertiaryCtaLabel,
+    backgroundImageUrl: overlay.backgroundImageUrl ?? base.backgroundImageUrl,
+    backgroundVideoUrl: overlay.backgroundVideoUrl ?? base.backgroundVideoUrl,
+    categories: categories == null || categories.isEmpty
+        ? base.categories
+        : [
+            for (final category in categories)
+              ServiceCategory(
+                id: categoryIdFromSlug(category.slug),
+                name: category.name,
+                description: category.description,
+                iconName: category.iconName,
+              ),
+          ],
+    whyChoose: base.whyChoose,
+    processSteps: base.processSteps,
+    caseStudies: caseStudies == null || caseStudies.isEmpty
+        ? base.caseStudies
+        : [
+            for (final study in caseStudies)
+              ServiceCaseStudy(
+                client: study.client,
+                service: study.serviceLabel,
+                challenge: study.challenge,
+                solution: study.solution,
+                results: study.results,
+                serviceSlug: study.serviceSlug,
+              ),
+          ],
+    technologies: base.technologies,
+    industries: base.industries,
+    testimonials: base.testimonials,
+    faqs: base.faqs,
+    knowledgeArticles: base.knowledgeArticles,
+    experts: base.experts,
+  );
+});
+
+ServiceCategoryId categoryIdFromSlug(String slug) {
+  final normalized = slug.trim().toLowerCase().replaceAll('_', '-');
+  return switch (normalized) {
+    'real-estate' || 'realestate' => ServiceCategoryId.realEstate,
+    'construction' => ServiceCategoryId.construction,
+    'design-planning' ||
+    'design-and-planning' => ServiceCategoryId.designPlanning,
+    'property-management' => ServiceCategoryId.propertyManagement,
+    'professional-services' => ServiceCategoryId.professionalServices,
+    _ => ServiceCategoryId.professionalServices,
+  };
+}
+
+List<ServiceBadge> _badgesFromStrings(List<String> badges) {
+  final result = <ServiceBadge>[];
+  for (final badge in badges) {
+    final mapped = switch (badge.trim().toLowerCase()) {
+      'featured' => ServiceBadge.featured,
+      'popular' => ServiceBadge.popular,
+      'new' || 'new-service' || 'new_service' => ServiceBadge.newService,
+      _ => null,
+    };
+    if (mapped != null && !result.contains(mapped)) result.add(mapped);
+  }
+  return result;
+}
 
 final featuredServicesProvider = Provider<List<ServiceSummary>>((ref) {
   return ref.watch(servicesCatalogProvider).where((s) => s.isFeatured).toList();
@@ -11,8 +121,11 @@ final featuredServicesProvider = Provider<List<ServiceSummary>>((ref) {
 
 final servicesByCategoryProvider =
     Provider.family<List<ServiceSummary>, ServiceCategoryId>((ref, categoryId) {
-  return ref.watch(servicesCatalogProvider).where((s) => s.categoryId == categoryId).toList();
-});
+      return ref
+          .watch(servicesCatalogProvider)
+          .where((s) => s.categoryId == categoryId)
+          .toList();
+    });
 
 const _allServices = [
   // Real Estate
@@ -20,18 +133,24 @@ const _allServices = [
     id: 's001',
     slug: 'property-sales',
     name: 'Property Sales',
-    shortDescription: 'End-to-end sales support for residential and commercial properties.',
+    shortDescription:
+        'End-to-end sales support for residential and commercial properties.',
     categoryId: ServiceCategoryId.realEstate,
     iconName: 'home',
     badges: [ServiceBadge.featured, ServiceBadge.popular],
-    keyBenefits: ['Verified listings', 'Transparent pricing', 'Dedicated agents'],
+    keyBenefits: [
+      'Verified listings',
+      'Transparent pricing',
+      'Dedicated agents',
+    ],
     isFeatured: true,
   ),
   ServiceSummary(
     id: 's002',
     slug: 'property-development',
     name: 'Property Development',
-    shortDescription: 'From land acquisition to handover — full development lifecycle.',
+    shortDescription:
+        'From land acquisition to handover — full development lifecycle.',
     categoryId: ServiceCategoryId.realEstate,
     iconName: 'building',
     badges: [ServiceBadge.featured],
@@ -42,17 +161,23 @@ const _allServices = [
     id: 's003',
     slug: 'property-investment',
     name: 'Property Investment',
-    shortDescription: 'Structured investment opportunities with transparent returns.',
+    shortDescription:
+        'Structured investment opportunities with transparent returns.',
     categoryId: ServiceCategoryId.realEstate,
     iconName: 'trending_up',
-    keyBenefits: ['ROI analysis', 'Portfolio diversification', 'Exit strategies'],
+    keyBenefits: [
+      'ROI analysis',
+      'Portfolio diversification',
+      'Exit strategies',
+    ],
     isFeatured: true,
   ),
   ServiceSummary(
     id: 's004',
     slug: 'estate-development',
     name: 'Estate Development',
-    shortDescription: 'Master-planned communities with infrastructure and amenities.',
+    shortDescription:
+        'Master-planned communities with infrastructure and amenities.',
     categoryId: ServiceCategoryId.realEstate,
     iconName: 'map',
     keyBenefits: ['Master planning', 'Infrastructure', 'Community design'],
@@ -71,7 +196,8 @@ const _allServices = [
     id: 's006',
     slug: 'property-acquisition',
     name: 'Property Acquisition',
-    shortDescription: 'Strategic land and property sourcing for developers and investors.',
+    shortDescription:
+        'Strategic land and property sourcing for developers and investors.',
     categoryId: ServiceCategoryId.realEstate,
     iconName: 'search',
     keyBenefits: ['Due diligence', 'Negotiation', 'Title verification'],
@@ -95,13 +221,18 @@ const _allServices = [
     shortDescription: 'Office, retail, and mixed-use commercial builds.',
     categoryId: ServiceCategoryId.construction,
     iconName: 'building',
-    keyBenefits: ['Code compliance', 'Project management', 'Tenant-ready delivery'],
+    keyBenefits: [
+      'Code compliance',
+      'Project management',
+      'Tenant-ready delivery',
+    ],
   ),
   ServiceSummary(
     id: 's009',
     slug: 'turnkey-construction',
     name: 'Turnkey Construction',
-    shortDescription: 'Design-to-handover solutions with single-point accountability.',
+    shortDescription:
+        'Design-to-handover solutions with single-point accountability.',
     categoryId: ServiceCategoryId.construction,
     iconName: 'key',
     badges: [ServiceBadge.popular],
@@ -112,16 +243,22 @@ const _allServices = [
     id: 's010',
     slug: 'renovation-remodeling',
     name: 'Renovation & Remodeling',
-    shortDescription: 'Transform existing spaces with modern finishes and layouts.',
+    shortDescription:
+        'Transform existing spaces with modern finishes and layouts.',
     categoryId: ServiceCategoryId.construction,
     iconName: 'hammer',
-    keyBenefits: ['Minimal disruption', 'Value enhancement', 'Design integration'],
+    keyBenefits: [
+      'Minimal disruption',
+      'Value enhancement',
+      'Design integration',
+    ],
   ),
   ServiceSummary(
     id: 's011',
     slug: 'civil-engineering',
     name: 'Civil Engineering',
-    shortDescription: 'Structural and civil works for estates and infrastructure.',
+    shortDescription:
+        'Structural and civil works for estates and infrastructure.',
     categoryId: ServiceCategoryId.construction,
     iconName: 'ruler',
     keyBenefits: ['Structural integrity', 'Soil analysis', 'Drainage systems'],
@@ -130,7 +267,8 @@ const _allServices = [
     id: 's012',
     slug: 'infrastructure-development',
     name: 'Infrastructure Development',
-    shortDescription: 'Roads, utilities, and estate-wide infrastructure delivery.',
+    shortDescription:
+        'Roads, utilities, and estate-wide infrastructure delivery.',
     categoryId: ServiceCategoryId.construction,
     iconName: 'road',
     keyBenefits: ['Utility networks', 'Road construction', 'Estate backbone'],
@@ -140,11 +278,16 @@ const _allServices = [
     id: 's013',
     slug: 'architectural-design',
     name: 'Architectural Design',
-    shortDescription: 'Contemporary designs tailored to Nigerian climate and lifestyle.',
+    shortDescription:
+        'Contemporary designs tailored to Nigerian climate and lifestyle.',
     categoryId: ServiceCategoryId.designPlanning,
     iconName: 'pen_tool',
     badges: [ServiceBadge.featured],
-    keyBenefits: ['3D visualization', 'Sustainable design', 'Regulatory approval'],
+    keyBenefits: [
+      '3D visualization',
+      'Sustainable design',
+      'Regulatory approval',
+    ],
     isFeatured: true,
   ),
   ServiceSummary(
@@ -178,7 +321,8 @@ const _allServices = [
     id: 's017',
     slug: 'structural-engineering',
     name: 'Structural Engineering',
-    shortDescription: 'Structural analysis and engineering for safe, durable builds.',
+    shortDescription:
+        'Structural analysis and engineering for safe, durable builds.',
     categoryId: ServiceCategoryId.designPlanning,
     iconName: 'layers',
     keyBenefits: ['Load calculations', 'Foundation design', 'Compliance certs'],
@@ -197,11 +341,16 @@ const _allServices = [
     id: 's019',
     slug: 'estate-management',
     name: 'Estate Management',
-    shortDescription: 'Gated community management, security, and resident services.',
+    shortDescription:
+        'Gated community management, security, and resident services.',
     categoryId: ServiceCategoryId.propertyManagement,
     iconName: 'shield',
     badges: [ServiceBadge.popular],
-    keyBenefits: ['Security coordination', 'Service charges', 'Community events'],
+    keyBenefits: [
+      'Security coordination',
+      'Service charges',
+      'Community events',
+    ],
   ),
   ServiceSummary(
     id: 's020',
@@ -236,7 +385,8 @@ const _allServices = [
     id: 's023',
     slug: 'property-valuation',
     name: 'Property Valuation',
-    shortDescription: 'Certified valuations for sale, mortgage, and investment.',
+    shortDescription:
+        'Certified valuations for sale, mortgage, and investment.',
     categoryId: ServiceCategoryId.professionalServices,
     iconName: 'calculator',
     badges: [ServiceBadge.featured],
@@ -265,7 +415,8 @@ const _allServices = [
     id: 's026',
     slug: 'legal-advisory',
     name: 'Legal Advisory',
-    shortDescription: 'Real estate legal counsel for transactions and disputes.',
+    shortDescription:
+        'Real estate legal counsel for transactions and disputes.',
     categoryId: ServiceCategoryId.professionalServices,
     iconName: 'scale',
     keyBenefits: ['Contract review', 'Due diligence', 'Dispute resolution'],
@@ -274,7 +425,8 @@ const _allServices = [
     id: 's027',
     slug: 'investment-advisory',
     name: 'Investment Advisory',
-    shortDescription: 'Portfolio strategy and investment analysis for property investors.',
+    shortDescription:
+        'Portfolio strategy and investment analysis for property investors.',
     categoryId: ServiceCategoryId.professionalServices,
     iconName: 'trending_up',
     badges: [ServiceBadge.popular],
@@ -288,13 +440,18 @@ const _allServices = [
     shortDescription: 'End-to-end project coordination for developments.',
     categoryId: ServiceCategoryId.professionalServices,
     iconName: 'clipboard',
-    keyBenefits: ['Timeline control', 'Budget tracking', 'Stakeholder reporting'],
+    keyBenefits: [
+      'Timeline control',
+      'Budget tracking',
+      'Stakeholder reporting',
+    ],
   ),
   ServiceSummary(
     id: 's029',
     slug: 'consultancy',
     name: 'Consultancy',
-    shortDescription: 'Strategic advisory for real estate and construction ventures.',
+    shortDescription:
+        'Strategic advisory for real estate and construction ventures.',
     categoryId: ServiceCategoryId.professionalServices,
     iconName: 'briefcase',
     keyBenefits: ['Feasibility studies', 'Market entry', 'Growth strategy'],
@@ -304,8 +461,11 @@ const _allServices = [
 final _pageCms = ServicesPageCms(
   heroHeadline: 'Building Exceptional Spaces. Delivering Enduring Value.',
   heroSubheadline:
-      'Premium real estate, construction, design, and property solutions — '
-      'engineered for trust, transparency, and long-term returns.',
+      'From property sales and estate development to construction, investment advisory, and after-sales care — one premium team.',
+  primaryCtaLabel: 'Explore Services',
+  secondaryCtaLabel: 'Book Consultation',
+  tertiaryCtaLabel: 'Request Proposal',
+  backgroundImageUrl: '',
   categories: const [
     ServiceCategory(
       id: ServiceCategoryId.realEstate,
@@ -336,7 +496,8 @@ final _pageCms = ServicesPageCms(
   whyChoose: const [
     ServiceWhyChooseItem(
       title: 'Experienced Professionals',
-      description: 'Licensed experts with decades of combined industry experience.',
+      description:
+          'Licensed experts with decades of combined industry experience.',
       iconName: 'users',
     ),
     ServiceWhyChooseItem(
@@ -346,12 +507,14 @@ final _pageCms = ServicesPageCms(
     ),
     ServiceWhyChooseItem(
       title: 'Transparent Communication',
-      description: 'Real-time updates, documented milestones, and open reporting.',
+      description:
+          'Real-time updates, documented milestones, and open reporting.',
       iconName: 'message',
     ),
     ServiceWhyChooseItem(
       title: 'Technology Driven',
-      description: 'BIM, drone surveys, digital documentation, and project monitoring.',
+      description:
+          'BIM, drone surveys, digital documentation, and project monitoring.',
       iconName: 'cpu',
     ),
     ServiceWhyChooseItem(
@@ -380,16 +543,20 @@ final _pageCms = ServicesPageCms(
     ServiceCaseStudy(
       client: 'Horizon Gardens Estate',
       service: 'Estate Development',
-      challenge: 'Deliver 240-unit estate with full infrastructure within 36 months.',
-      solution: 'Phased development with parallel infrastructure and quality checkpoints.',
-      results: '78% Phase 1 complete · 180 units sold · On-track for Q4 2027 handover.',
+      challenge:
+          'Deliver 240-unit estate with full infrastructure within 36 months.',
+      solution:
+          'Phased development with parallel infrastructure and quality checkpoints.',
+      results:
+          '78% Phase 1 complete · 180 units sold · On-track for Q4 2027 handover.',
       serviceSlug: 'estate-development',
     ),
     ServiceCaseStudy(
       client: 'Lekki Corporate Client',
       service: 'Turnkey Construction',
       challenge: 'Build a 4-storey commercial complex on a tight urban plot.',
-      solution: 'Turnkey contract with BIM modeling and accelerated scheduling.',
+      solution:
+          'Turnkey contract with BIM modeling and accelerated scheduling.',
       results: 'Delivered 2 weeks ahead of schedule · Zero safety incidents.',
       serviceSlug: 'turnkey-construction',
     ),
@@ -397,36 +564,103 @@ final _pageCms = ServicesPageCms(
       client: 'Diaspora Investor Group',
       service: 'Investment Advisory',
       challenge: 'Deploy ₦500M across Lagos residential portfolio.',
-      solution: 'Diversified acquisition strategy with rental yield optimization.',
-      results: '8.2% average rental yield · 14% capital appreciation in 18 months.',
+      solution:
+          'Diversified acquisition strategy with rental yield optimization.',
+      results:
+          '8.2% average rental yield · 14% capital appreciation in 18 months.',
       serviceSlug: 'investment-advisory',
     ),
   ],
   technologies: const [
-    ServiceTechnology(name: 'BIM', description: 'Building Information Modeling', iconName: 'layers'),
-    ServiceTechnology(name: '3D Modeling', description: 'Photorealistic visualizations', iconName: 'box'),
-    ServiceTechnology(name: 'Drone Surveys', description: 'Aerial site monitoring', iconName: 'plane'),
-    ServiceTechnology(name: 'GIS', description: 'Geospatial planning', iconName: 'map'),
-    ServiceTechnology(name: 'Smart Construction', description: 'IoT-enabled site tracking', iconName: 'cpu'),
-    ServiceTechnology(name: 'AI Planning', description: 'Predictive scheduling', iconName: 'sparkles'),
-    ServiceTechnology(name: 'Digital Docs', description: 'Secure document vault', iconName: 'file'),
-    ServiceTechnology(name: 'Project Monitoring', description: 'Real-time dashboards', iconName: 'activity'),
+    ServiceTechnology(
+      name: 'BIM',
+      description: 'Building Information Modeling',
+      iconName: 'layers',
+    ),
+    ServiceTechnology(
+      name: '3D Modeling',
+      description: 'Photorealistic visualizations',
+      iconName: 'box',
+    ),
+    ServiceTechnology(
+      name: 'Drone Surveys',
+      description: 'Aerial site monitoring',
+      iconName: 'plane',
+    ),
+    ServiceTechnology(
+      name: 'GIS',
+      description: 'Geospatial planning',
+      iconName: 'map',
+    ),
+    ServiceTechnology(
+      name: 'Smart Construction',
+      description: 'IoT-enabled site tracking',
+      iconName: 'cpu',
+    ),
+    ServiceTechnology(
+      name: 'AI Planning',
+      description: 'Predictive scheduling',
+      iconName: 'sparkles',
+    ),
+    ServiceTechnology(
+      name: 'Digital Docs',
+      description: 'Secure document vault',
+      iconName: 'file',
+    ),
+    ServiceTechnology(
+      name: 'Project Monitoring',
+      description: 'Real-time dashboards',
+      iconName: 'activity',
+    ),
   ],
   industries: const [
-    ServiceIndustry(name: 'Residential', description: 'Homes, estates, and apartments', iconName: 'home'),
-    ServiceIndustry(name: 'Commercial', description: 'Offices, retail, and mixed-use', iconName: 'building'),
-    ServiceIndustry(name: 'Hospitality', description: 'Hotels and serviced apartments', iconName: 'bed'),
-    ServiceIndustry(name: 'Healthcare', description: 'Clinics and medical facilities', iconName: 'heart'),
-    ServiceIndustry(name: 'Education', description: 'Schools and training centres', iconName: 'graduation'),
-    ServiceIndustry(name: 'Industrial', description: 'Warehouses and factories', iconName: 'factory'),
-    ServiceIndustry(name: 'Government', description: 'Public infrastructure projects', iconName: 'landmark'),
-    ServiceIndustry(name: 'Corporate', description: 'Head offices and campuses', iconName: 'briefcase'),
+    ServiceIndustry(
+      name: 'Residential',
+      description: 'Homes, estates, and apartments',
+      iconName: 'home',
+    ),
+    ServiceIndustry(
+      name: 'Commercial',
+      description: 'Offices, retail, and mixed-use',
+      iconName: 'building',
+    ),
+    ServiceIndustry(
+      name: 'Hospitality',
+      description: 'Hotels and serviced apartments',
+      iconName: 'bed',
+    ),
+    ServiceIndustry(
+      name: 'Healthcare',
+      description: 'Clinics and medical facilities',
+      iconName: 'heart',
+    ),
+    ServiceIndustry(
+      name: 'Education',
+      description: 'Schools and training centres',
+      iconName: 'graduation',
+    ),
+    ServiceIndustry(
+      name: 'Industrial',
+      description: 'Warehouses and factories',
+      iconName: 'factory',
+    ),
+    ServiceIndustry(
+      name: 'Government',
+      description: 'Public infrastructure projects',
+      iconName: 'landmark',
+    ),
+    ServiceIndustry(
+      name: 'Corporate',
+      description: 'Head offices and campuses',
+      iconName: 'briefcase',
+    ),
   ],
   testimonials: const [
     ServiceTestimonial(
       name: 'Adaeze Okafor',
       role: 'Property Investor',
-      comment: 'HD Homes handled our entire acquisition and management pipeline with complete transparency.',
+      comment:
+          'HD Homes handled our entire acquisition and management pipeline with complete transparency.',
       rating: 5,
       verified: true,
       serviceSlug: 'property-investment',
@@ -434,7 +668,8 @@ final _pageCms = ServicesPageCms(
     ServiceTestimonial(
       name: 'Chukwuemeka Nwosu',
       role: 'Estate Developer',
-      comment: 'Their turnkey construction team delivered our show units ahead of schedule.',
+      comment:
+          'Their turnkey construction team delivered our show units ahead of schedule.',
       rating: 5,
       verified: true,
       serviceSlug: 'turnkey-construction',
@@ -442,7 +677,8 @@ final _pageCms = ServicesPageCms(
     ServiceTestimonial(
       name: 'Fatima Abdullahi',
       role: 'Homeowner',
-      comment: 'From architectural design to handover — seamless, professional, and stress-free.',
+      comment:
+          'From architectural design to handover — seamless, professional, and stress-free.',
       rating: 4.5,
       verified: true,
       serviceSlug: 'architectural-design',
@@ -451,23 +687,28 @@ final _pageCms = ServicesPageCms(
   faqs: const [
     ServiceFaqItem(
       question: 'How do I request a consultation?',
-      answer: 'Use the consultation form below or call our sales line. We respond within 24 hours.',
+      answer:
+          'Use the consultation form below or call our sales line. We respond within 24 hours.',
     ),
     ServiceFaqItem(
       question: 'Do you work outside Lagos?',
-      answer: 'Yes. HD Homes operates across major Nigerian cities including Abuja, Port Harcourt, and Ibadan.',
+      answer:
+          'Yes. HD Homes operates across major Nigerian cities including Abuja, Port Harcourt, and Ibadan.',
     ),
     ServiceFaqItem(
       question: 'Can I combine multiple services?',
-      answer: 'Absolutely. Many clients use bundled services — e.g. design + construction + property management.',
+      answer:
+          'Absolutely. Many clients use bundled services — e.g. design + construction + property management.',
     ),
     ServiceFaqItem(
       question: 'How are proposals generated?',
-      answer: 'After consultation, our digital proposal system generates a branded scope, timeline, and budget summary.',
+      answer:
+          'After consultation, our digital proposal system generates a branded scope, timeline, and budget summary.',
     ),
     ServiceFaqItem(
       question: 'Is pricing fixed or custom?',
-      answer: 'Most services use custom quotes based on scope. Starting prices are shown where applicable.',
+      answer:
+          'Most services use custom quotes based on scope. Starting prices are shown where applicable.',
     ),
   ],
   knowledgeArticles: const [

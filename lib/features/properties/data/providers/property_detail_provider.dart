@@ -1,15 +1,37 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/properties/data/models/marketplace_property.dart';
 import 'package:hdhomesproject/features/properties/data/models/property_detail_content.dart';
+import 'package:hdhomesproject/features/properties/data/models/property_detail_extras.dart';
 import 'package:hdhomesproject/features/properties/data/providers/marketplace_listings_provider.dart';
 
+/// Public property detail — prefers a fresh CMS fetch by id or slug
+/// (homepage cards use slug; marketplace cards use UUID).
 final propertyDetailProvider =
-    Provider.family<PropertyDetailContent?, String>((ref, id) {
+    Provider.family<PropertyDetailContent?, String>((ref, idOrSlug) {
   final listings = ref.watch(marketplaceListingsProvider);
-  final listing = listings.cast<MarketplaceProperty?>().firstWhere(
-        (p) => p?.id == id,
-        orElse: () => null,
-      );
+  MarketplaceProperty? findLocal() {
+    return listings.cast<MarketplaceProperty?>().firstWhere(
+          (p) => p?.id == idOrSlug || p?.slug == idOrSlug,
+          orElse: () => null,
+        );
+  }
+
+  if (ref.watch(supabaseConfiguredProvider)) {
+    final remote = ref.watch(publishedPropertyByIdProvider(idOrSlug));
+    final cms = remote.asData?.value;
+    if (cms != null) {
+      return _buildDetail(toMarketplaceProperty(cms), listings);
+    }
+    if (remote.isLoading) {
+      final listing = findLocal();
+      if (listing != null) return _buildDetail(listing, listings);
+      return null;
+    }
+  }
+
+  final listing = findLocal();
   if (listing == null) return null;
   return _buildDetail(listing, listings);
 });
@@ -34,244 +56,226 @@ PropertyDetailContent _buildDetail(
       .map((x) => x.id)
       .toList();
 
+  final x = p.detailExtras ?? PropertyDetailExtras.emptyForWizard();
+  final price = p.priceValue;
+  final rawFee = x.reservationFeePercent;
+  final feeAmount = rawFee > 100 ? rawFee : price * rawFee / 100;
+  final overview = p.overviewSummary?.trim() ?? '';
+
+  final gallery = p.galleryUrls.isNotEmpty
+      ? p.galleryUrls
+      : (p.imageUrl != null && p.imageUrl!.isNotEmpty
+          ? [p.imageUrl!]
+          : const <String>[]);
+
+  final paymentPlans = x.paymentPlans
+      .where((plan) => plan.name.trim().isNotEmpty && plan.months > 0)
+      .map((plan) {
+    final rawDown = plan.downPaymentPercent;
+    final downPayment = rawDown > 100 ? rawDown : price * rawDown / 100;
+    final balance = (price - downPayment).clamp(0, price);
+    final months = plan.months <= 0 ? 1 : plan.months;
+    final withInterest = balance * (1 + plan.interestRate / 100);
+    return PropertyPaymentPlan(
+      name: plan.name,
+      downPayment: downPayment.round(),
+      monthlyInstallment: (withInterest / months).round(),
+      durationMonths: plan.months,
+      interestRate: plan.interestRate,
+    );
+  }).toList();
+
+  final floorPlans = x.floorPlans
+      .where((f) => f.label.trim().isNotEmpty)
+      .map(
+        (f) => PropertyFloorPlan(
+          label: f.label,
+          dimensions: f.dimensions,
+          downloadUrl: f.downloadUrl.isEmpty ? '#' : f.downloadUrl,
+        ),
+      )
+      .toList();
+
+  final documents = x.documents
+      .where(
+        (d) => d.title.trim().isNotEmpty && d.url.trim().isNotEmpty,
+      )
+      .map(
+        (d) => PropertyDocument(
+          title: d.title,
+          type: d.type,
+          url: d.url,
+        ),
+      )
+      .toList();
+
+  final nearby = x.nearbyPlaces
+      .where((n) => n.name.trim().isNotEmpty)
+      .map(
+        (n) => NearbyPlace(
+          name: n.name,
+          category: n.category,
+          distance: n.distance,
+          travelTime: n.travelTime,
+        ),
+      )
+      .toList();
+
+  final reviews = x.reviews
+      .where((r) => r.comment.trim().isNotEmpty || r.name.trim().isNotEmpty)
+      .map(
+        (r) => PropertyReview(
+          name: r.name,
+          role: r.role,
+          rating: r.rating.toDouble(),
+          comment: r.comment,
+          verified: r.verified,
+          type: r.type,
+        ),
+      )
+      .toList();
+
+  final faqs = x.faqs
+      .where((f) => f.question.trim().isNotEmpty)
+      .map((f) => PropertyFaqItem(question: f.question, answer: f.answer))
+      .toList();
+
+  final slots = x.inspectionSlots
+      .where((s) => s.date.trim().isNotEmpty || s.time.trim().isNotEmpty)
+      .map(
+        (s) => InspectionSlot(
+          date: s.date,
+          time: s.time,
+          available: s.available,
+        ),
+      )
+      .toList();
+
+  final brochure = documents
+      .cast<PropertyDocument?>()
+      .firstWhere(
+        (d) => d!.title.toLowerCase().contains('brochure'),
+        orElse: () => documents.isNotEmpty ? documents.first : null,
+      );
+
   return PropertyDetailContent(
     listing: p,
     lastUpdated: p.createdAt,
     relatedIds: related,
     overview: PropertyOverview(
-      summary:
-          '${p.title} in ${p.estate} offers ${p.bedrooms > 0 ? '${p.bedrooms}-bedroom' : ''} ${p.type.toLowerCase()} living '
-          'with premium finishes and HD Homes transparency from inquiry to handover.',
-      architecturalConcept:
-          'Contemporary Nigerian architecture with optimized natural light, cross-ventilation, and durable materials.',
+      summary: overview,
+      architecturalConcept: p.architecturalConcept?.trim() ?? '',
       lifestyleBenefits: p.lifestyleTags,
-      targetBuyers: p.purpose == PropertyPurpose.invest
-          ? 'Investors seeking capital growth and rental income'
-          : 'Families and professionals seeking quality homes',
-      investmentPotential: p.roiEstimate,
-      communityFeatures: [
-        'Gated estate access',
-        'Landscaped green areas',
-        'Community security',
-        'Proximity to major corridors',
-      ],
-      developerHighlights: [
-        'HD Homes verified delivery',
-        'Transparent documentation',
-        'Dedicated after-sales support',
-      ],
+      targetBuyers: x.targetBuyers.trim(),
+      investmentPotential: p.investmentPotentialText?.trim() ?? '',
+      communityFeatures: x.communityFeatures,
+      developerHighlights: x.developerHighlights,
     ),
     specs: PropertySpecs(
       bedrooms: p.bedrooms,
       bathrooms: p.bathrooms,
-      toilets: p.bathrooms,
-      kitchens: p.bedrooms > 0 ? 1 : 0,
-      parkingSpaces: p.bedrooms >= 3 ? 2 : 1,
+      toilets: p.toilets ?? 0,
+      kitchens: p.kitchens ?? 0,
+      parkingSpaces: p.parkingSpaces ?? 0,
       floorArea: p.buildingSize,
       landArea: p.landSize,
       plotSize: p.landSize,
-      floors: p.bedrooms >= 4 ? 2 : 1,
-      yearBuilt: p.completionStatus == CompletionStatus.readyToMove ? '2025' : '2027 (est.)',
+      floors: p.floors ?? 0,
+      yearBuilt: p.yearBuilt ?? '',
       smartHomeFeatures: p.amenities.where((a) => a.contains('Smart')).toList(),
-      powerSupply: 'Grid + backup generator provision',
-      waterSupply: 'Borehole + treatment plant',
-      internetConnectivity: 'Fiber-ready infrastructure',
+      powerSupply: p.powerSupply ?? '',
+      waterSupply: p.waterSupply ?? '',
+      internetConnectivity: p.internetConnectivity ?? '',
     ),
     pricing: PropertyPricing(
-      basePrice: p.priceValue,
-      promotionalPrice: p.isNew ? (p.priceValue * 0.97).round() : null,
-      reservationFee: (p.priceValue * 0.05).round(),
-      taxesAndFees: 'Documentation & statutory fees apply',
-      mortgageEligible: p.paymentOptions.contains('Mortgage'),
+      basePrice: price,
+      promotionalPrice: (p.promoPrice != null && p.promoPrice! > 0)
+          ? p.promoPrice!.round()
+          : null,
+      reservationFee: feeAmount.round(),
+      taxesAndFees: x.taxesAndFees,
+      mortgageEligible: x.mortgageEligible,
+      showMortgageCalculator: x.showMortgageCalculator,
+      mortgageDepositPercent: x.mortgageDepositPercent,
+      mortgageDepositMinPercent: x.mortgageDepositMinPercent,
+      mortgageDepositMaxPercent: x.mortgageDepositMaxPercent,
+      mortgageInterestRate: x.mortgageInterestRate,
+      mortgageInterestMin: x.mortgageInterestMin,
+      mortgageInterestMax: x.mortgageInterestMax,
+      mortgageTermYears: x.mortgageTermYears,
+      mortgageTermMinYears: x.mortgageTermMinYears,
+      mortgageTermMaxYears: x.mortgageTermMaxYears,
     ),
-    paymentPlans: [
-      PropertyPaymentPlan(
-        name: '12-Month Plan',
-        downPayment: (p.priceValue * 0.3).round(),
-        monthlyInstallment: ((p.priceValue * 0.7) / 12).round(),
-        durationMonths: 12,
-        interestRate: 0,
-      ),
-      PropertyPaymentPlan(
-        name: '24-Month Plan',
-        downPayment: (p.priceValue * 0.2).round(),
-        monthlyInstallment: ((p.priceValue * 0.8) / 24).round(),
-        durationMonths: 24,
-        interestRate: 10,
-      ),
-    ],
+    paymentPlans: paymentPlans,
     investment: PropertyInvestmentDetail(
-      expectedRoi: p.roiEstimate,
-      rentalYield: p.rentalYield,
-      capitalAppreciation: p.capitalAppreciation,
-      paybackPeriod: '6–8 years',
-      occupancyForecast: '85–92%',
+      expectedRoi: _adminText(p.roiEstimate),
+      rentalYield: _adminText(p.rentalYield),
+      capitalAppreciation: x.appreciationEstimate.trim(),
+      paybackPeriod: '',
+      occupancyForecast: '',
       investmentScore: p.investmentScore,
       riskLevel: p.riskLevel,
       isInvestmentProperty:
-          p.purpose == PropertyPurpose.invest || p.category == PropertyCategory.investment,
+          p.purpose == PropertyPurpose.invest ||
+              p.category == PropertyCategory.investment,
     ),
     media: PropertyMediaBundle(
-      images: List.generate(5, (i) => 'gallery_${p.id}_$i'),
-      videos: const ['property_tour'],
-      hasVirtualTour: true,
-      hasDroneFootage: true,
-      brochureUrl: '#',
+      images: gallery,
+      videos: [
+        if (x.videoTourUrl.trim().isNotEmpty) x.videoTourUrl.trim(),
+      ],
+      hasVirtualTour: x.tour360Url.trim().isNotEmpty,
+      hasDroneFootage: x.droneTourUrl.trim().isNotEmpty,
+      brochureUrl: brochure?.url,
+      tour360Url: x.tour360Url.trim().isEmpty ? null : x.tour360Url.trim(),
+      videoTourUrl:
+          x.videoTourUrl.trim().isEmpty ? null : x.videoTourUrl.trim(),
+      droneTourUrl:
+          x.droneTourUrl.trim().isEmpty ? null : x.droneTourUrl.trim(),
     ),
-    floorPlans: [
-      PropertyFloorPlan(
-        label: 'Ground Floor',
-        dimensions: 'Open plan · 180 sqm',
-        downloadUrl: '#',
-      ),
-      PropertyFloorPlan(
-        label: 'First Floor',
-        dimensions: '4 bedrooms · 200 sqm',
-        downloadUrl: '#',
-      ),
-    ],
+    floorPlans: floorPlans,
     masterPlan: PropertyMasterPlan(
-      description: 'Master-planned estate with roads, green belts, clubhouse, and phased development.',
-      legend: const [
-        'Available plots',
-        'Reserved plots',
-        'Sold plots',
-        'Clubhouse',
-        'Green areas',
-      ],
+      description: x.masterPlanDescription.trim(),
+      legend: x.masterPlanLegend,
     ),
-    construction: PropertyConstructionDetail(
-      progress: p.completionStatus == CompletionStatus.readyToMove
-          ? 1.0
-          : p.completionStatus == CompletionStatus.underConstruction
-              ? 0.65
-              : 0.35,
-      timeline: 'Foundation → Structure → Roofing → Finishing',
-      weeklyUpdate: 'Structural work progressing on schedule with quality inspections completed.',
-      completionForecast: p.completionStatus == CompletionStatus.readyToMove
-          ? 'Ready now'
-          : 'Q4 2026',
-      milestones: const [
-        'Planning approved',
-        'Foundation complete',
-        'Structure in progress',
-        'Roofing',
-        'Finishing',
-      ],
+    construction: const PropertyConstructionDetail(
+      progress: 0,
+      timeline: '',
+      weeklyUpdate: '',
+      completionForecast: '',
+      milestones: [],
     ),
-    documents: const [
-      PropertyDocument(title: 'Property Brochure', type: 'PDF', url: '#'),
-      PropertyDocument(title: 'Price List', type: 'PDF', url: '#'),
-      PropertyDocument(title: 'Floor Plans', type: 'PDF', url: '#'),
-      PropertyDocument(title: 'Payment Schedule', type: 'PDF', url: '#'),
-      PropertyDocument(title: 'Site Plan', type: 'PDF', url: '#'),
-    ],
-    nearbyPlaces: const [
-      NearbyPlace(
-        name: 'Greenfield International School',
-        category: 'School',
-        distance: '1.2 km',
-        travelTime: '4 min',
-      ),
-      NearbyPlace(
-        name: 'Lekki Mall',
-        category: 'Shopping',
-        distance: '3.5 km',
-        travelTime: '12 min',
-      ),
-      NearbyPlace(
-        name: 'General Hospital',
-        category: 'Hospital',
-        distance: '2.8 km',
-        travelTime: '10 min',
-      ),
-      NearbyPlace(
-        name: 'First Bank Branch',
-        category: 'Bank',
-        distance: '0.8 km',
-        travelTime: '3 min',
-      ),
-    ],
-    reviews: const [
-      PropertyReview(
-        name: 'Chioma A.',
-        role: 'Verified Buyer',
-        rating: 5,
-        comment: 'Exceptional build quality and transparent process from start to finish.',
-        verified: true,
-        type: 'buyer',
-      ),
-      PropertyReview(
-        name: 'James O.',
-        role: 'Investor',
-        rating: 5,
-        comment: 'Strong rental demand in this corridor. HD Homes delivered on timelines.',
-        verified: true,
-        type: 'investor',
-      ),
-    ],
-    faqs: const [
-      PropertyFaqItem(
-        question: 'Is the title verified?',
-        answer: 'Yes. All HD Homes estates include verified title documentation.',
-      ),
-      PropertyFaqItem(
-        question: 'Are installment plans available?',
-        answer: 'Multiple flexible plans are available. See pricing section or contact sales.',
-      ),
-      PropertyFaqItem(
-        question: 'Can I inspect before purchase?',
-        answer: 'Yes. Book an inspection slot online or contact our sales team.',
-      ),
-      PropertyFaqItem(
-        question: 'What documents are required?',
-        answer: 'Valid ID, proof of income, and reservation fee to secure your unit.',
-      ),
-    ],
+    documents: documents,
+    nearbyPlaces: nearby,
+    reviews: reviews,
+    faqs: faqs,
     availability: PropertyAvailabilityDashboard(
-      totalUnits: 48,
-      availableUnits: switch (p.availability) {
-        AvailabilityLevel.available => 32,
-        AvailabilityLevel.limited => 12,
-        AvailabilityLevel.almostSoldOut => 4,
-        AvailabilityLevel.soldOut => 0,
-      },
-      reservedUnits: 8,
-      soldUnits: switch (p.availability) {
-        AvailabilityLevel.soldOut => 48,
-        _ => 8,
-      },
+      totalUnits: x.totalUnits,
+      availableUnits: x.availableUnits,
+      reservedUnits: x.reservedUnits,
+      soldUnits: x.soldUnits,
     ),
     neighborhood: NeighborhoodIntelligence(
-      safetyScore: 82,
-      trafficConditions: 'Moderate — peak hours 7–9 AM',
-      plannedInfrastructure: 'Road expansion and BRT corridor planned',
-      appreciationEstimate: p.capitalAppreciation,
-      walkabilityScore: 68,
-      lifestyleScore: 85,
+      safetyScore: x.safetyScore,
+      trafficConditions: x.trafficConditions,
+      plannedInfrastructure: x.plannedInfrastructure,
+      appreciationEstimate: x.appreciationEstimate.trim(),
+      walkabilityScore: x.walkabilityScore,
+      lifestyleScore: x.lifestyleScore,
     ),
-    inspectionSlots: const [
-      InspectionSlot(date: 'Sat 12 Jul', time: '10:00 AM', available: true),
-      InspectionSlot(date: 'Sat 12 Jul', time: '2:00 PM', available: true),
-      InspectionSlot(date: 'Sun 13 Jul', time: '11:00 AM', available: false),
-      InspectionSlot(date: 'Mon 14 Jul', time: '3:00 PM', available: true),
-    ],
+    inspectionSlots: slots,
     aiInsight: PropertyAiInsight(
-      matchSummary:
-          'This property aligns with your preferences for ${p.city}, ${p.type}, and ${p.purpose.name} intent.',
-      investmentStrengths: [
-        'Strong ${p.capitalAppreciation} appreciation corridor',
-        '${p.rentalYield} rental yield potential',
-        'Verified developer track record',
-      ],
+      matchSummary: '',
+      investmentStrengths: const [],
       lifestyleBenefits: p.lifestyleTags,
-      affordabilityNote:
-          'Estimated monthly from ₦${((p.priceValue * 0.7) / 24 / 1e6).toStringAsFixed(1)}M on 24-month plan',
-      suggestedActions: const [
-        'Book a site inspection',
-        'Speak with a sales advisor',
-        'Reserve this unit',
-      ],
+      affordabilityNote: '',
+      suggestedActions: const [],
     ),
   );
+}
+
+String _adminText(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty || trimmed == '—' || trimmed == '-') return '';
+  return trimmed;
 }

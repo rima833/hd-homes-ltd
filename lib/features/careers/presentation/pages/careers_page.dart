@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/website/seo/seo_binder.dart';
+import 'package:hdhomesproject/core/website/seo/seo_config.dart';
+import 'package:hdhomesproject/core/website/seo/seo_metadata.dart';
+import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/features/careers/data/models/careers_hub_content.dart';
 import 'package:hdhomesproject/features/careers/data/providers/careers_cms_provider.dart';
-import 'package:hdhomesproject/features/careers/presentation/sections/careers_closing_sections.dart';
-import 'package:hdhomesproject/features/careers/presentation/sections/careers_hero_section.dart';
-import 'package:hdhomesproject/features/careers/presentation/sections/careers_hub_sections.dart';
+import 'package:hdhomesproject/features/careers/presentation/sections/careers_premium_sections.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-/// Careers Hub — Volume 2 Part 12.
+/// Careers Hub — premium dark-luxury CMS-backed page.
 class CareersPage extends ConsumerStatefulWidget {
   const CareersPage({super.key});
 
@@ -16,12 +19,9 @@ class CareersPage extends ConsumerStatefulWidget {
 
 class _CareersPageState extends ConsumerState<CareersPage> {
   final _rolesKey = GlobalKey();
-  final _applyKey = GlobalKey();
-  final _faqKey = GlobalKey();
-  CareerJob? _selectedJob;
 
-  void _scrollTo(GlobalKey key) {
-    final target = key.currentContext;
+  void _scrollToRoles() {
+    final target = _rolesKey.currentContext;
     if (target != null) {
       Scrollable.ensureVisible(
         target,
@@ -31,43 +31,66 @@ class _CareersPageState extends ConsumerState<CareersPage> {
     }
   }
 
-  void _applyFor(CareerJob job) {
-    setState(() => _selectedJob = job);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTo(_applyKey));
+  Future<void> _mailto(String email, {String? subject}) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: email,
+      queryParameters: {
+        if (subject != null && subject.trim().isNotEmpty) 'subject': subject,
+      },
+    );
+    await launchUrl(uri);
+  }
+
+  Future<void> _apply(CareerJob job, String cvEmail) async {
+    final url = job.applyUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      final uri = Uri.tryParse(url);
+      if (uri != null) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    }
+    await _mailto(cvEmail, subject: 'Application: ${job.title}');
   }
 
   @override
   Widget build(BuildContext context) {
     final cms = ref.watch(careersHubCmsProvider);
 
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: CareersHeroSection(
-            headline: cms.heroHeadline,
-            subheadline: cms.heroSubheadline,
-            openPositions: cms.openPositionsCount,
-            onViewRoles: () => _scrollTo(_rolesKey),
-            onGeneralApply: () {
-              setState(() => _selectedJob = null);
-              _scrollTo(_applyKey);
-            },
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: CareersHubSections(
-            rolesKey: _rolesKey,
-            onApply: _applyFor,
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: CareersClosingSections(
-            applyKey: _applyKey,
-            faqKey: _faqKey,
-            preselectedJob: _selectedJob,
-          ),
-        ),
-      ],
+    final title = cms.seoTitle?.trim();
+    final description = cms.seoDescription?.trim();
+    final page = CareersPremiumSections(
+      cms: cms,
+      rolesKey: _rolesKey,
+      dense: true,
+      onApply: (job) => _apply(job, cms.cvEmail),
+      onViewRoles: _scrollToRoles,
+      onSubmitCv: () => _mailto(
+        cms.cvEmail,
+        subject: 'CV submission — HD Homes careers',
+      ),
+    );
+
+    if ((title == null || title.isEmpty) &&
+        (description == null || description.isEmpty)) {
+      return page;
+    }
+
+    return SeoBinder(
+      metadata: SeoMetadata(
+        title: (title != null && title.isNotEmpty)
+            ? title
+            : SeoMetadata.careersHub.title,
+        description: (description != null && description.isNotEmpty)
+            ? description
+            : SeoMetadata.careersHub.description,
+        canonicalUrl: SeoConfig.canonicalFor(RoutePaths.careers),
+        keywords: SeoMetadata.careersHub.keywords,
+        structuredData: SeoMetadata.careersHub.structuredData,
+        ogImageUrl: cms.heroImageUrl,
+      ),
+      child: page,
     );
   }
 }

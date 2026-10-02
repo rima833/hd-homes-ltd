@@ -38,7 +38,8 @@ class SearchClosingSections extends HookConsumerWidget {
       () => calculateAffordability(
         monthlyIncome: double.tryParse(income.value.replaceAll(',', '')) ?? 0,
         savings: double.tryParse(savings.value.replaceAll(',', '')) ?? 0,
-        commitments: double.tryParse(commitments.value.replaceAll(',', '')) ?? 0,
+        commitments:
+            double.tryParse(commitments.value.replaceAll(',', '')) ?? 0,
       ),
       [income.value, savings.value, commitments.value],
     );
@@ -49,9 +50,10 @@ class SearchClosingSections extends HookConsumerWidget {
           child: Column(
             children: [
               const AnimatedSectionTitle(
-                overline: 'AI MATCHING',
+                overline: 'SMART MATCHING',
                 title: 'Recommended for you',
-                subtitle: 'Based on search history, budget, and lifestyle preferences.',
+                subtitle:
+                    'Based on search history, budget, and lifestyle preferences.',
               ),
               const SizedBox(height: AppSpacing.xl),
               Wrap(
@@ -78,7 +80,10 @@ class SearchClosingSections extends HookConsumerWidget {
           backgroundColor: Theme.of(context).colorScheme.surface,
           child: Column(
             children: [
-              const AnimatedSectionTitle(overline: 'RECENT', title: 'Recently viewed'),
+              const AnimatedSectionTitle(
+                overline: 'RECENT',
+                title: 'Recently viewed',
+              ),
               const SizedBox(height: AppSpacing.lg),
               if (recentlyViewed.isEmpty)
                 const Text('Browse properties to build your history.')
@@ -86,7 +91,12 @@ class SearchClosingSections extends HookConsumerWidget {
                 Wrap(
                   spacing: AppSpacing.base,
                   children: recentlyViewed
-                      .map((p) => SizedBox(width: 280, child: MarketplacePropertyCard(property: p)))
+                      .map(
+                        (p) => SizedBox(
+                          width: 280,
+                          child: MarketplacePropertyCard(property: p),
+                        ),
+                      )
                       .toList(),
                 ),
             ],
@@ -97,17 +107,26 @@ class SearchClosingSections extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AnimatedSectionTitle(overline: 'SAVED', title: 'Saved searches'),
+              const AnimatedSectionTitle(
+                overline: 'SAVED',
+                title: 'Saved searches',
+              ),
               const SizedBox(height: AppSpacing.lg),
               ...saved.map(
                 (s) => ListTile(
-                  leading: const Icon(LucideIcons.bookmark, color: AppColors.gold),
+                  leading: const Icon(
+                    LucideIcons.bookmark,
+                    color: AppColors.gold,
+                  ),
                   title: Text(s.name),
-                  subtitle: Text('Created ${s.createdAt.day}/${s.createdAt.month}/${s.createdAt.year}'),
+                  subtitle: Text(
+                    'Created ${s.createdAt.day}/${s.createdAt.month}/${s.createdAt.year}',
+                  ),
                   trailing: IconButton(
                     icon: const Icon(Icons.play_arrow),
                     onPressed: () {
-                      ref.read(marketplaceFiltersProvider.notifier).state = s.filters;
+                      ref.read(marketplaceFiltersProvider.notifier).state =
+                          s.filters;
                     },
                   ),
                 ),
@@ -115,7 +134,8 @@ class SearchClosingSections extends HookConsumerWidget {
               PrimaryButton(
                 label: 'Save current search',
                 icon: LucideIcons.plus,
-                onPressed: () => saveCurrentSearch(ref, 'My search ${saved.length + 1}'),
+                onPressed: () =>
+                    saveCurrentSearch(ref, 'My search ${saved.length + 1}'),
               ),
             ],
           ),
@@ -125,7 +145,10 @@ class SearchClosingSections extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AnimatedSectionTitle(overline: 'ALERTS', title: 'Property alerts'),
+              const AnimatedSectionTitle(
+                overline: 'ALERTS',
+                title: 'Property alerts',
+              ),
               const SizedBox(height: AppSpacing.lg),
               ...alerts.map(
                 (a) => SwitchListTile(
@@ -142,7 +165,10 @@ class SearchClosingSections extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AnimatedSectionTitle(overline: 'ANALYTICS', title: 'Your search analytics'),
+              const AnimatedSectionTitle(
+                overline: 'ANALYTICS',
+                title: 'Your search analytics',
+              ),
               const SizedBox(height: AppSpacing.lg),
               Wrap(
                 spacing: AppSpacing.base,
@@ -153,7 +179,9 @@ class SearchClosingSections extends HookConsumerWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
-              Text('Favorite locations: ${analytics.favoriteLocations.join(', ')}'),
+              Text(
+                'Favorite locations: ${analytics.favoriteLocations.join(', ')}',
+              ),
               Text('Tip: ${analytics.suggestedImprovement}'),
             ],
           ),
@@ -163,16 +191,26 @@ class SearchClosingSections extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AnimatedSectionTitle(overline: 'HISTORY', title: 'Search history'),
-              ...history.take(5).map(
+              const AnimatedSectionTitle(
+                overline: 'HISTORY',
+                title: 'Search history',
+              ),
+              ...history
+                  .take(5)
+                  .map(
                     (h) => ListTile(
                       title: Text(h.query),
-                      subtitle: Text('${h.filterSummary} · ${h.resultsCount} results'),
+                      subtitle: Text(
+                        '${h.filterSummary} · ${h.resultsCount} results',
+                      ),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline),
                         onPressed: () {
-                          ref.read(searchHistoryProvider.notifier).update(
-                                (list) => list.where((e) => e.id != h.id).toList(),
+                          ref
+                              .read(searchHistoryProvider.notifier)
+                              .update(
+                                (list) =>
+                                    list.where((e) => e.id != h.id).toList(),
                               );
                         },
                       ),
@@ -186,19 +224,31 @@ class SearchClosingSections extends HookConsumerWidget {
             children: [
               const AnimatedSectionTitle(
                 overline: 'DREAM HOME',
-                title: 'AI Dream Home Finder',
-                subtitle: 'Conversational questionnaire → personalized shortlist.',
+                title: 'Dream Home Finder',
+                subtitle:
+                    'Conversational questionnaire → personalized shortlist.',
               ),
               const SizedBox(height: AppSpacing.lg),
               if (dreamStep.value < cms.dreamHomeQuestions.length)
-                Text(cms.dreamHomeQuestions[dreamStep.value], style: Theme.of(context).textTheme.titleMedium)
+                Text(
+                  cms.dreamHomeQuestions[dreamStep.value],
+                  style: Theme.of(context).textTheme.titleMedium,
+                )
               else
-                const Text('Your personalized shortlist is ready — see recommendations above.'),
+                const Text(
+                  'Your personalized shortlist is ready — see recommendations above.',
+                ),
               const SizedBox(height: AppSpacing.base),
               if (dreamStep.value < cms.dreamHomeQuestions.length)
                 Row(
                   children: [
-                    Expanded(child: TextField(decoration: const InputDecoration(hintText: 'Your answer…'))),
+                    Expanded(
+                      child: TextField(
+                        decoration: const InputDecoration(
+                          hintText: 'Your answer…',
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: AppSpacing.sm),
                     PrimaryButton(
                       label: 'Next',
@@ -214,19 +264,46 @@ class SearchClosingSections extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AnimatedSectionTitle(overline: 'AFFORDABILITY', title: 'Smart affordability analyzer'),
+              const AnimatedSectionTitle(
+                overline: 'AFFORDABILITY',
+                title: 'Smart affordability analyzer',
+              ),
               const SizedBox(height: AppSpacing.lg),
               Wrap(
                 spacing: AppSpacing.base,
                 children: [
-                  SizedBox(width: 180, child: TextField(decoration: const InputDecoration(labelText: 'Monthly income ₦'), onChanged: (v) => income.value = v)),
-                  SizedBox(width: 180, child: TextField(decoration: const InputDecoration(labelText: 'Savings ₦'), onChanged: (v) => savings.value = v)),
-                  SizedBox(width: 180, child: TextField(decoration: const InputDecoration(labelText: 'Commitments ₦'), onChanged: (v) => commitments.value = v)),
+                  SizedBox(
+                    width: 180,
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        labelText: 'Monthly income ₦',
+                      ),
+                      onChanged: (v) => income.value = v,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 180,
+                    child: TextField(
+                      decoration: const InputDecoration(labelText: 'Savings ₦'),
+                      onChanged: (v) => savings.value = v,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 180,
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        labelText: 'Commitments ₦',
+                      ),
+                      onChanged: (v) => commitments.value = v,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
               Text('Comfortable budget: ${affordability.comfortableBudget}'),
-              Text('Mortgage eligible: ${affordability.mortgageEligible ? 'Yes' : 'Review options'}'),
+              Text(
+                'Mortgage eligible: ${affordability.mortgageEligible ? 'Yes' : 'Review options'}',
+              ),
               Text('Installment: ${affordability.installmentAffordable}'),
               Text('Recommended: ${affordability.recommendedPlan}'),
             ],
@@ -237,14 +314,16 @@ class SearchClosingSections extends HookConsumerWidget {
             children: [
               const AnimatedSectionTitle(
                 overline: 'NEIGHBORHOODS',
-                title: 'AI Neighborhood Matcher',
+                title: 'Neighborhood Matcher',
               ),
               const SizedBox(height: AppSpacing.lg),
               ...cms.neighborhoods.map(
                 (n) => Card(
                   child: ListTile(
                     title: Text('${n.name}, ${n.city}'),
-                    subtitle: Text('${n.summary} · ${n.propertyCount} listings'),
+                    subtitle: Text(
+                      '${n.summary} · ${n.propertyCount} listings',
+                    ),
                     trailing: Chip(label: Text('${n.lifestyleScore}/100')),
                   ),
                 ),
@@ -257,7 +336,10 @@ class SearchClosingSections extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AnimatedSectionTitle(overline: 'DISCOVERY', title: 'Personalized discovery feed'),
+              const AnimatedSectionTitle(
+                overline: 'DISCOVERY',
+                title: 'Personalized discovery feed',
+              ),
               const SizedBox(height: AppSpacing.lg),
               ...cms.discoveryFeed.map(
                 (item) => ListTile(
@@ -290,10 +372,10 @@ class SearchClosingSections extends HookConsumerWidget {
   }
 
   IconData _feedIcon(String type) => switch (type) {
-        'property' => LucideIcons.home,
-        'investment' => LucideIcons.trendingUp,
-        'article' => LucideIcons.newspaper,
-        'event' => LucideIcons.calendar,
-        _ => LucideIcons.sparkles,
-      };
+    'property' => LucideIcons.home,
+    'investment' => LucideIcons.trendingUp,
+    'article' => LucideIcons.newspaper,
+    'event' => LucideIcons.calendar,
+    _ => LucideIcons.sparkles,
+  };
 }

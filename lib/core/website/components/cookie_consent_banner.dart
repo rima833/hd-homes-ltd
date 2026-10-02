@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/growth/consent/consent_gate.dart';
 import 'package:hdhomesproject/core/storage/storage_service.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
@@ -28,10 +30,13 @@ class _CookieConsentBannerState extends ConsumerState<CookieConsentBanner> {
     final storage = await ref.read(storageServiceProvider.future);
     if (!mounted) return;
     final accepted = storage.cookieConsentAccepted;
+    if (accepted && storage.cookieConsentChoice == null) {
+      await storage.setCookieConsentChoice('accepted');
+    }
     ref.read(consentGateProvider.notifier).hydrate(accepted);
     setState(() {
       _loaded = true;
-      _visible = !accepted;
+      _visible = !storage.cookieConsentAnswered && !accepted;
     });
   }
 
@@ -54,24 +59,56 @@ class _CookieConsentBannerState extends ConsumerState<CookieConsentBanner> {
         color: Theme.of(context).colorScheme.surface,
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.base),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  AppStrings.cookieMessage,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.base),
-              TextButton(
-                onPressed: () => _accept(false),
-                child: const Text(AppStrings.cookieDecline),
-              ),
-              FilledButton(
-                onPressed: () => _accept(true),
-                child: const Text(AppStrings.cookieAccept),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = constraints.maxWidth < 480;
+              final message = Text(
+                AppStrings.cookieMessage,
+                style: Theme.of(context).textTheme.bodySmall,
+                maxLines: stacked ? 4 : 3,
+                overflow: TextOverflow.ellipsis,
+              );
+              final actions = Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                alignment: stacked ? WrapAlignment.end : WrapAlignment.start,
+                children: [
+                  TextButton(
+                    onPressed: () =>
+                        context.go(RoutePaths.cmsPagePath('cookies')),
+                    child: const Text('Cookie policy'),
+                  ),
+                  TextButton(
+                    onPressed: () => _accept(false),
+                    child: const Text(AppStrings.cookieDecline),
+                  ),
+                  FilledButton(
+                    onPressed: () => _accept(true),
+                    child: const Text(AppStrings.cookieAccept),
+                  ),
+                ],
+              );
+
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    message,
+                    const SizedBox(height: AppSpacing.sm),
+                    actions,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: message),
+                  const SizedBox(width: AppSpacing.base),
+                  actions,
+                ],
+              );
+            },
           ),
         ),
       ),

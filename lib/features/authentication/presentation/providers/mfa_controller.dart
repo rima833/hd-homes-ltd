@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/mfa_models.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/device_fingerprint_service.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/mfa_service.dart';
-import 'package:hdhomesproject/features/authentication/presentation/providers/account_security_controller.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/auth_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,9 +17,31 @@ final mfaServiceProvider = Provider<MfaService>((ref) {
   );
 });
 
+/// MFA gate snapshot — always waits for a stable device fingerprint so trusted
+/// devices are matched before the router decides `/mfa/challenge`.
 final mfaStatusProvider = FutureProvider<MfaStatusSnapshot>((ref) async {
-  final role = ref.watch(identitySessionProvider).primaryRole;
-  return ref.watch(mfaServiceProvider).status(role: role);
+  // Select only gate-relevant fields. Watching the full session re-fetched MFA
+  // on every token refresh / activity tick and caused dashboard blink loops.
+  final gate = ref.watch(
+    identitySessionProvider.select(
+      (s) => (s.userId, s.primaryRole, s.isAuthenticated),
+    ),
+  );
+  if (!gate.$3 || gate.$1 == null) {
+    return const MfaStatusSnapshot(statusKnown: false);
+  }
+
+  final fpService = await ref.watch(deviceFingerprintServiceProvider.future);
+  // Mint / load the stable id before any trust comparison.
+  await fpService.fingerprint();
+
+  final configured = ref.watch(supabaseConfiguredProvider);
+  final service = MfaService(
+    security: ref.watch(securityServiceProvider),
+    client: configured ? ref.watch(supabaseClientProvider) : null,
+    fingerprint: fpService,
+  );
+  return service.status(role: gate.$2);
 });
 
 class MfaUiState {
@@ -88,7 +110,7 @@ class MfaController extends Notifier<MfaUiState> {
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
     }
   }
@@ -113,7 +135,7 @@ class MfaController extends Notifier<MfaUiState> {
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }
@@ -123,38 +145,113 @@ class MfaController extends Notifier<MfaUiState> {
     required String factorId,
     required String code,
     bool trustDevice = false,
+    int trustDurationDays = MfaTrustDurationOptions.days30,
   }) async {
     state = state.copyWith(isBusy: true, clearError: true);
     try {
       await _service.verifyLoginFactor(factorId: factorId, code: code);
       if (trustDevice) {
-        final role = ref.read(identitySessionProvider).primaryRole;
-        final policy = MfaPolicyCatalog.forRole(role);
-        await _service.trustCurrentDevice(durationDays: policy.trustDurationDays);
+        await _persistTrust(trustDurationDays);
       }
       state = state.copyWith(isBusy: false, message: 'Verification successful.');
       ref.invalidate(mfaStatusProvider);
+      await ref.read(mfaStatusProvider.future);
       return true;
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }
   }
 
-  Future<bool> verifyWithBackupCode(String code) async {
+  Future<bool> verifyWithBackupCode(
+    String code, {
+    bool trustDevice = false,
+    int trustDurationDays = MfaTrustDurationOptions.days30,
+  }) async {
     state = state.copyWith(isBusy: true, clearError: true);
     final ok = await _service.verifyBackupCode(code);
+    if (ok && trustDevice) {
+      try {
+        await _persistTrust(trustDurationDays);
+      } catch (e) {
+        state = state.copyWith(
+          isBusy: false,
+          error: userFacingError(e),
+          message: 'Backup code accepted, but device trust failed.',
+        );
+        ref.invalidate(mfaStatusProvider);
+        return true;
+      }
+    }
     state = state.copyWith(
       isBusy: false,
       error: ok ? null : 'Invalid or used backup code.',
       message: ok ? 'Backup code accepted.' : null,
       clearError: ok,
     );
-    if (ok) ref.invalidate(mfaStatusProvider);
+    if (ok) {
+      ref.invalidate(mfaStatusProvider);
+      await ref.read(mfaStatusProvider.future);
+    }
     return ok;
+  }
+
+  Future<void> _persistTrust(int trustDurationDays) async {
+    final fpService = await ref.read(deviceFingerprintServiceProvider.future);
+    await fpService.fingerprint();
+    final role = ref.read(identitySessionProvider).primaryRole;
+    final policy = MfaPolicyCatalog.forRole(role);
+    final configured = ref.read(supabaseConfiguredProvider);
+    final service = MfaService(
+      security: ref.read(securityServiceProvider),
+      client: configured ? ref.read(supabaseClientProvider) : null,
+      fingerprint: fpService,
+    );
+    await service.trustCurrentDevice(
+      durationDays: MfaTrustDurationOptions.clampToAllowed(
+        trustDurationDays,
+      ),
+      maxTrustedDevices: policy.maxTrustedDevices,
+    );
+  }
+
+  Future<void> extendDeviceTrust({
+    required String deviceId,
+    required int durationDays,
+  }) async {
+    state = state.copyWith(isBusy: true, clearError: true);
+    try {
+      await _service.extendTrustedDevice(
+        deviceId: deviceId,
+        durationDays: durationDays,
+      );
+      state = state.copyWith(isBusy: false, message: 'Device trust updated.');
+      ref.invalidate(mfaStatusProvider);
+    } catch (e) {
+      state = state.copyWith(
+        isBusy: false,
+        error: userFacingError(e),
+      );
+    }
+  }
+
+  Future<void> trustThisDevice({
+    required int durationDays,
+  }) async {
+    state = state.copyWith(isBusy: true, clearError: true);
+    try {
+      await _persistTrust(durationDays);
+      state = state.copyWith(isBusy: false, message: 'This device is trusted.');
+      ref.invalidate(mfaStatusProvider);
+    } catch (e) {
+      state = state.copyWith(
+        isBusy: false,
+        error: userFacingError(e),
+      );
+    }
   }
 
   Future<void> regenerateBackupCodes() async {
@@ -166,7 +263,7 @@ class MfaController extends Notifier<MfaUiState> {
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
     }
   }
@@ -187,7 +284,7 @@ class MfaController extends Notifier<MfaUiState> {
     } catch (e) {
       state = state.copyWith(
         isBusy: false,
-        error: e.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), ''),
+        error: userFacingError(e),
       );
       return false;
     }
@@ -206,16 +303,4 @@ final mfaFingerprintWarmupProvider = FutureProvider<DeviceFingerprintService?>((
   if (!ref.watch(supabaseConfiguredProvider)) return null;
   final prefs = await SharedPreferences.getInstance();
   return DeviceFingerprintService(prefs);
-});
-
-/// Security readiness combining Part 5 health + MFA.
-final securityReadinessProvider = Provider<int>((ref) {
-  final health = ref.watch(securityHealthProvider);
-  final mfa = ref.watch(mfaStatusProvider).valueOrNull;
-  return SecurityReadinessScore.compute(
-    baseSecurityHealth: health.score,
-    mfaEnabled: mfa?.enabled ?? false,
-    hasBackupCodes: (mfa?.backupCodesRemaining ?? 0) > 0,
-    hasTrustedDevices: (mfa?.trustedDeviceCount ?? 0) > 0,
-  );
 });

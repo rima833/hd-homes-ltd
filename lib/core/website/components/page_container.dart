@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 
-/// Max-width page container with responsive horizontal padding.
+/// Max-width content column with responsive horizontal padding.
+///
+/// Vertical spacing belongs on [SectionWrapper] (or the caller) — this
+/// container defaults to **horizontal padding only** so stacked sections
+/// don't accumulate double gaps.
 class PageContainer extends StatelessWidget {
   const PageContainer({
     super.key,
@@ -29,7 +33,6 @@ class PageContainer extends StatelessWidget {
                   horizontal: constraints.maxWidth < horizontal * 2
                       ? AppSpacing.base
                       : horizontal,
-                  vertical: AppSpacing.xl,
                 );
             return Padding(
               padding: pad,

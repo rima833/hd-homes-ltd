@@ -134,11 +134,58 @@ void main() {
     });
   });
 
-  group('AuditSeverity', () {
-    test('alert thresholds', () {
-      expect(AuditSeverity.info.shouldAlert, isFalse);
-      expect(AuditSeverity.warning.shouldAlert, isTrue);
-      expect(AuditSeverity.critical.shouldAlert, isTrue);
+  group('CommandCenterSnapshot.fromRpc', () {
+    test('maps server KPIs and nested rows', () {
+      final snap = CommandCenterSnapshot.fromRpc({
+        'today_activity': 12,
+        'active_users': 4,
+        'failed_logins': 2,
+        'open_alerts': 3,
+        'critical_alerts': 1,
+        'security_score': 68,
+        'recent_activity': [
+          {
+            'id': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+            'action': 'observability_heartbeat',
+            'module': 'observability',
+            'event_category': 'system',
+            'severity': 'info',
+            'result_status': 'success',
+            'created_at': '2026-09-21T12:00:00Z',
+          },
+        ],
+        'alerts': [
+          {
+            'id': 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee',
+            'title': 'observability: probe',
+            'severity': 'warning',
+            'lifecycle': 'open',
+            'created_at': '2026-09-21T12:00:00Z',
+          },
+        ],
+        'health': [
+          {
+            'service_key': 'database',
+            'label': 'Database',
+            'status': 'healthy',
+            'latency_ms': 12,
+            'message': 'Reachable',
+            'checked_at': '2026-09-21T12:00:00Z',
+          },
+        ],
+        'generated_at': '2026-09-21T12:00:00Z',
+      });
+
+      expect(snap.todayActivity, 12);
+      expect(snap.activeUsersEstimate, 4);
+      expect(snap.failedLogins, 2);
+      expect(snap.openAlerts, 3);
+      expect(snap.criticalAlerts, 1);
+      expect(snap.securityScore, 68);
+      expect(snap.recentActivity, hasLength(1));
+      expect(snap.alerts, hasLength(1));
+      expect(snap.health.first.serviceKey, 'database');
+      expect(snap.health.first.latencyMs, 12);
     });
   });
 }

@@ -38,7 +38,7 @@ void main() {
     test('wizard draft defaults are ready for step 0', () {
       const draft = PmsWizardDraft();
       expect(draft.step, 0);
-      expect(draft.estateName, 'Victoria Crest');
+      expect(draft.estateName, isEmpty);
       expect(draft.publishStatus, PublishWorkflowStatus.draft);
       expect(draft.inventoryStatus, InventoryStatus.available);
       expect(PmsWizardDraft.amenityCatalog, isNotEmpty);
@@ -61,12 +61,13 @@ void main() {
   });
 
   group('PmsService', () {
-    test('offline client returns demo command center', () async {
+    test('offline client returns an empty command center', () async {
       final service = PmsService();
       final snap = await service.loadCommandCenter();
       expect(snap.fromRemote, isFalse);
-      expect(snap.properties, isNotEmpty);
-      expect(snap.kpis.length, greaterThanOrEqualTo(6));
+      expect(snap.properties, isEmpty);
+      expect(snap.inspections, isEmpty);
+      expect(snap.aiInsights, isEmpty);
     });
 
     test('generateAiSummary stub is informative', () {

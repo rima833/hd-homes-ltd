@@ -9,7 +9,7 @@ class BlogSearchBar extends StatelessWidget {
     required this.controller,
     required this.onChanged,
     this.onSubmitted,
-    this.hintText = 'Search articles, guides, reports, authors…',
+    this.hintText = 'Search articles…',
     this.popularSearches = const [],
   });
 

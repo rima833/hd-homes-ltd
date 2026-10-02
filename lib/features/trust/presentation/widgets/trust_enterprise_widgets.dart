@@ -23,10 +23,13 @@ class _TrustPillarCardState extends State<TrustPillarCard> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: AppDurations.fast,
-        transform: Matrix4.translationValues(0, _hovered ? -3 : 0, 0),
+        transform: Matrix4.translationValues(0, _hovered ? -4 : 0, 0),
         decoration: BoxDecoration(
           borderRadius: AppRadius.cardBorder,
           boxShadow: _hovered ? AppShadows.md : AppShadows.sm,
+          border: Border.all(
+            color: AppColors.gold.withValues(alpha: _hovered ? 0.4 : 0.16),
+          ),
         ),
         child: Material(
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -36,52 +39,38 @@ class _TrustPillarCardState extends State<TrustPillarCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(TrustIcons.resolve(widget.pillar.iconName), color: AppColors.gold, size: 28),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    TrustIcons.resolve(widget.pillar.iconName),
+                    color: AppColors.gold,
+                    size: 22,
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.sm),
-                Text(widget.pillar.title, style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  widget.pillar.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
                 const SizedBox(height: AppSpacing.xs),
-                Text(widget.pillar.description, style: Theme.of(context).textTheme.bodySmall),
+                Expanded(
+                  child: Text(
+                    widget.pillar.description,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Certificate card with verification link.
-class TrustCertificateCard extends StatelessWidget {
-  const TrustCertificateCard({super.key, required this.cert});
-
-  final TrustCertification cert;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 80,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: AppRadius.cardBorder,
-                color: AppColors.charcoal,
-              ),
-              child: const Center(child: Icon(Icons.verified, color: AppColors.gold, size: 36)),
-            ),
-            const SizedBox(height: AppSpacing.base),
-            Text(cert.title, style: Theme.of(context).textTheme.titleSmall),
-            Text('${cert.issuer} · ${cert.certificateNumber}', style: Theme.of(context).textTheme.bodySmall),
-            Text('Issued ${cert.issueDate}${cert.expiryDate != null ? ' · Expires ${cert.expiryDate}' : ''}'),
-            if (cert.verificationUrl != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              TextButton(onPressed: () {}, child: const Text('Verify online')),
-            ],
-          ],
         ),
       ),
     );

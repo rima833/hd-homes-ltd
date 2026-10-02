@@ -2,13 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hdhomesproject/core/media/widgets/delivery_image.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/features/home/data/models/home_cms_content.dart';
 import 'package:hdhomesproject/core/website/l10n/app_strings.dart';
+import 'package:video_player/video_player.dart';
 
-/// Section 4 — Premium hero with parallax gradient (CMS video/image ready).
+/// Section 4 — Premium hero with CMS-driven image/video background.
 class HomeHeroSection extends StatelessWidget {
   const HomeHeroSection({super.key, required this.content});
 
@@ -24,15 +26,17 @@ class HomeHeroSection extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          const _HeroBackground(),
+          _HeroBackground(content: content),
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppColors.deepBlack.withValues(alpha: 0.2),
-                  AppColors.deepBlack.withValues(alpha: 0.88),
+                  AppColors.deepBlack.withValues(alpha: 0.15),
+                  AppColors.deepBlack.withValues(
+                    alpha: content.overlayOpacity.clamp(0.35, 0.92),
+                  ),
                 ],
               ),
             ),
@@ -105,7 +109,9 @@ class HomeHeroSection extends StatelessWidget {
 }
 
 class _HeroBackground extends StatefulWidget {
-  const _HeroBackground();
+  const _HeroBackground({required this.content});
+
+  final HomeHeroContent content;
 
   @override
   State<_HeroBackground> createState() => _HeroBackgroundState();
@@ -114,6 +120,8 @@ class _HeroBackground extends StatefulWidget {
 class _HeroBackgroundState extends State<_HeroBackground>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  VideoPlayerController? _video;
+  String? _loadedVideoUrl;
 
   @override
   void initState() {
@@ -124,21 +132,111 @@ class _HeroBackgroundState extends State<_HeroBackground>
       lowerBound: 0,
       upperBound: 1,
     );
-    // Skip continuous ken-burns on web — it burns CPU while the page is open.
     if (!kIsWeb) {
       _controller.repeat(reverse: true);
     }
+    _syncVideo();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HeroBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.content.backgroundVideoUrl !=
+        widget.content.backgroundVideoUrl) {
+      _syncVideo();
+    }
+  }
+
+  Future<void> _syncVideo() async {
+    final url = widget.content.backgroundVideoUrl?.trim();
+    if (url == null || url.isEmpty) {
+      await _video?.dispose();
+      _video = null;
+      _loadedVideoUrl = null;
+      if (mounted) setState(() {});
+      return;
+    }
+    if (url == _loadedVideoUrl && _video != null) return;
+
+    await _video?.dispose();
+    _video = null;
+    _loadedVideoUrl = url;
+    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    try {
+      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.setVolume(0);
+      await controller.play();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() => _video = controller);
+    } catch (_) {
+      await controller.dispose();
+      if (mounted) setState(() => _video = null);
+    }
+  }
+
+  @override
+  void deactivate() {
+    _video?.pause();
+    super.deactivate();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _video?.dispose();
+    _video = null;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget background = Container(
+    final hasVideo = _video != null && _video!.value.isInitialized;
+    final imageUrl = widget.content.backgroundImageUrl?.trim();
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+
+    Widget media;
+    if (hasVideo) {
+      media = FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: _video!.value.size.width,
+          height: _video!.value.size.height,
+          child: VideoPlayer(_video!),
+        ),
+      );
+    } else if (hasImage) {
+      media = MediaDeliveryImage(
+        url: imageUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        placeholder: const ColoredBox(color: AppColors.deepBlack),
+        errorWidget: _fallbackGradient(),
+      );
+    } else {
+      media = _fallbackGradient();
+    }
+
+    if (kIsWeb || hasVideo) return media;
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: 1.0 + (_controller.value * 0.04),
+          child: child,
+        );
+      },
+      child: media,
+    );
+  }
+
+  Widget _fallbackGradient() {
+    return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -151,19 +249,6 @@ class _HeroBackgroundState extends State<_HeroBackground>
         ),
       ),
       child: CustomPaint(painter: _HeroPatternPainter()),
-    );
-
-    if (kIsWeb) return background;
-
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: 1.0 + (_controller.value * 0.04),
-          child: child,
-        );
-      },
-      child: background,
     );
   }
 }

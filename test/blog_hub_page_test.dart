@@ -6,7 +6,7 @@ import 'package:hdhomesproject/features/blog/presentation/pages/blog_article_pag
 import 'package:hdhomesproject/features/blog/presentation/pages/blog_hub_page.dart';
 
 void main() {
-  testWidgets('Blog hub loads Knowledge Center sections', (WidgetTester tester) async {
+  testWidgets('Blog hub loads live CMS sections', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1280, 7200));
 
     await tester.pumpWidget(
@@ -20,15 +20,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(seconds: 2));
 
-    expect(find.textContaining('Insights That Build Better Decisions'), findsOneWidget);
+    expect(
+      find.textContaining('Insights That Build Better Decisions'),
+      findsOneWidget,
+    );
     expect(find.text('Featured stories'), findsOneWidget);
     expect(find.text('Latest articles'), findsOneWidget);
-    expect(find.text('Browse by topic'), findsOneWidget);
-    expect(find.text('Trending content'), findsOneWidget);
-    expect(find.text('Live market dashboard'), findsOneWidget);
-    expect(find.text('HD Homes Learning Academy'), findsOneWidget);
-    expect(find.text('Meet our experts'), findsOneWidget);
-    expect(find.text('Stay ahead of the market'), findsOneWidget);
+    expect(find.text('Need advice on a property decision?'), findsOneWidget);
+    expect(find.text('Browse by topic'), findsNothing);
+    expect(find.text('Trending content'), findsNothing);
+    expect(find.text('Live market dashboard'), findsNothing);
+    expect(find.text('HD Homes Learning Academy'), findsNothing);
+    expect(find.text('Market Reports'), findsNothing);
+    expect(find.text('Investment Guides'), findsNothing);
 
     addTearDown(() => tester.binding.setSurfaceSize(null));
   });
@@ -52,9 +56,9 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.textContaining('First-Time Buyer'), findsWidgets);
-    expect(find.text('Summarize this article'), findsOneWidget);
-    expect(find.text('Related articles'), findsOneWidget);
-    expect(find.text('Join the discussion'), findsOneWidget);
+    expect(find.text('Browse all articles'), findsOneWidget);
+    expect(find.text('Summarize this article'), findsNothing);
+    expect(find.text('Join the discussion'), findsNothing);
 
     addTearDown(() => tester.binding.setSurfaceSize(null));
   });
@@ -74,6 +78,6 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('Article not found'), findsOneWidget);
-    expect(find.text('Browse Knowledge Center'), findsOneWidget);
+    expect(find.text('Browse articles'), findsOneWidget);
   });
 }

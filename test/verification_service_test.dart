@@ -6,21 +6,29 @@ import 'package:hdhomesproject/features/authentication/domain/services/sms_provi
 
 void main() {
   group('VerificationPolicyCatalog', () {
-    test('clients have optional phone', () {
+    test('clients do not require SMS phone verification', () {
       final policy = VerificationPolicyCatalog.forRole(AppRole.client);
       expect(policy.emailRequired, isTrue);
       expect(policy.phoneRequired, isFalse);
+      expect(
+        policy.phoneRequirement,
+        PhoneVerificationRequirement.disabled,
+      );
     });
 
-    test('investors require phone', () {
+    test('investors do not require SMS phone verification', () {
       final policy = VerificationPolicyCatalog.forRole(AppRole.investor);
-      expect(policy.phoneRequired, isTrue);
+      expect(policy.phoneRequired, isFalse);
+      expect(
+        policy.phoneRequirement,
+        PhoneVerificationRequirement.disabled,
+      );
     });
 
-    test('super admin recommends MFA', () {
+    test('super admin recommends MFA without SMS phone OTP', () {
       final policy = VerificationPolicyCatalog.forRole(AppRole.superAdmin);
       expect(policy.mfaRecommended, isTrue);
-      expect(policy.phoneRequired, isTrue);
+      expect(policy.phoneRequired, isFalse);
     });
   });
 
@@ -65,6 +73,19 @@ void main() {
       final result = await failover.sendOtp(phoneE164: '+2348012345678');
       expect(result.success, isTrue);
       expect(failover.providerId, PhoneOtpProviderId.mock);
+    });
+
+    test('verifies against the provider that sent the OTP', () async {
+      final failover = FailoverPhoneOtpService(
+        primary: const TermiiPhoneOtpService(),
+        fallbacks: const [MockPhoneOtpService()],
+      );
+      await failover.sendOtp(phoneE164: '+2348012345678');
+      final ok = await failover.verifyOtp(
+        phoneE164: '+2348012345678',
+        code: '123456',
+      );
+      expect(ok.success, isTrue);
     });
   });
 

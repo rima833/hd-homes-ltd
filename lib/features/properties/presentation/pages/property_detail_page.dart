@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
+import 'package:hdhomesproject/core/growth/analytics/journey_tracker.dart';
 import 'package:hdhomesproject/core/website/seo/seo_binder.dart';
 import 'package:hdhomesproject/core/website/seo/seo_config.dart';
 import 'package:hdhomesproject/core/website/seo/seo_metadata.dart';
 import 'package:hdhomesproject/core/website/seo/seo_resolver.dart';
 import 'package:hdhomesproject/core/widgets/feedback/empty_state.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/properties/data/providers/property_detail_provider.dart';
 import 'package:hdhomesproject/features/properties/presentation/sections/property_detail_body_sections.dart';
 import 'package:hdhomesproject/features/properties/presentation/sections/property_detail_closing_sections.dart';
@@ -15,14 +17,38 @@ import 'package:hdhomesproject/features/properties/presentation/sections/propert
 import 'package:hdhomesproject/features/properties/presentation/widgets/property_media_gallery.dart';
 
 /// Premium digital property showroom — Volume 2 Part 5.
-class PropertyDetailPage extends ConsumerWidget {
+class PropertyDetailPage extends ConsumerStatefulWidget {
   const PropertyDetailPage({super.key, required this.propertyId});
 
   final String propertyId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detail = ref.watch(propertyDetailProvider(propertyId));
+  ConsumerState<PropertyDetailPage> createState() => _PropertyDetailPageState();
+}
+
+class _PropertyDetailPageState extends ConsumerState<PropertyDetailPage> {
+  String? _trackedViewId;
+
+  @override
+  Widget build(BuildContext context) {
+    ref.watch(publishedPropertiesRealtimeProvider);
+    final detail = ref.watch(propertyDetailProvider(widget.propertyId));
+    final remote = ref.watch(publishedPropertyByIdProvider(widget.propertyId));
+
+    if (detail != null && _trackedViewId != detail.listing.id) {
+      _trackedViewId = detail.listing.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        trackGrowthPropertyView(ref, detail.listing.id);
+      });
+    }
+
+    if (detail == null && remote.isLoading) {
+      return const SizedBox(
+        height: 320,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     if (detail == null) {
       return EmptyState(

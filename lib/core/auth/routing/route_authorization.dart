@@ -1,5 +1,7 @@
 import 'package:hdhomesproject/core/auth/models/auth_session_snapshot.dart';
 import 'package:hdhomesproject/core/auth/models/auth_status.dart';
+import 'package:hdhomesproject/core/auth/policies/admin_access_policy.dart';
+import 'package:hdhomesproject/core/auth/policies/dashboard_access_policy.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/app_role.dart';
 
@@ -35,6 +37,7 @@ abstract final class RouteAuthorization {
       RoutePaths.careers,
       RoutePaths.contact,
       RoutePaths.bookInspection,
+      RoutePaths.bookConsultation,
       RoutePaths.search,
     };
     if (publicExact.contains(path)) return true;
@@ -43,6 +46,10 @@ abstract final class RouteAuthorization {
     if (path.startsWith('${RoutePaths.services}/')) return true;
     if (path.startsWith('${RoutePaths.blog}/')) return true;
     if (path.startsWith('${RoutePaths.gallery}/')) return true;
+    if (path.startsWith('/pages/')) return true;
+    if (path.startsWith('/lp/')) return true;
+    if (path.startsWith('${RoutePaths.construction}/')) return true;
+    if (path.startsWith('${RoutePaths.investment}/')) return true;
     return false;
   }
 
@@ -79,11 +86,22 @@ abstract final class RouteAuthorization {
       return const RouteAuthDecision.allow();
     }
 
-    if (session.status == AuthStatus.emailPending && isProtected) {
-      return RouteAuthDecision.redirect(
-        '${RoutePaths.verifyEmail}?email=${Uri.encodeComponent(session.profile?.email ?? '')}',
-        reason: AuthStatus.emailPending.userMessage,
-      );
+    if (session.status == AuthStatus.emailPending) {
+      if (isProtected) {
+        return RouteAuthDecision.redirect(
+          '${RoutePaths.verifyEmail}?email=${Uri.encodeComponent(session.profile?.email ?? session.email ?? '')}',
+          reason: AuthStatus.emailPending.userMessage,
+        );
+      }
+      // Stay on verification / auth handoff screens; do not bounce to portals.
+      if (path == RoutePaths.verifyEmail ||
+          path == RoutePaths.authCallback ||
+          path == RoutePaths.login ||
+          path == RoutePaths.register ||
+          path == RoutePaths.forgotPassword ||
+          path == RoutePaths.resetPassword) {
+        return const RouteAuthDecision.allow();
+      }
     }
 
     if (isProtected && !session.isAuthenticated) {
@@ -102,9 +120,17 @@ abstract final class RouteAuthorization {
     }
 
     if (session.isAuthenticated && isAuthRoute) {
-      // Allow password recovery and MFA challenge while session is active.
+      // Allow recovery, MFA, and post-confirm verification UX while signed in.
+      // Stay on login/register until the MFA gate resolves — bouncing to the
+      // dashboard here caused a visible flash before the challenge screen.
       if (path == RoutePaths.resetPassword ||
-          path == RoutePaths.mfaChallenge) {
+          path == RoutePaths.mfaChallenge ||
+          path == RoutePaths.mfaSetup ||
+          path == RoutePaths.verifyEmail ||
+          path == RoutePaths.authCallback ||
+          path == RoutePaths.welcome ||
+          path == RoutePaths.login ||
+          path == RoutePaths.register) {
         return const RouteAuthDecision.allow();
       }
       return RouteAuthDecision.redirect(
@@ -114,11 +140,33 @@ abstract final class RouteAuthorization {
     }
 
     if (session.isAuthenticated && path.startsWith(RoutePaths.dashboard)) {
+      if (path == RoutePaths.dashboardWebsiteSupport) {
+        return RouteAuthDecision.redirect(
+          RoutePaths.dashboardSupport,
+          reason: 'Support lives in one command center',
+        );
+      }
       final role = session.primaryRole;
       if (role != null && !role.canAccessDashboard && !role.isStaff) {
         return RouteAuthDecision.redirect(
           role.defaultRoute,
           reason: 'Insufficient role for admin dashboard',
+        );
+      }
+
+      final homeRedirect =
+          DashboardAccessPolicy.redirectIfWrongDashboardHome(session, path);
+      if (homeRedirect != null) {
+        return RouteAuthDecision.redirect(
+          homeRedirect,
+          reason: 'Redirecting to your role dashboard',
+        );
+      }
+
+      if (!AdminAccessPolicy.canAccessDashboardPath(session, path)) {
+        return RouteAuthDecision.redirect(
+          DashboardAccessPolicy.homeRouteFor(session),
+          reason: 'You do not have permission to access this area.',
         );
       }
     }
@@ -139,8 +187,6 @@ abstract final class RouteAuthorization {
 
   /// Whether the session may perform an action gated by [permissionSlug].
   static bool canPerform(AuthSessionSnapshot session, String permissionSlug) {
-    if (!session.isAuthenticated) return false;
-    if (session.hasRole(AppRole.superAdmin)) return true;
-    return session.hasPermission(permissionSlug);
+    return AdminAccessPolicy.canAny(session, [permissionSlug]);
   }
 }

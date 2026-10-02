@@ -162,7 +162,7 @@ class SecurityHealthSnapshot {
     if (phoneVerified) {
       score += 20;
     } else {
-      recommendations.add('Add and verify a phone number.');
+      recommendations.add('Add a phone number on your profile.');
     }
 
     if (mfaEnabled) {
@@ -171,9 +171,17 @@ class SecurityHealthSnapshot {
       recommendations.add('Enable multi-factor authentication when available.');
     }
 
+    if (mfaEnabled && trustedDeviceCount == 0) {
+      recommendations.add('Trust a device for 14, 30, or 90 days after MFA.');
+    }
+
     if (activeSessionCount > 5) {
       recommendations.add('Review and end unused active sessions.');
       score = (score - 5).clamp(0, 100);
+    }
+
+    if (trustedDeviceCount > 0) {
+      score = (score + 5).clamp(0, 100);
     }
 
     if (recommendations.isEmpty) {

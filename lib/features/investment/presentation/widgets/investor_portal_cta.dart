@@ -7,7 +7,7 @@ import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-/// Public-site bridge into the Investor Portal (Volume 3 auth unlocks full access).
+/// Public-site bridge into the Investor Portal.
 ///
 /// Unauthenticated visitors hitting [RoutePaths.investor] are redirected to login
 /// with a return URL — this CTA is the intentional public entry point.
@@ -17,7 +17,7 @@ class InvestorPortalCtaSection extends StatelessWidget {
     this.title = 'Investor Portal',
     this.subtitle =
         'Track portfolios, construction progress, reports, and documents. '
-        'Sign in to access your Investor Portal — full experience ships in Volume 3.',
+        'Sign in to manage investments and fund via bank transfer.',
   });
 
   final String title;

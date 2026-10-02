@@ -34,29 +34,42 @@ class MfaService {
     final policy = MfaPolicyCatalog.forRole(role);
     final client = _client;
     if (client == null) {
-      return MfaStatusSnapshot(policy: policy);
+      return MfaStatusSnapshot(policy: policy, statusKnown: false);
+    }
+
+    if (client.auth.currentSession == null) {
+      // Identity UI may still look signed-in while GoTrue has no JWT.
+      return MfaStatusSnapshot(policy: policy, statusKnown: false);
     }
 
     try {
       final factors = await client.auth.mfa.listFactors();
-      final totp = factors.totp;
+      // Only verified TOTP factors count as "enabled" for login gates.
+      final totp = factors.totp
+          .where((f) => f.status == FactorStatus.verified)
+          .toList();
       final aal = client.auth.mfa.getAuthenticatorAssuranceLevel();
-      final aalOk = aal.currentLevel == AuthenticatorAssuranceLevels.aal2 ||
-          totp.isEmpty;
+      final aalOk = totp.isEmpty
+          ? true
+          : aal.currentLevel == AuthenticatorAssuranceLevels.aal2;
       final backupRemaining = await _countBackupCodes();
       final trusted = await listTrustedDevices();
+      final currentTrusted =
+          trusted.any((d) => d.isCurrent && d.isTrustValid);
 
       return MfaStatusSnapshot(
         enabled: totp.isNotEmpty,
         totpEnrolled: totp.isNotEmpty,
         backupCodesRemaining: backupRemaining,
         trustedDeviceCount: trusted.where((d) => d.isTrustValid).length,
+        currentDeviceTrusted: currentTrusted,
         aalSatisfied: aalOk,
         policy: policy,
         factorIds: totp.map((f) => f.id).toList(),
       );
     } catch (_) {
-      return MfaStatusSnapshot(policy: policy);
+      // Do not treat probe failures as "must enroll" — that caused dashboard blink loops.
+      return MfaStatusSnapshot(policy: policy, statusKnown: false);
     }
   }
 
@@ -79,10 +92,28 @@ class MfaService {
     String friendlyName = 'HD Homes Authenticator',
   }) async {
     final mfa = _mfa;
-    if (mfa == null) {
+    final client = _client;
+    if (mfa == null || client == null) {
       throw const AuthenticationException('Authentication is not configured.');
     }
+
+    // MFA enroll requires a live GoTrue access token (Bearer).
+    if (client.auth.currentSession == null) {
+      try {
+        await client.auth.refreshSession();
+      } catch (_) {}
+    }
+    if (client.auth.currentSession == null) {
+      throw const AuthenticationException(
+        'Your session expired. Sign out and sign in again, then enable MFA.',
+      );
+    }
+
     try {
+      // Drop leftover unverified factors so re-tries (and authenticator rescan)
+      // always get a fresh secret that matches the live QR.
+      await _cleanupUnverifiedFactors();
+
       final enrolled = await mfa.enroll(
         factorType: FactorType.totp,
         issuer: 'HD Homes',
@@ -90,23 +121,62 @@ class MfaService {
       );
       final totp = enrolled.totp;
       if (totp == null) {
-        throw const AuthenticationException('Unable to start authenticator setup.');
+        throw const AuthenticationException(
+          'Unable to start authenticator setup.',
+        );
       }
+      final secret = totp.secret.trim();
+      final uri = totp.uri.trim().isNotEmpty
+          ? totp.uri.trim()
+          : 'otpauth://totp/HD%20Homes:${Uri.encodeComponent(client.auth.currentUser?.email ?? 'user')}?secret=$secret&issuer=HD%20Homes&algorithm=SHA1&digits=6&period=30';
+
       _audit('mfa_enroll_started', success: true);
       return MfaEnrollmentDraft(
         factorId: enrolled.id,
-        secret: totp.secret,
-        uri: totp.uri,
+        secret: secret,
+        uri: uri,
         qrCodeSvg: totp.qrCode,
         friendlyName: friendlyName,
       );
     } catch (e) {
       _audit('mfa_enroll_failed', success: false);
       if (e is AppException) rethrow;
-      throw const AuthenticationException(
-        'Unable to start MFA enrollment. Ensure MFA is enabled in Supabase Auth.',
+      final raw = e is AuthException ? e.message : e.toString();
+      final msg = raw.toLowerCase();
+      if (msg.contains('bearer') ||
+          msg.contains('jwt') ||
+          msg.contains('not authenticated') ||
+          msg.contains('session')) {
+        throw const AuthenticationException(
+          'Your session expired. Sign out and sign in again, then enable MFA.',
+        );
+      }
+      if (msg.contains('mfa') &&
+          (msg.contains('disabled') || msg.contains('not enabled'))) {
+        throw const AuthenticationException(
+          'Authenticator MFA is disabled in Supabase Auth. '
+          'Enable MFA (TOTP) in the Auth providers settings, then try again.',
+        );
+      }
+      throw AuthenticationException(
+        'Unable to start MFA enrollment. $raw',
       );
     }
+  }
+
+  Future<void> _cleanupUnverifiedFactors() async {
+    final mfa = _mfa;
+    if (mfa == null) return;
+    try {
+      final listed = await mfa.listFactors();
+      for (final factor in listed.all) {
+        if (factor.status == FactorStatus.unverified) {
+          try {
+            await mfa.unenroll(factor.id);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 
   Future<BackupCodeBundle> confirmTotpEnrollment({
@@ -114,11 +184,23 @@ class MfaService {
     required String code,
   }) async {
     final mfa = _mfa;
-    if (mfa == null) {
+    final client = _client;
+    if (mfa == null || client == null) {
       throw const AuthenticationException('Authentication is not configured.');
     }
+    final normalized = code.replaceAll(RegExp(r'\D'), '');
+    if (normalized.length != 6) {
+      throw const AuthenticationException(
+        'Enter the 6-digit code from your authenticator app.',
+      );
+    }
     try {
-      await mfa.challengeAndVerify(factorId: factorId, code: code.trim());
+      await mfa.challengeAndVerify(
+        factorId: factorId,
+        code: normalized,
+      );
+      // Promote JWT to AAL2 so admin/portal redirects accept the session.
+      await client.auth.refreshSession();
       final bundle = await regenerateBackupCodes();
       await _upsertMfaSettings(enabled: true, preferred: 'totp');
       _audit('mfa_enabled', success: true);
@@ -127,7 +209,7 @@ class MfaService {
       _audit('mfa_verify_failed', success: false);
       if (e is AppException) rethrow;
       throw const AuthenticationException(
-        'Invalid authenticator code. Please try again.',
+        'Invalid authenticator code. Wait for a new code and try again.',
       );
     }
   }
@@ -137,16 +219,29 @@ class MfaService {
     required String code,
   }) async {
     final mfa = _mfa;
-    if (mfa == null) {
+    final client = _client;
+    if (mfa == null || client == null) {
       throw const AuthenticationException('Authentication is not configured.');
     }
+    final normalized = code.replaceAll(RegExp(r'\D'), '');
+    if (normalized.length != 6) {
+      throw const AuthenticationException(
+        'Enter the 6-digit code from your authenticator app.',
+      );
+    }
     try {
-      await mfa.challengeAndVerify(factorId: factorId, code: code.trim());
+      await mfa.challengeAndVerify(
+        factorId: factorId,
+        code: normalized,
+      );
+      await client.auth.refreshSession();
       _audit('mfa_verification_succeeded', success: true);
     } catch (e) {
       _audit('mfa_verification_failed', success: false);
       if (e is AppException) rethrow;
-      throw const AuthenticationException('Invalid verification code.');
+      throw const AuthenticationException(
+        'Invalid verification code. Wait for a new code and try again.',
+      );
     }
   }
 
@@ -258,14 +353,43 @@ class MfaService {
     }
   }
 
-  Future<void> trustCurrentDevice({required int durationDays}) async {
+  Future<void> trustCurrentDevice({
+    required int durationDays,
+    int? maxTrustedDevices,
+  }) async {
     final client = _client;
     final fpService = _fingerprint;
     final userId = client?.auth.currentUser?.id;
-    if (client == null || fpService == null || userId == null) return;
+    if (client == null || fpService == null || userId == null) {
+      throw const AuthenticationException(
+        'Unable to trust this device. Sign in again and retry.',
+      );
+    }
+    final days = MfaTrustDurationOptions.clampToAllowed(durationDays);
     final fp = await fpService.fingerprint();
-    final until = DateTime.now().toUtc().add(Duration(days: durationDays));
+    final now = DateTime.now().toUtc();
+    final until = now.add(Duration(days: days));
+
+    // Enforce role max: revoke oldest valid trusts beyond the limit (excluding
+    // the device we are about to upsert).
+    final max = maxTrustedDevices ?? 5;
     try {
+      final existing = await listTrustedDevices();
+      final others = existing
+          .where((d) => d.fingerprint != fp && d.isTrustValid)
+          .toList()
+        ..sort((a, b) {
+          final aUntil = a.trustedUntil ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bUntil = b.trustedUntil ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return aUntil.compareTo(bUntil);
+        });
+      final overflow = (others.length + 1) - max;
+      if (overflow > 0) {
+        for (final d in others.take(overflow)) {
+          await revokeTrustedDevice(d.id);
+        }
+      }
+
       await client.from('trusted_devices').upsert({
         'user_id': userId,
         'device_fingerprint': fp,
@@ -274,10 +398,47 @@ class MfaService {
         'operating_system': kIsWeb ? 'web' : defaultTargetPlatform.name,
         'is_trusted': true,
         'mfa_trusted_until': until.toIso8601String(),
-        'last_activity_at': DateTime.now().toUtc().toIso8601String(),
+        'first_trusted_at': now.toIso8601String(),
+        'last_activity_at': now.toIso8601String(),
+        'updated_at': now.toIso8601String(),
+        'revoked_at': null,
+        'is_deleted': false,
       }, onConflict: 'user_id,device_fingerprint');
       _audit('trusted_device_added', success: true);
-    } catch (_) {}
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AuthenticationException(
+        'Could not save trusted device. ${e is AuthException ? e.message : e}',
+      );
+    }
+  }
+
+  /// Extend MFA trust on an existing device row (by id) for [durationDays].
+  Future<void> extendTrustedDevice({
+    required String deviceId,
+    required int durationDays,
+  }) async {
+    final client = _client;
+    if (client == null) {
+      throw const AuthenticationException('Authentication is not configured.');
+    }
+    final days = MfaTrustDurationOptions.clampToAllowed(durationDays);
+    final now = DateTime.now().toUtc();
+    final until = now.add(Duration(days: days));
+    try {
+      await client.from('trusted_devices').update({
+        'is_trusted': true,
+        'mfa_trusted_until': until.toIso8601String(),
+        'last_activity_at': now.toIso8601String(),
+        'updated_at': now.toIso8601String(),
+        'revoked_at': null,
+      }).eq('id', deviceId);
+      _audit('trusted_device_extended', success: true);
+    } catch (e) {
+      throw AuthenticationException(
+        'Could not extend device trust. ${e is AuthException ? e.message : e}',
+      );
+    }
   }
 
   Future<bool> isCurrentDeviceTrusted() async {

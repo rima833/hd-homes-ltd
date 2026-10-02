@@ -1,9 +1,13 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/app.dart';
 
 void main() {
   testWidgets('App loads home page with branding', (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(1440, 3200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(
       const ProviderScope(
         child: HdHomesApp(),

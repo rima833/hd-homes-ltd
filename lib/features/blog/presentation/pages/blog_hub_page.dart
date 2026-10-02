@@ -4,7 +4,7 @@ import 'package:hdhomesproject/features/blog/data/providers/blog_catalog_provide
 import 'package:hdhomesproject/features/blog/presentation/sections/blog_closing_sections.dart';
 import 'package:hdhomesproject/features/blog/presentation/sections/blog_hub_sections.dart';
 
-/// Knowledge Center hub — Volume 2 Part 9.
+/// Public blog hub — CMS-backed, realtime.
 class BlogHubPage extends ConsumerStatefulWidget {
   const BlogHubPage({super.key});
 
@@ -14,7 +14,6 @@ class BlogHubPage extends ConsumerStatefulWidget {
 
 class _BlogHubPageState extends ConsumerState<BlogHubPage> {
   final _articlesKey = GlobalKey();
-  final _newsletterKey = GlobalKey();
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String? _selectedCategoryId;
@@ -36,6 +35,11 @@ class _BlogHubPageState extends ConsumerState<BlogHubPage> {
     }
   }
 
+  void _onCategorySelected(String? id) {
+    setState(() => _selectedCategoryId = id);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTo(_articlesKey));
+  }
+
   @override
   Widget build(BuildContext context) {
     final cms = ref.watch(blogHubCmsProvider);
@@ -45,18 +49,24 @@ class _BlogHubPageState extends ConsumerState<BlogHubPage> {
         BlogHeroSection(
           headline: cms.heroHeadline,
           subheadline: cms.heroSubheadline,
+          primaryCtaLabel: cms.primaryCtaLabel,
+          secondaryCtaLabel: cms.secondaryCtaLabel,
+          backgroundImageUrl: cms.backgroundImageUrl,
+          backgroundVideoUrl: cms.backgroundVideoUrl,
           searchController: _searchController,
-          onSearchChanged: (q) => setState(() => _searchQuery = q),
-          popularSearches: cms.popularSearches,
+          onSearchChanged: (q) {
+            setState(() => _searchQuery = q);
+            _scrollTo(_articlesKey);
+          },
           onBrowseArticles: () => _scrollTo(_articlesKey),
         ),
         BlogHubSections(
           articlesKey: _articlesKey,
           searchQuery: _searchQuery,
           selectedCategoryId: _selectedCategoryId,
-          onCategorySelected: (id) => setState(() => _selectedCategoryId = id),
+          onCategorySelected: _onCategorySelected,
         ),
-        BlogClosingSections(newsletterKey: _newsletterKey),
+        const BlogClosingSections(),
       ],
     );
   }

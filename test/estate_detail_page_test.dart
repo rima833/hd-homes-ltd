@@ -47,13 +47,13 @@ void main() {
 
     expect(find.textContaining('Horizon Gardens'), findsWidgets);
     expect(find.text('Estate overview'), findsOneWidget);
-    expect(find.text('Interactive master plan'), findsOneWidget);
+    expect(find.text('Master plan'), findsOneWidget);
     expect(find.text('Available properties'), findsOneWidget);
     expect(find.text('Construction Time Machine'), findsNothing);
     expect(find.text('Progress over time'), findsOneWidget);
     expect(find.text('Live Estate Dashboard'), findsNothing);
     expect(find.text('Estate availability & progress'), findsOneWidget);
-    expect(find.text('Estate Investment Intelligence'), findsOneWidget);
+    expect(find.text('Investment potential'), findsOneWidget);
 
     addTearDown(() => tester.binding.setSurfaceSize(null));
   });

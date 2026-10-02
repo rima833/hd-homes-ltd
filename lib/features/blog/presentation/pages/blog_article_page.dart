@@ -11,6 +11,7 @@ import 'package:hdhomesproject/core/website/seo/seo_resolver.dart';
 import 'package:hdhomesproject/core/widgets/feedback/empty_state.dart';
 import 'package:hdhomesproject/features/blog/data/providers/blog_article_provider.dart';
 import 'package:hdhomesproject/features/blog/presentation/sections/blog_article_sections.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 
 /// Article detail page — Volume 2 Part 9.
 class BlogArticlePage extends ConsumerWidget {
@@ -20,14 +21,22 @@ class BlogArticlePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final catalogAsync = ref.watch(publishedBlogsProvider);
     final detail = ref.watch(blogArticleProvider(slug));
 
     if (detail == null) {
+      final loading = catalogAsync.isLoading || catalogAsync.value == null;
+      if (loading) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 80),
+          child: Center(child: CircularProgressIndicator()),
+        );
+      }
       return EmptyState(
         title: 'Article not found',
         message: 'This article may have been unpublished or moved.',
         icon: Icons.article_outlined,
-        actionLabel: 'Browse Knowledge Center',
+        actionLabel: 'Browse articles',
         onAction: () => context.go(RoutePaths.blog),
       );
     }
@@ -48,7 +57,7 @@ class BlogArticlePage extends ConsumerWidget {
             child: WebsiteBreadcrumbs(
               items: [
                 const BreadcrumbItem(label: 'Home', path: RoutePaths.home),
-                const BreadcrumbItem(label: 'Knowledge Center', path: RoutePaths.blog),
+                const BreadcrumbItem(label: 'Blog', path: RoutePaths.blog),
                 BreadcrumbItem(label: detail.category.name),
                 BreadcrumbItem(label: detail.summary.title),
               ],

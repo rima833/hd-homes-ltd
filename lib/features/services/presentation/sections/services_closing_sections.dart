@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/website/components/animated_section_title.dart';
 import 'package:hdhomesproject/core/website/components/cta_banner.dart';
-import 'package:hdhomesproject/core/website/components/page_container.dart';
+import 'package:hdhomesproject/core/website/components/published_faq_section.dart';
+import 'package:hdhomesproject/core/website/components/published_testimonials_section.dart';
 import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
-import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/features/services/data/models/service_models.dart';
-import 'package:hdhomesproject/features/services/data/providers/service_detail_provider.dart';
 import 'package:hdhomesproject/features/services/data/providers/services_catalog_provider.dart';
 import 'package:hdhomesproject/features/services/presentation/widgets/consultation_form.dart';
+import 'package:hdhomesproject/features/services/presentation/widgets/service_cta.dart';
 import 'package:hdhomesproject/features/services/presentation/widgets/service_icons.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-/// Sections 5–12 + enterprise — Why choose, process, case studies, consultation.
-class ServicesClosingSections extends HookConsumerWidget {
+/// Closing sections for the Services hub — lean, polished, conversion-focused.
+class ServicesClosingSections extends ConsumerWidget {
   const ServicesClosingSections({super.key, this.consultationKey});
 
   final GlobalKey? consultationKey;
@@ -26,66 +24,53 @@ class ServicesClosingSections extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cms = ref.watch(servicesCmsProvider);
-    final faqQuery = useState('');
-    final projectType = useState('Residential Build');
-    final sizeSqm = useState(250.0);
-    final budget = useState(50);
-    final location = useState('Lagos');
-    final timeline = useState('Standard (12–24 months)');
-
-    final estimate = estimateProject(
-      projectType: projectType.value,
-      sizeSqm: sizeSqm.value,
-      budgetMillions: budget.value,
-      location: location.value,
-      timeline: timeline.value,
-    );
-
-    final filteredFaqs = cms.faqs
-        .where(
-          (f) =>
-              faqQuery.value.isEmpty ||
-              f.question.toLowerCase().contains(faqQuery.value.toLowerCase()) ||
-              f.answer.toLowerCase().contains(faqQuery.value.toLowerCase()),
-        )
-        .toList();
 
     return Column(
       children: [
         SectionWrapper(
-          child: PageContainer(
-            child: Column(
+          child: Column(
               children: [
                 const AnimatedSectionTitle(
                   overline: 'WHY HD HOMES',
                   title: 'Why choose HD Homes',
+                subtitle:
+                    'Premium delivery, transparent process, and lasting client partnerships.',
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                Wrap(
-                  spacing: AppSpacing.base,
-                  runSpacing: AppSpacing.base,
-                  children: cms.whyChoose
-                      .map(
-                        (w) => SizedBox(
-                          width: context.isMobile ? double.infinity : 280,
-                          child: _WhyCard(item: w),
-                        ),
-                      )
-                      .toList(),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final maxW = constraints.maxWidth;
+                  final cols = maxW >= 1100
+                      ? 3
+                      : maxW >= 700
+                          ? 2
+                          : 1;
+                  final gap = AppSpacing.base;
+                  final cardW = cols == 1
+                      ? maxW
+                      : (maxW - gap * (cols - 1)) / cols;
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: gap,
+                    children: [
+                      for (final w in cms.whyChoose)
+                        SizedBox(width: cardW, child: _WhyCard(item: w)),
+                    ],
+                  );
+                },
                 ),
               ],
             ),
-          ),
         ),
         SectionWrapper(
           backgroundColor: AppColors.charcoal,
-          child: PageContainer(
-            child: Column(
+          child: Column(
               children: [
                 const AnimatedSectionTitle(
                   overline: 'PROCESS',
-                  title: 'Our process',
-                  subtitle: 'A transparent workflow from inquiry to after-sales support.',
+                title: 'How we deliver',
+                subtitle:
+                    'A clear path from first inquiry to after-sales support.',
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 Wrap(
@@ -106,284 +91,73 @@ class ServicesClosingSections extends HookConsumerWidget {
                 ),
               ],
             ),
-          ),
         ),
         SectionWrapper(
-          child: PageContainer(
-            child: Column(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const AnimatedSectionTitle(
                   overline: 'CASE STUDIES',
                   title: 'Proven results',
+                subtitle: 'Outcomes from real HD Homes engagements.',
                   alignment: TextAlign.start,
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                for (final cs in cms.caseStudies)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.base),
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    decoration: BoxDecoration(
-                      borderRadius: AppRadius.cardBorder,
-                      border: Border.all(color: AppColors.gold.withValues(alpha: 0.25)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 900;
+                  if (!wide) {
+                    return Column(
                       children: [
-                        Text(cs.client, style: Theme.of(context).textTheme.titleMedium),
-                        Text(cs.service, style: const TextStyle(color: AppColors.gold)),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text('Challenge: ${cs.challenge}'),
-                        Text('Solution: ${cs.solution}'),
-                        Text('Results: ${cs.results}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextButton(
-                          onPressed: () => context.go('/services/${cs.serviceSlug}'),
-                          child: const Text('View service →'),
-                        ),
+                        for (final cs in cms.caseStudies) ...[
+                          _CaseStudyCard(study: cs),
+                          const SizedBox(height: AppSpacing.base),
+                        ],
                       ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        SectionWrapper(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          child: PageContainer(
-            child: Column(
-              children: [
-                const AnimatedSectionTitle(
-                  overline: 'TECHNOLOGY',
-                  title: 'Technology & innovation',
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                Wrap(
-                  spacing: AppSpacing.base,
-                  runSpacing: AppSpacing.base,
-                  children: cms.technologies
-                      .map(
-                        (t) => SizedBox(
-                          width: context.isMobile ? double.infinity : 200,
-                          child: _TechTile(tech: t),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
-            ),
-          ),
-        ),
-        SectionWrapper(
-          child: PageContainer(
-            child: Column(
-              children: [
-                const AnimatedSectionTitle(
-                  overline: 'INDUSTRIES',
-                  title: 'Industries we serve',
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                Wrap(
-                  spacing: AppSpacing.base,
-                  runSpacing: AppSpacing.base,
-                  children: cms.industries
-                      .map(
-                        (ind) => Chip(
-                          avatar: Icon(ServiceIcons.resolve(ind.iconName), size: 16, color: AppColors.gold),
-                          label: Text(ind.name),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ],
-            ),
-          ),
-        ),
-        SectionWrapper(
-          backgroundColor: AppColors.charcoal,
-          child: PageContainer(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const AnimatedSectionTitle(
-                  overline: 'TESTIMONIALS',
-                  title: 'Client testimonials',
-                  alignment: TextAlign.start,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                for (final t in cms.testimonials)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.base),
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    decoration: BoxDecoration(
-                      color: AppColors.darkSurface,
-                      borderRadius: AppRadius.cardBorder,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            ...List.generate(
-                              5,
-                              (i) => Icon(
-                                i < t.rating.round() ? Icons.star_rounded : Icons.star_outline_rounded,
-                                color: AppColors.gold,
-                                size: 16,
-                              ),
-                            ),
-                            if (t.verified) ...[
-                              const Spacer(),
-                              const Text('Verified', style: TextStyle(fontSize: 11, color: AppColors.gold)),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text('"${t.comment}"', style: const TextStyle(color: AppColors.white)),
-                        Text('${t.name} · ${t.role}'),
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < cms.caseStudies.length; i++) ...[
+                        if (i > 0) const SizedBox(width: AppSpacing.base),
+                        Expanded(child: _CaseStudyCard(study: cms.caseStudies[i])),
                       ],
-                    ),
-                  ),
+                    ],
+                  );
+                },
+                ),
               ],
             ),
-          ),
         ),
-        SectionWrapper(
-          child: PageContainer(
-            child: Column(
-              children: [
-                const AnimatedSectionTitle(
-                  overline: 'KNOWLEDGE CENTER',
-                  title: 'Service knowledge hub',
-                  subtitle: 'Guides, checklists, and resources — optimized for SEO.',
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                for (final article in cms.knowledgeArticles)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(LucideIcons.bookOpen, color: AppColors.gold),
-                    title: Text(article.title),
-                    subtitle: Text('${article.category} · ${article.readMinutes} min read'),
-                    trailing: const Icon(Icons.arrow_forward_rounded),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        SectionWrapper(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          child: PageContainer(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const AnimatedSectionTitle(
-                  overline: 'ESTIMATOR',
-                  title: 'Smart project estimator',
-                  alignment: TextAlign.start,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                DropdownMenu<String>(
-                  initialSelection: projectType.value,
-                  dropdownMenuEntries: const [
-                    DropdownMenuEntry(value: 'Residential Build', label: 'Residential Build'),
-                    DropdownMenuEntry(value: 'Commercial Build', label: 'Commercial Build'),
-                    DropdownMenuEntry(value: 'Buy Property', label: 'Buy Property'),
-                  ],
-                  onSelected: (v) => projectType.value = v ?? projectType.value,
-                ),
-                Slider(
-                  value: sizeSqm.value,
-                  min: 50,
-                  max: 2000,
-                  label: '${sizeSqm.value.round()} sqm',
-                  onChanged: (v) => sizeSqm.value = v,
-                ),
-                Slider(
-                  value: budget.value.toDouble(),
-                  min: 10,
-                  max: 500,
-                  divisions: 49,
-                  label: '₦${budget.value}M',
-                  onChanged: (v) => budget.value = v.round(),
-                ),
-                Text('Estimated cost: ${estimate.costRange}'),
-                Text('Duration: ${estimate.duration}'),
-                Text('Suggested: ${estimate.suggestedServices.join(', ')}'),
-                Text(estimate.consultationNote, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
-        ),
-        SectionWrapper(
+        const PublishedTestimonialsSection(
           backgroundColor: AppColors.charcoal,
-          child: PageContainer(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const AnimatedSectionTitle(
-                  overline: 'EXPERTS',
-                  title: 'Live expert availability',
-                  subtitle: 'Realtime consultant status via Supabase (placeholder).',
-                  alignment: TextAlign.start,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                for (final expert in cms.experts)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      backgroundColor: expert.isOnline ? AppColors.success : AppColors.neutral500,
-                      radius: 6,
-                    ),
-                    title: Text(expert.name, style: const TextStyle(color: AppColors.white)),
-                    subtitle: Text('${expert.department} · ${expert.responseTime}'),
-                    trailing: PrimaryButton(
-                      label: 'Book',
-                      onPressed: () => context.go(RoutePaths.contact),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          title: 'What clients say',
+          subtitle:
+              'Verified feedback across advisory, construction, and property services.',
         ),
-        SectionWrapper(
-          child: PageContainer(
-            child: Column(
-              children: [
-                const AnimatedSectionTitle(overline: 'FAQ', title: 'Frequently asked questions'),
-                const SizedBox(height: AppSpacing.base),
-                TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search FAQs…',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                  onChanged: (v) => faqQuery.value = v,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                for (final faq in filteredFaqs)
-                  ExpansionTile(title: Text(faq.question), children: [Text(faq.answer)]),
-              ],
-            ),
-          ),
+        const PublishedFaqSection(
+          title: 'Frequently asked questions',
+          subtitle: 'Answers published from the website FAQ desk.',
         ),
         KeyedSubtree(
           key: consultationKey,
           child: SectionWrapper(
             backgroundColor: Theme.of(context).colorScheme.surface,
-            child: PageContainer(
-              child: Column(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const AnimatedSectionTitle(
                     overline: 'CONSULTATION',
-                    title: 'Request a consultation',
-                    subtitle: 'Book a call, request a proposal, or schedule a site visit.',
+                  title: 'Talk to a specialist',
+                  subtitle:
+                      'Book a live consultation — phone, video, or on-site — with the right department.',
                     alignment: TextAlign.start,
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   const ConsultationForm(),
                 ],
               ),
-            ),
           ),
         ),
         Padding(
@@ -393,9 +167,10 @@ class ServicesClosingSections extends HookConsumerWidget {
           ),
           child: CtaBanner(
             title: 'Ready to start your project?',
-            subtitle: 'Speak with our experts and receive a tailored proposal within 48 hours.',
+            subtitle:
+                'Speak with our experts and receive a tailored proposal within 48 hours.',
             primaryLabel: 'Book Consultation',
-            primaryPath: RoutePaths.contact,
+            primaryPath: RoutePaths.bookConsultation,
             secondaryLabel: 'Browse Services',
             secondaryPath: RoutePaths.services,
           ),
@@ -415,16 +190,49 @@ class _WhyCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        borderRadius: AppRadius.cardBorder,
-        border: Border.all(color: AppColors.neutral200.withValues(alpha: 0.15)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.22)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.darkSurface.withValues(alpha: 0.9),
+            AppColors.charcoal.withValues(alpha: 0.55),
+          ],
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(ServiceIcons.resolve(item.iconName), color: AppColors.gold),
-          const SizedBox(height: AppSpacing.sm),
-          Text(item.title, style: Theme.of(context).textTheme.titleSmall),
-          Text(item.description, style: Theme.of(context).textTheme.bodySmall),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.gold.withValues(alpha: 0.14),
+              border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+            ),
+            child: Icon(
+              ServiceIcons.resolve(item.iconName),
+              color: AppColors.gold,
+              size: 20,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.base),
+          Text(
+            item.title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            item.description,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondaryDark,
+                  height: 1.45,
+                ),
+          ),
         ],
       ),
     );
@@ -442,40 +250,107 @@ class _ProcessChip extends StatelessWidget {
     return Chip(
       avatar: CircleAvatar(
         backgroundColor: AppColors.gold,
-        child: Text('$index', style: const TextStyle(fontSize: 11, color: AppColors.deepBlack)),
+        child: Text(
+          '$index',
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.deepBlack,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
       label: Text(step),
+      backgroundColor: AppColors.darkSurface.withValues(alpha: 0.65),
+      side: BorderSide(color: AppColors.gold.withValues(alpha: 0.25)),
     );
   }
 }
 
-class _TechTile extends StatelessWidget {
-  const _TechTile({required this.tech});
+class _CaseStudyCard extends ConsumerWidget {
+  const _CaseStudyCard({required this.study});
 
-  final ServiceTechnology tech;
+  final ServiceCaseStudy study;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final catalog = ref.watch(servicesCatalogProvider);
+    final slug = study.serviceSlug.trim();
+    final target = slug.isEmpty
+        ? null
+        : catalog.cast<ServiceSummary?>().firstWhere(
+              (s) => s?.slug == slug,
+              orElse: () => null,
+            );
+
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.base),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.darkSurface,
-        borderRadius: AppRadius.cardBorder,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.28)),
+        color: AppColors.darkSurface.withValues(alpha: 0.55),
       ),
-      child: Row(
-        children: [
-          Icon(ServiceIcons.resolve(tech.iconName), color: AppColors.gold),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tech.name, style: const TextStyle(color: AppColors.white, fontWeight: FontWeight.w600)),
-                Text(tech.description, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryDark)),
-              ],
+          Text(
+            study.client,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            study.service,
+            style: const TextStyle(
+              color: AppColors.gold,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.base),
+          _meta('Challenge', study.challenge),
+          _meta('Solution', study.solution),
+          _meta('Results', study.results, emphasize: true),
+          const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: target == null
+                  ? null
+                  : () => openServiceLearnMore(context, target),
+              child: Text(
+                target == null ? 'Service unavailable' : 'View service →',
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _meta(String label, String value, {bool emphasize = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(
+            color: AppColors.textSecondaryDark,
+            height: 1.4,
+            fontSize: 13,
+            fontWeight: emphasize ? FontWeight.w600 : FontWeight.w400,
+          ),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(
+                color: AppColors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 
@@ -60,13 +61,19 @@ class AppErrorWidget extends StatelessWidget {
     super.key,
     required this.message,
     this.onRetry,
+    this.retryLabel = 'Try Again',
   });
 
-  final String message;
+  /// Raw exception or text — sanitized before display.
+  final Object message;
   final VoidCallback? onRetry;
+  final String retryLabel;
 
   @override
   Widget build(BuildContext context) {
+    final friendly = userFacingError(message);
+    final isNetwork = friendly == kNetworkErrorMessage ||
+        friendly == kTimeoutErrorMessage;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xxxl),
@@ -79,26 +86,26 @@ class AppErrorWidget extends StatelessWidget {
                 color: AppColors.error.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                AppIcons.error,
+              child: Icon(
+                isNetwork ? Icons.wifi_off_rounded : AppIcons.error,
                 size: AppIcons.xl,
                 color: AppColors.error,
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
             Text(
-              'Something went wrong',
+              isNetwork ? 'Connection problem' : 'Something went wrong',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              message,
+              friendly,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.xl),
-              PrimaryButton(label: 'Try Again', onPressed: onRetry),
+              PrimaryButton(label: retryLabel, onPressed: onRetry),
             ],
           ],
         ),

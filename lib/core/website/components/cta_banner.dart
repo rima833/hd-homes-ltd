@@ -14,6 +14,7 @@ class CtaBanner extends StatelessWidget {
     this.primaryPath,
     this.secondaryLabel,
     this.secondaryPath,
+    this.onSecondary,
     this.backgroundColor,
   });
 
@@ -23,6 +24,7 @@ class CtaBanner extends StatelessWidget {
   final String? primaryPath;
   final String? secondaryLabel;
   final String? secondaryPath;
+  final VoidCallback? onSecondary;
   final Color? backgroundColor;
 
   @override
@@ -37,23 +39,33 @@ class CtaBanner extends StatelessWidget {
         color: backgroundColor ?? AppColors.charcoal,
         borderRadius: AppRadius.cardBorder,
       ),
-      child: context.isMobile
-          ? Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = constraints.maxWidth < 800;
+          if (stacked) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: _children(context),
-            )
-          : Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _text(context),
-                  ),
+            );
+          }
+          return Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _text(context),
                 ),
-                const SizedBox(width: AppSpacing.xl),
-                ..._actions(context),
-              ],
-            ),
+              ),
+              const SizedBox(width: AppSpacing.xl),
+              Wrap(
+                spacing: AppSpacing.base,
+                runSpacing: AppSpacing.base,
+                children: _actions(context),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -91,11 +103,12 @@ class CtaBanner extends StatelessWidget {
             label: primaryLabel!,
             onPressed: () => context.go(primaryPath!),
           ),
-        if (secondaryLabel != null && secondaryPath != null)
+        if (secondaryLabel != null &&
+            (secondaryPath != null || onSecondary != null))
           PrimaryButton(
             label: secondaryLabel!,
             variant: ButtonVariant.secondary,
-            onPressed: () => context.go(secondaryPath!),
+            onPressed: onSecondary ?? () => context.go(secondaryPath!),
           ),
       ];
 }

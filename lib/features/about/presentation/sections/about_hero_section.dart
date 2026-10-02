@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/app_theme.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/core/website/components/cms_hero_media_background.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/features/about/data/models/about_cms_content.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
-/// Section 1 — About hero banner.
+/// Section 1 — About hero banner with CMS image/video background.
 class AboutHeroSection extends StatelessWidget {
   const AboutHeroSection({super.key, required this.content});
 
@@ -23,18 +24,9 @@ class AboutHeroSection extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF1A1510),
-                  AppColors.charcoal,
-                  AppColors.deepBlack,
-                ],
-              ),
-            ),
+          CmsHeroMediaBackground(
+            imageUrl: content.backgroundImageUrl,
+            videoUrl: content.backgroundVideoUrl,
           ),
           Container(
             decoration: BoxDecoration(

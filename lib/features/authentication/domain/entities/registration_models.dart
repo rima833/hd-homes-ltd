@@ -4,25 +4,27 @@ import 'package:hdhomesproject/features/authentication/domain/entities/app_role.
 enum RegistrationAccountType {
   client(
     id: 'client',
-    title: 'Registered Client',
-    description: 'Buy property, book inspections, and track your journey.',
+    title: 'Looking for a home',
+    description:
+        'Buy property, book inspections, and follow every step of your journey.',
     benefits: [
       'Save and compare properties',
       'Book site inspections',
       'Track purchases and payments',
-      'Access the Client Dashboard',
+      'Access your Client Dashboard',
     ],
     enabled: true,
   ),
   investor(
     id: 'investor',
-    title: 'Investor',
-    description: 'Explore opportunities, portfolios, and ROI reporting.',
+    title: 'Building wealth',
+    description:
+        'Explore opportunities, track portfolios, and grow with HD Homes.',
     benefits: [
       'Investor Portal access',
-      'Investment opportunities',
+      'Curated investment opportunities',
       'Portfolio and ROI tracking',
-      'Investment documents',
+      'Secure investment documents',
     ],
     enabled: true,
   ),
@@ -86,9 +88,9 @@ enum RegistrationAccountType {
   }
 
   AppRole get defaultRole => switch (this) {
-        RegistrationAccountType.investor => AppRole.investor,
-        _ => AppRole.client,
-      };
+    RegistrationAccountType.investor => AppRole.investor,
+    _ => AppRole.client,
+  };
 
   static List<RegistrationAccountType> get selectable =>
       values.where((t) => t.enabled).toList();
@@ -97,24 +99,18 @@ enum RegistrationAccountType {
       values.where((t) => !t.enabled).toList();
 }
 
-enum RegistrationStep {
-  accountType,
-  personalInfo,
-  credentials,
-  legal,
-  review,
-}
+enum RegistrationStep { accountType, personalInfo, credentials, legal, review }
 
 extension RegistrationStepX on RegistrationStep {
   int get index => RegistrationStep.values.indexOf(this);
 
   String get title => switch (this) {
-        RegistrationStep.accountType => 'Account type',
-        RegistrationStep.personalInfo => 'Personal details',
-        RegistrationStep.credentials => 'Credentials',
-        RegistrationStep.legal => 'Agreements',
-        RegistrationStep.review => 'Review',
-      };
+    RegistrationStep.accountType => 'Account type',
+    RegistrationStep.personalInfo => 'Personal details',
+    RegistrationStep.credentials => 'Credentials',
+    RegistrationStep.legal => 'Agreements',
+    RegistrationStep.review => 'Review',
+  };
 
   RegistrationStep? get previous {
     final i = index;
@@ -221,23 +217,25 @@ class RegistrationDraft {
   }
 
   Map<String, dynamic> toAuthMetadata() => {
-        'first_name': firstName.trim(),
-        'last_name': lastName.trim(),
-        'phone': phone.trim(),
-        'country': country.trim(),
-        'state': state.trim(),
-        'city': city.trim(),
-        'account_type': accountType?.id ?? 'client',
-        'referral_code': referralCode.trim().isEmpty ? null : referralCode.trim(),
-        'invitation_token': invitationToken,
-        'marketing_opt_in': marketingOptIn,
-        'product_updates_opt_in': productUpdatesOptIn,
-        'newsletter_opt_in': newsletterOptIn,
-        'terms_version': LegalDocumentVersions.terms,
-        'privacy_version': LegalDocumentVersions.privacy,
-        'cookies_version': LegalDocumentVersions.cookies,
-        'accepted_legal_at': DateTime.now().toUtc().toIso8601String(),
-      };
+    'first_name': firstName.trim(),
+    'last_name': lastName.trim(),
+    'phone': phone.trim(),
+    'country': country.trim(),
+    'state': state.trim(),
+    'city': city.trim(),
+    'account_type':
+        accountType?.id ??
+        ((invitationToken ?? '').trim().isNotEmpty ? 'staff' : 'client'),
+    'referral_code': referralCode.trim().isEmpty ? null : referralCode.trim(),
+    'invitation_token': invitationToken,
+    'marketing_opt_in': marketingOptIn,
+    'product_updates_opt_in': productUpdatesOptIn,
+    'newsletter_opt_in': newsletterOptIn,
+    'terms_version': LegalDocumentVersions.terms,
+    'privacy_version': LegalDocumentVersions.privacy,
+    'cookies_version': LegalDocumentVersions.cookies,
+    'accepted_legal_at': DateTime.now().toUtc().toIso8601String(),
+  };
 }
 
 class RegistrationResult {

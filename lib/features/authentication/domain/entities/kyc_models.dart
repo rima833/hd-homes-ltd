@@ -89,6 +89,11 @@ enum KycStatus {
       this == KycStatus.awaitingDocuments ||
       this == KycStatus.needsResubmission ||
       this == KycStatus.rejected;
+
+  bool get needsStaffAction =>
+      this == KycStatus.underReview ||
+      this == KycStatus.awaitingDocuments ||
+      this == KycStatus.needsResubmission;
 }
 
 /// Configurable document type catalog.
@@ -154,6 +159,17 @@ enum KycDocumentStatus {
         RegExp(r'[A-Z]'),
         (m) => '_${m.group(0)!.toLowerCase()}',
       ).replaceFirst(RegExp(r'^_'), '');
+
+  String get label => switch (this) {
+        KycDocumentStatus.draft => 'Draft',
+        KycDocumentStatus.uploaded => 'Uploaded',
+        KycDocumentStatus.submitted => 'Submitted',
+        KycDocumentStatus.underReview => 'Under review',
+        KycDocumentStatus.approved => 'Approved',
+        KycDocumentStatus.rejected => 'Rejected',
+        KycDocumentStatus.expired => 'Expired',
+        KycDocumentStatus.replaced => 'Replaced',
+      };
 
   static KycDocumentStatus fromSlug(String? raw) {
     final s = (raw ?? 'uploaded').toLowerCase();
@@ -354,6 +370,65 @@ class KycEvent {
   }
 }
 
+class KycApplicantIdentity {
+  const KycApplicantIdentity({
+    required this.userId,
+    this.email,
+    this.displayName,
+    this.phone,
+    this.dateOfBirth,
+    this.nationality,
+    this.occupation,
+    this.gender,
+    this.addressLine,
+    this.phoneVerified = false,
+    this.accountStatus,
+  });
+
+  final String userId;
+  final String? email;
+  final String? displayName;
+  final String? phone;
+  final String? dateOfBirth;
+  final String? nationality;
+  final String? occupation;
+  final String? gender;
+  final String? addressLine;
+  final bool phoneVerified;
+  final String? accountStatus;
+}
+
+/// Full record a reviewer reads before approving or rejecting KYC.
+class KycReviewCase {
+  const KycReviewCase({
+    required this.identity,
+    required this.status,
+    required this.currentLevel,
+    required this.targetLevel,
+    required this.documents,
+    required this.compliance,
+    this.reviewerNotes,
+    this.submittedAt,
+    this.reviewedAt,
+    this.timeline = const [],
+  });
+
+  final KycApplicantIdentity identity;
+  final KycStatus status;
+  final KycLevel currentLevel;
+  final KycLevel targetLevel;
+  final List<KycDocument> documents;
+  final InvestorComplianceInfo compliance;
+  final String? reviewerNotes;
+  final DateTime? submittedAt;
+  final DateTime? reviewedAt;
+  final List<KycEvent> timeline;
+
+  List<KycDocument> get activeDocuments => documents
+      .where((d) => d.status != KycDocumentStatus.replaced)
+      .toList();
+}
+
 class KycReviewQueueItem {
   const KycReviewQueueItem({
     required this.userId,
@@ -472,7 +547,7 @@ abstract final class IntelligentVerificationEngine {
       ),
       KycRequirementItem(
         id: 'phone',
-        label: 'Phone verified',
+        label: 'Phone number on file',
         completed: phoneVerified,
       ),
       if (targetLevel.rank >= KycLevel.identity.rank) ...[

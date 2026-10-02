@@ -6,6 +6,7 @@ import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/website/l10n/app_strings.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/core/widgets/inputs/app_text_field.dart';
+import 'package:hdhomesproject/features/settings/presentation/providers/platform_settings_providers.dart';
 
 /// Newsletter signup band — wired to Growth Engine newsletter service.
 class NewsletterBanner extends ConsumerStatefulWidget {
@@ -27,22 +28,44 @@ class _NewsletterBannerState extends ConsumerState<NewsletterBanner> {
 
   Future<void> _subscribe() async {
     setState(() => _loading = true);
-    final ok = subscribeNewsletter(ref, email: _emailController.text);
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok ? 'Thank you for subscribing!' : 'Please enter a valid email address.',
+    try {
+      final ok = await subscribeNewsletter(ref, email: _emailController.text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? 'Thank you for subscribing!'
+                : 'Please enter a valid email address.',
+          ),
         ),
-      ),
-    );
-    if (ok) _emailController.clear();
+      );
+      if (ok) _emailController.clear();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e is StateError
+                ? e.message
+                : 'Unable to subscribe right now. Please try again.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final enabled = ref
+            .watch(publishedPlatformSettingsProvider)
+            .valueOrNull
+            ?.enableNewsletter ??
+        true;
+    if (!enabled) return const SizedBox.shrink();
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
@@ -53,25 +76,39 @@ class _NewsletterBannerState extends ConsumerState<NewsletterBanner> {
         gradient: AppColors.goldGradient,
         borderRadius: AppRadius.cardBorder,
       ),
-      child: context.isMobile
-          ? Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Fixed 360px form overflows tablet side-by-side layouts.
+          final stacked = constraints.maxWidth < 900;
+          if (stacked) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: _content(context),
-            )
-          : Row(
-              children: [
-                Expanded(child: _copy(context)),
-                const SizedBox(width: AppSpacing.xl),
-                SizedBox(width: 360, child: _form(context)),
-              ],
-            ),
+              children: _content(context, stackedForm: true),
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: _copy(context)),
+              const SizedBox(width: AppSpacing.xl),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: SizedBox(
+                  width: 360,
+                  child: _form(context, stackedForm: false),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
-  List<Widget> _content(BuildContext context) => [
+  List<Widget> _content(BuildContext context, {required bool stackedForm}) => [
         _copy(context),
         const SizedBox(height: AppSpacing.lg),
-        _form(context),
+        _form(context, stackedForm: stackedForm),
       ];
 
   Widget _copy(BuildContext context) => Column(
@@ -94,21 +131,35 @@ class _NewsletterBannerState extends ConsumerState<NewsletterBanner> {
         ],
       );
 
-  Widget _form(BuildContext context) => Row(
+  Widget _form(BuildContext context, {required bool stackedForm}) {
+    final field = AppTextField(
+      controller: _emailController,
+      hint: 'Email address',
+      keyboardType: TextInputType.emailAddress,
+    );
+    final button = PrimaryButton(
+      label: AppStrings.newsletterCta,
+      isLoading: _loading,
+      onPressed: _subscribe,
+    );
+
+    if (stackedForm && context.screenWidth < 420) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: AppTextField(
-              controller: _emailController,
-              hint: 'Email address',
-              keyboardType: TextInputType.emailAddress,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          PrimaryButton(
-            label: AppStrings.newsletterCta,
-            isLoading: _loading,
-            onPressed: _subscribe,
-          ),
+          field,
+          const SizedBox(height: AppSpacing.sm),
+          button,
         ],
       );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: field),
+        const SizedBox(width: AppSpacing.sm),
+        button,
+      ],
+    );
+  }
 }

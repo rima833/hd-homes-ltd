@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:hdhomesproject/core/email/email_config.dart';
 import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/core/utils/app_logger.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/registration_models.dart';
@@ -67,6 +68,33 @@ class RegistrationRepositoryImpl implements RegistrationRepository {
         accountType: draft.accountType,
         metadata: {'user_id': profile.id, 'needs_verification': needsVerification},
       );
+
+      // Queue branded welcome (delivered after Edge worker + Resend are configured).
+      try {
+        final emailConfig = EmailConfig(_client);
+        final loginUrl = EmailConfig.composeActionUrl(
+          await emailConfig.loadSiteUrl(),
+          '/login',
+        );
+        await _client?.rpc(
+          'queue_transactional_email',
+          params: {
+            'p_template_slug': 'welcome',
+            'p_recipient_email': profile.email.trim().toLowerCase(),
+            'p_user_id': profile.id,
+            'p_variables': {
+              'first_name': draft.firstName.trim().isEmpty
+                  ? 'there'
+                  : draft.firstName.trim(),
+              'cta_url': loginUrl,
+            },
+            'p_payload': {
+              'source': 'registration',
+              'account_type': draft.accountType?.id,
+            },
+          },
+        );
+      } catch (_) {}
 
       return RegistrationResult(
         userId: profile.id,

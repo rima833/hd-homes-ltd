@@ -90,10 +90,11 @@ final _cms = GrowthHubCms(
     ),
     ThirdPartyIntegration(
       id: 'resend',
-      name: 'Resend / SendGrid',
+      name: 'Resend',
       category: 'Email',
-      status: IntegrationStatus.configured,
-      description: 'Transactional and marketing email delivery.',
+      status: IntegrationStatus.disconnected,
+      description:
+          'Transactional email via Edge + Resend. Status comes from Admin → Settings → Email health check (not assumed configured).',
     ),
     ThirdPartyIntegration(
       id: 'termii',

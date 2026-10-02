@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:hdhomesproject/core/auth/models/security_event.dart';
+import 'package:hdhomesproject/core/email/email_config.dart';
 import 'package:hdhomesproject/core/auth/services/security_service.dart';
 import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/notification_models.dart';
@@ -12,8 +13,8 @@ class CommunicationService {
   CommunicationService({
     required SecurityService security,
     SupabaseClient? client,
-  })  : _security = security,
-        _client = client;
+  }) : _security = security,
+       _client = client;
 
   final SecurityService _security;
   final SupabaseClient? _client;
@@ -21,7 +22,9 @@ class CommunicationService {
   bool get isConfigured => _client != null;
 
   /// Smart Communication Orchestrator™ entry point.
-  Future<AppNotification?> dispatch(CommunicationDispatchRequest request) async {
+  Future<AppNotification?> dispatch(
+    CommunicationDispatchRequest request,
+  ) async {
     final client = _client;
     if (client == null) {
       throw const AuthenticationException('Communication service unavailable.');
@@ -29,7 +32,9 @@ class CommunicationService {
 
     final template = NotificationTemplateCatalog.bySlug(request.templateSlug);
     if (template == null) {
-      throw ValidationException('Unknown notification template: ${request.templateSlug}');
+      throw ValidationException(
+        'Unknown notification template: ${request.templateSlug}',
+      );
     }
 
     final prefs = await loadPrefs(request.userId);
@@ -75,6 +80,10 @@ class CommunicationService {
         status: plan.sendImmediately
             ? DeliveryStatus.queued
             : DeliveryStatus.queued,
+        templateSlug: request.templateSlug,
+        variables: request.variables,
+        actionUrl: request.actionUrl,
+        metadata: request.metadata,
       );
     }
 
@@ -105,10 +114,7 @@ class CommunicationService {
     final client = _client;
     if (client == null) return const [];
     try {
-      var query = client
-          .from('notifications')
-          .select()
-          .eq('user_id', userId);
+      var query = client.from('notifications').select().eq('user_id', userId);
       if (!includeArchived) {
         query = query.eq('is_archived', false);
       }
@@ -117,7 +123,10 @@ class CommunicationService {
           .order('created_at', ascending: false)
           .limit(100);
       return (rows as List)
-          .map((r) => AppNotification.fromJson(Map<String, dynamic>.from(r as Map)))
+          .map(
+            (r) =>
+                AppNotification.fromJson(Map<String, dynamic>.from(r as Map)),
+          )
           .toList();
     } catch (_) {
       return const [];
@@ -143,35 +152,44 @@ class CommunicationService {
   Future<void> markRead(String notificationId) async {
     final client = _client;
     if (client == null) return;
-    await client.from('notifications').update({
-      'is_read': true,
-      'read_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('id', notificationId);
+    await client
+        .from('notifications')
+        .update({
+          'is_read': true,
+          'read_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', notificationId);
   }
 
   Future<void> markAllRead(String userId) async {
     final client = _client;
     if (client == null) return;
-    await client.from('notifications').update({
-      'is_read': true,
-      'read_at': DateTime.now().toUtc().toIso8601String(),
-    }).eq('user_id', userId).eq('is_read', false);
+    await client
+        .from('notifications')
+        .update({
+          'is_read': true,
+          'read_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('user_id', userId)
+        .eq('is_read', false);
   }
 
   Future<void> archive(String notificationId) async {
     final client = _client;
     if (client == null) return;
-    await client.from('notifications').update({
-      'is_archived': true,
-    }).eq('id', notificationId);
+    await client
+        .from('notifications')
+        .update({'is_archived': true})
+        .eq('id', notificationId);
   }
 
   Future<void> togglePin(String notificationId, bool pinned) async {
     final client = _client;
     if (client == null) return;
-    await client.from('notifications').update({
-      'is_pinned': pinned,
-    }).eq('id', notificationId);
+    await client
+        .from('notifications')
+        .update({'is_pinned': pinned})
+        .eq('id', notificationId);
   }
 
   Future<void> deleteNotification(String notificationId) async {
@@ -200,46 +218,121 @@ class CommunicationService {
   Future<void> savePrefs(String userId, CommunicationChannelPrefs prefs) async {
     final client = _client;
     if (client == null) return;
-    await client.from('notification_preferences').upsert(prefs.toUpsertMap(userId));
+    await client
+        .from('notification_preferences')
+        .upsert(prefs.toUpsertMap(userId));
     await _log(userId, 'prefs_updated', {});
   }
 
-  Future<AnnouncementPost> publishAnnouncement({
+  Future<AnnouncementPublishResult> publishAnnouncement({
     required String title,
     required String body,
     required String actorId,
     String targetAudience = 'everyone',
+    bool surfacePublicSite = true,
+    bool queueEmail = false,
   }) async {
     final client = _client;
     if (client == null) {
       throw const AuthenticationException('Communication service unavailable.');
     }
-    final row = await client.from('announcement_posts').insert({
-      'title': title,
-      'body': body,
-      'target_audience': targetAudience,
-      'published': true,
-      'published_at': DateTime.now().toUtc().toIso8601String(),
-      'created_by': actorId,
-    }).select().single();
 
-    await _log(actorId, 'announcement_published', {
-      'title': title,
-      'audience': targetAudience,
-    });
+    try {
+      final raw = await client.rpc(
+        'publish_announcement_post',
+        params: {
+          'p_title': title,
+          'p_body': body,
+          'p_target_audience': targetAudience,
+          'p_surface_public_site': surfacePublicSite,
+          'p_queue_email': queueEmail,
+        },
+      );
+      final map = Map<String, dynamic>.from(raw as Map);
+      final result = AnnouncementPublishResult.fromJson(map);
+      await _log(actorId, 'announcement_published', map);
+      return result;
+    } on PostgrestException {
+      final row = await client
+          .from('announcement_posts')
+          .insert({
+            'title': title,
+            'body': body,
+            'target_audience': targetAudience,
+            'published': true,
+            'published_at': DateTime.now().toUtc().toIso8601String(),
+            'created_by': actorId,
+          })
+          .select()
+          .single();
 
-    // Fan-out simplified: create system notification for actor demo;
-    // full fan-out uses Edge Function / queue in production.
-    await dispatch(
-      CommunicationDispatchRequest(
-        userId: actorId,
-        templateSlug: 'announcement',
-        variables: {'title': title, 'body': body},
-        priority: NotificationPriority.high,
-      ),
-    );
+      await dispatch(
+        CommunicationDispatchRequest(
+          userId: actorId,
+          templateSlug: 'announcement',
+          variables: {'title': title, 'body': body},
+          priority: NotificationPriority.high,
+        ),
+      );
 
-    return AnnouncementPost.fromJson(Map<String, dynamic>.from(row));
+      final post = AnnouncementPost.fromJson(Map<String, dynamic>.from(row));
+      return AnnouncementPublishResult(
+        announcementId: post.id,
+        targetAudience: targetAudience,
+        recipientCount: 1,
+        inAppCount: 1,
+        investorInboxCount: 0,
+        emailQueuedCount: 0,
+        surfacesPublicSite: false,
+      );
+    }
+  }
+
+  Future<AnnouncementPost?> latestPublicAnnouncement() async {
+    final client = _client;
+    if (client == null) return null;
+    try {
+      final row = await client
+          .from('announcement_posts')
+          .select()
+          .eq('published', true)
+          .eq('surfaces_public_site', true)
+          .eq('target_audience', 'everyone')
+          .order('published_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (row == null) return null;
+      return AnnouncementPost.fromJson(Map<String, dynamic>.from(row));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<CommunicationAdminStats> loadAdminStats() async {
+    final client = _client;
+    if (client == null) return const CommunicationAdminStats();
+    try {
+      final posts = await client
+          .from('announcement_posts')
+          .select('id, recipient_count, published_at')
+          .eq('published', true)
+          .order('published_at', ascending: false)
+          .limit(100);
+      final list = (posts as List).cast<Map>();
+      final totalRecipients = list.fold<int>(
+        0,
+        (sum, row) => sum + ((row['recipient_count'] as num?)?.toInt() ?? 0),
+      );
+      return CommunicationAdminStats(
+        publishedCount: list.length,
+        totalRecipients: totalRecipients,
+        lastPublishedAt: list.isEmpty
+            ? null
+            : DateTime.tryParse('${list.first['published_at']}'),
+      );
+    } catch (_) {
+      return const CommunicationAdminStats();
+    }
   }
 
   Future<List<AnnouncementPost>> listAnnouncements() async {
@@ -253,18 +346,40 @@ class CommunicationService {
           .order('published_at', ascending: false)
           .limit(50);
       return (rows as List)
-          .map((r) => AnnouncementPost.fromJson(Map<String, dynamic>.from(r as Map)))
+          .map(
+            (r) =>
+                AnnouncementPost.fromJson(Map<String, dynamic>.from(r as Map)),
+          )
           .toList();
     } catch (_) {
       return const [];
     }
   }
 
+  RealtimeChannel? subscribeAnnouncements(
+    void Function() onChange, {
+    void Function(RealtimeSubscribeStatus status, Object? error)? onStatus,
+  }) {
+    final client = _client;
+    if (client == null) return null;
+    final channel = client.channel('announcement_posts:admin');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'announcement_posts',
+          callback: (_) => onChange(),
+        )
+        .subscribe((status, [error]) => onStatus?.call(status, error));
+    return channel;
+  }
+
   /// Subscribe to realtime inserts for the current user.
   RealtimeChannel? subscribe(
     String userId,
-    void Function(AppNotification notification) onInsert,
-  ) {
+    void Function(AppNotification notification) onInsert, {
+    void Function(RealtimeSubscribeStatus status, Object? error)? onStatus,
+  }) {
     final client = _client;
     if (client == null) return null;
     final channel = client.channel('notifications:$userId');
@@ -287,7 +402,7 @@ class CommunicationService {
             } catch (_) {}
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) => onStatus?.call(status, error));
     return channel;
   }
 
@@ -302,20 +417,25 @@ class CommunicationService {
     bool deliverNow = true,
   }) async {
     final client = _client!;
-    final row = await client.from('notifications').insert({
-      'user_id': userId,
-      'title': title,
-      'body': body,
-      'category': template.category.slug,
-      'type': template.type.slug,
-      'priority': priority.slug,
-      'template_slug': template.slug,
-      'action_url': actionUrl,
-      'metadata': metadata,
-      'is_read': false,
-      'delivery_status':
-          deliverNow ? DeliveryStatus.delivered.slug : DeliveryStatus.queued.slug,
-    }).select().single();
+    final row = await client
+        .from('notifications')
+        .insert({
+          'user_id': userId,
+          'title': title,
+          'body': body,
+          'category': template.category.slug,
+          'type': template.type.slug,
+          'priority': priority.slug,
+          'template_slug': template.slug,
+          'action_url': actionUrl,
+          'metadata': metadata,
+          'is_read': false,
+          'delivery_status': deliverNow
+              ? DeliveryStatus.delivered.slug
+              : DeliveryStatus.queued.slug,
+        })
+        .select()
+        .single();
     return AppNotification.fromJson(Map<String, dynamic>.from(row));
   }
 
@@ -326,10 +446,70 @@ class CommunicationService {
     required String body,
     String? notificationId,
     required DeliveryStatus status,
+    String? templateSlug,
+    Map<String, String> variables = const {},
+    String? actionUrl,
+    Map<String, dynamic> metadata = const {},
   }) async {
     final client = _client;
     if (client == null) return;
     try {
+      String? recipientEmail;
+      final vars = Map<String, String>.from(variables);
+      if (channel == NotificationChannel.email) {
+        try {
+          final profile = await client
+              .from('profiles')
+              .select('email,first_name')
+              .eq('id', userId)
+              .maybeSingle();
+          recipientEmail = (profile?['email'] as String?)?.trim().toLowerCase();
+          final firstName = (profile?['first_name'] as String?)?.trim();
+          if (firstName != null &&
+              firstName.isNotEmpty &&
+              !vars.containsKey('first_name')) {
+            vars['first_name'] = firstName;
+          }
+        } catch (_) {}
+
+        // Prefer RPC so template subject/body + payload are consistent for the Edge worker.
+        if (recipientEmail != null &&
+            recipientEmail.contains('@') &&
+            templateSlug != null &&
+            templateSlug.isNotEmpty) {
+          try {
+            await client.rpc(
+              'queue_transactional_email',
+              params: {
+                'p_template_slug': templateSlug,
+                'p_recipient_email': recipientEmail,
+                'p_user_id': userId,
+                'p_variables': {
+                  ...vars,
+                  if (actionUrl != null && actionUrl.isNotEmpty)
+                    'cta_url': EmailConfig.composeActionUrl(
+                      EmailConfig.productionSiteFallback,
+                      actionUrl,
+                    ),
+                },
+                'p_notification_id': notificationId,
+                'p_payload': {
+                  ...metadata,
+                  if (actionUrl != null)
+                    'action_url': EmailConfig.composeActionUrl(
+                      EmailConfig.productionSiteFallback,
+                      actionUrl,
+                    ),
+                },
+              },
+            );
+            return;
+          } catch (_) {
+            // Fall through to direct insert.
+          }
+        }
+      }
+
       await client.from('notification_delivery').insert({
         'user_id': userId,
         'notification_id': notificationId,
@@ -337,6 +517,19 @@ class CommunicationService {
         'title': title,
         'body': body,
         'status': status.slug,
+        if (recipientEmail != null) 'recipient_email': recipientEmail,
+        if (templateSlug != null) 'template_slug': templateSlug,
+        'payload': {
+          'variables': {
+            ...vars,
+            if (actionUrl != null && actionUrl.isNotEmpty)
+              'cta_url': EmailConfig.composeActionUrl(
+                EmailConfig.productionSiteFallback,
+                actionUrl,
+              ),
+          },
+          ...metadata,
+        },
       });
     } catch (_) {}
   }
@@ -358,10 +551,13 @@ class CommunicationService {
     final client = _client;
     if (client == null) return;
     // ignore: unawaited_futures
-    client.from('communication_logs').insert({
-      'actor_id': actorId,
-      'event_type': action,
-      'metadata': metadata,
-    }).then((_) {}, onError: (_) {});
+    client
+        .from('communication_logs')
+        .insert({
+          'actor_id': actorId,
+          'event_type': action,
+          'metadata': metadata,
+        })
+        .then((_) {}, onError: (_) {});
   }
 }

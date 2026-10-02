@@ -177,6 +177,8 @@ class DdcmsDocument {
     this.tags = const [],
     this.currentVersion = 1,
     this.updatedAt,
+    this.storageBucket,
+    this.storagePath,
   });
 
   final String id;
@@ -193,6 +195,14 @@ class DdcmsDocument {
   final List<String> tags;
   final int currentVersion;
   final DateTime? updatedAt;
+  final String? storageBucket;
+  final String? storagePath;
+
+  bool get hasFile =>
+      storageBucket != null &&
+      storageBucket!.isNotEmpty &&
+      storagePath != null &&
+      storagePath!.isNotEmpty;
 
   DocStatus get statusEnum => DocStatus.fromDb(status);
 
@@ -217,6 +227,8 @@ class DdcmsDocument {
       tags: rawTags is List ? rawTags.map((e) => e.toString()).toList() : const [],
       currentVersion: (json['current_version'] as num?)?.toInt() ?? 1,
       updatedAt: DateTime.tryParse(json['updated_at'] as String? ?? ''),
+      storageBucket: json['storage_bucket'] as String?,
+      storagePath: json['storage_path'] as String?,
     );
   }
 }
@@ -588,6 +600,38 @@ class DdcmsCommandCenterSnapshot {
     this.loadedAt,
     this.aiDisclaimer = kDdcmsAiDisclaimer,
   });
+
+  factory DdcmsCommandCenterSnapshot.empty({
+    bool fromRemote = false,
+    DateTime? loadedAt,
+  }) {
+    return DdcmsCommandCenterSnapshot(
+      kpis: const [
+        DdcmsKpi(label: 'Active Docs', value: 0),
+        DdcmsKpi(label: 'Contracts', value: 0),
+        DdcmsKpi(label: 'Pending Signatures', value: 0),
+        DdcmsKpi(label: 'Approvals', value: 0),
+        DdcmsKpi(label: 'OCR Queue', value: 0),
+        DdcmsKpi(label: 'DAM Assets', value: 0),
+        DdcmsKpi(label: 'Retention Alerts', value: 0),
+      ],
+      folders: const [],
+      documents: const [],
+      contracts: const [],
+      signatures: const [],
+      approvals: const [],
+      assets: const [],
+      ocrJobs: const [],
+      shares: const [],
+      retention: const [],
+      archival: const [],
+      aiInsights: const [],
+      activities: const [],
+      reports: const [],
+      fromRemote: fromRemote,
+      loadedAt: loadedAt,
+    );
+  }
 
   final List<DdcmsKpi> kpis;
   final List<DdcmsFolder> folders;

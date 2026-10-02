@@ -1,5 +1,7 @@
 // Property listing model for the marketplace (CMS/Supabase in Part 5).
 
+import 'package:hdhomesproject/features/properties/data/models/property_detail_extras.dart';
+
 enum PropertyPurpose { buy, invest, rent }
 
 enum PropertyCategory {
@@ -63,6 +65,20 @@ class MarketplaceProperty {
     required this.lng,
     required this.createdAt,
     required this.popularity,
+    this.toilets,
+    this.kitchens,
+    this.parkingSpaces,
+    this.floors,
+    this.yearBuilt,
+    this.powerSupply,
+    this.waterSupply,
+    this.internetConnectivity,
+    this.overviewSummary,
+    this.architecturalConcept,
+    this.investmentPotentialText,
+    this.propertyCodeOverride,
+    this.detailExtras,
+    this.promoPrice,
   });
 
   final String id;
@@ -105,7 +121,24 @@ class MarketplaceProperty {
   final DateTime createdAt;
   final int popularity;
 
-  String get propertyCode => 'HD-${id.toUpperCase()}';
+  /// When set, public detail uses these instead of synthesized values.
+  final int? toilets;
+  final int? kitchens;
+  final int? parkingSpaces;
+  final int? floors;
+  final String? yearBuilt;
+  final String? powerSupply;
+  final String? waterSupply;
+  final String? internetConnectivity;
+  final String? overviewSummary;
+  final String? architecturalConcept;
+  final String? investmentPotentialText;
+  final String? propertyCodeOverride;
+  final PropertyDetailExtras? detailExtras;
+  final double? promoPrice;
+
+  String get propertyCode =>
+      propertyCodeOverride ?? 'HD-${id.toUpperCase()}';
 }
 
 class MarketplaceCategoryCard {
@@ -114,12 +147,38 @@ class MarketplaceCategoryCard {
     required this.count,
     required this.filterKey,
     required this.iconName,
+    this.description = '',
+    this.imageUrl,
+    this.isFeatured = false,
   });
 
   final String label;
   final int count;
   final String filterKey;
   final String iconName;
+  final String description;
+  final String? imageUrl;
+  final bool isFeatured;
+
+  MarketplaceCategoryCard copyWith({
+    String? label,
+    int? count,
+    String? filterKey,
+    String? iconName,
+    String? description,
+    String? imageUrl,
+    bool? isFeatured,
+  }) {
+    return MarketplaceCategoryCard(
+      label: label ?? this.label,
+      count: count ?? this.count,
+      filterKey: filterKey ?? this.filterKey,
+      iconName: iconName ?? this.iconName,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      isFeatured: isFeatured ?? this.isFeatured,
+    );
+  }
 }
 
 class MarketplaceFaqItem {
@@ -139,6 +198,8 @@ class MarketplaceHeroContent {
     required this.secondaryCtaPath,
     required this.tertiaryCtaLabel,
     required this.tertiaryCtaPath,
+    this.backgroundImageUrl,
+    this.backgroundVideoUrl,
   });
 
   final String headline;
@@ -149,6 +210,8 @@ class MarketplaceHeroContent {
   final String secondaryCtaPath;
   final String tertiaryCtaLabel;
   final String tertiaryCtaPath;
+  final String? backgroundImageUrl;
+  final String? backgroundVideoUrl;
 }
 
 class MarketplaceInsight {

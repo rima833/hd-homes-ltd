@@ -2,7 +2,13 @@
 ///
 /// UI talks only to this contract so Termii / Twilio / regional providers
 /// can be swapped without changing screens.
-enum PhoneOtpProviderId { termii, twilio, africasTalking, mock }
+enum PhoneOtpProviderId {
+  termii,
+  twilio,
+  africasTalking,
+  mock,
+  supabaseAuth,
+}
 
 class PhoneOtpSendResult {
   const PhoneOtpSendResult({
@@ -58,7 +64,7 @@ class MockPhoneOtpService implements PhoneOtpService {
     return PhoneOtpSendResult(
       success: true,
       requestId: 'mock-${phoneE164.hashCode.abs()}',
-      message: 'OTP queued (mock provider).',
+      message: 'Development OTP ready — enter $debugCode to verify.',
     );
   }
 

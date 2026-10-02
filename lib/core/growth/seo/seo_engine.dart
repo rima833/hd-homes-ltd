@@ -18,6 +18,11 @@ abstract final class SeoEngine {
     RoutePaths.search,
     RoutePaths.investment,
     RoutePaths.careers,
+    RoutePaths.construction,
+    '/pages/privacy',
+    '/pages/terms',
+    '/pages/cookies',
+    '/pages/refund-policy',
   ];
 
   static String robotsTxt() => '''

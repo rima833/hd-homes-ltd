@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hdhomesproject/core/errors/app_exception.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/observability_models.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/audit_controller.dart';
@@ -110,7 +111,11 @@ class ActivityTimelinePage extends HookConsumerWidget {
           Expanded(
             child: snapAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Unable to load activity: $e')),
+              error: (e, _) => Center(
+                child: Text(
+                  userFacingError(e, fallback: 'Unable to load activity.'),
+                ),
+              ),
               data: (snap) {
                 if (snap == null) {
                   return const Center(child: Text('Sign in to view your activity.'));

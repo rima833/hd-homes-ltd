@@ -17,39 +17,63 @@ final executiveDashboardServiceProvider =
 
 final executiveDashboardSnapshotProvider =
     FutureProvider<ExecutiveDashboardSnapshot>((ref) async {
+  ref.watch(executiveDashboardRealtimeProvider);
   return ref.watch(executiveDashboardServiceProvider).loadSnapshot();
 });
 
-/// Invalidates snapshot when live tables change (after SQL apply + Realtime).
+void _refreshMissionControl(Ref ref) {
+  Future.microtask(() {
+    try {
+      ref.invalidate(executiveDashboardSnapshotProvider);
+    } catch (_) {}
+  });
+}
+
+/// Invalidates snapshot when public-site or ops tables change.
 final executiveDashboardRealtimeProvider = Provider<void>((ref) {
+  ref.keepAlive();
   if (!ref.watch(supabaseConfiguredProvider)) return;
   final client = ref.watch(supabaseClientProvider);
-  final channel = client.channel('executive-mission-control')
-    ..onPostgresChanges(
+  final channel = client.channel('executive-mission-control');
+  for (final table in const [
+    'properties',
+    'estates',
+    'property_inspections',
+    'crm_clients',
+    'investors',
+    'payments',
+    'invoices',
+    'tickets',
+    'live_chat_sessions',
+    'construction_projects',
+    'career_jobs',
+    'career_applications',
+    'partnership_requests',
+    'callback_requests',
+    'consultation_bookings',
+    'blogs',
+    'partners',
+    'testimonials',
+    'executive_activity_feed',
+    'executive_notifications',
+    'investment_commitments',
+    'marketing_analytics',
+    'property_analytics_daily',
+    'journey_analytics',
+    'analytics_kpis',
+    'user_sessions',
+    'campaigns',
+    'property_views',
+    'visitor_statistics',
+  ]) {
+    channel.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
-      table: 'kpi_snapshots',
-      callback: (_) => ref.invalidate(executiveDashboardSnapshotProvider),
-    )
-    ..onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'executive_activity_feed',
-      callback: (_) => ref.invalidate(executiveDashboardSnapshotProvider),
-    )
-    ..onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'ai_executive_insights',
-      callback: (_) => ref.invalidate(executiveDashboardSnapshotProvider),
-    )
-    ..onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'executive_notifications',
-      callback: (_) => ref.invalidate(executiveDashboardSnapshotProvider),
-    )
-    ..subscribe();
+      table: table,
+      callback: (_) => _refreshMissionControl(ref),
+    );
+  }
+  channel.subscribe();
 
   ref.onDispose(() {
     unawaited(client.removeChannel(channel));

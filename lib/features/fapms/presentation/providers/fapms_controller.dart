@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
 import 'package:hdhomesproject/features/fapms/domain/entities/fapms_models.dart';
 import 'package:hdhomesproject/features/fapms/domain/services/fapms_service.dart';
+import 'package:hdhomesproject/features/fapms/presentation/providers/payment_verification_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final fapmsServiceProvider = Provider<FapmsService>((ref) {
@@ -18,8 +19,16 @@ final fapmsSnapshotProvider =
   return ref.watch(fapmsServiceProvider).loadCommandCenter();
 });
 
-/// Invalidates snapshot when FAPMS live tables change (after SQL apply + Realtime).
+final fapmsLiveTickProvider = StateProvider<int>((ref) => 0);
+
+void _bumpLive(Ref ref) {
+  ref.read(fapmsLiveTickProvider.notifier).state++;
+  ref.invalidate(fapmsSnapshotProvider);
+}
+
+/// Invalidates snapshot when finance live tables change.
 final fapmsRealtimeProvider = Provider<void>((ref) {
+  ref.keepAlive();
   if (!ref.watch(supabaseConfiguredProvider)) return;
   final client = ref.watch(supabaseClientProvider);
   final channel = client.channel('fapms-command-center')
@@ -27,55 +36,199 @@ final fapmsRealtimeProvider = Provider<void>((ref) {
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'invoices',
-      callback: (_) => ref.invalidate(fapmsSnapshotProvider),
+      callback: (_) => _bumpLive(ref),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'payments',
-      callback: (_) => ref.invalidate(fapmsSnapshotProvider),
+      callback: (_) => _bumpLive(ref),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'payment_transactions',
-      callback: (_) => ref.invalidate(fapmsSnapshotProvider),
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'client_payment_intents',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'payment_verifications',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'investor_payment_intents',
+      callback: (_) => _bumpLive(ref),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'expenses',
-      callback: (_) => ref.invalidate(fapmsSnapshotProvider),
+      callback: (_) => _bumpLive(ref),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'budgets',
-      callback: (_) => ref.invalidate(fapmsSnapshotProvider),
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'budget_lines',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'budget_variances',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'financial_statements',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'bank_accounts',
+      callback: (_) => _bumpLive(ref),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'bank_transactions',
-      callback: (_) => ref.invalidate(fapmsSnapshotProvider),
+      callback: (_) => _bumpLive(ref),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'journal_entries',
-      callback: (_) => ref.invalidate(fapmsSnapshotProvider),
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'accounts_receivable',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'accounts_payable',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'installments',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'finance_receipts',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'company_receiving_accounts',
+      callback: (_) => _bumpLive(ref),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'finance_activity_logs',
-      callback: (_) => ref.invalidate(fapmsSnapshotProvider),
+      callback: (_) => _bumpLive(ref),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'finance_notifications',
-      callback: (_) => ref.invalidate(fapmsSnapshotProvider),
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'payment_charges',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'investment_distributions',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'investment_receiving_accounts',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'payment_settings',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'client_property_applications',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'calculator_applications',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'client_referral_commissions',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'investor_referral_commissions',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'sales_commissions',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'payment_methods',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'late_fee_rules',
+      callback: (_) => _bumpLive(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'investor_wallets',
+      callback: (_) => _bumpLive(ref),
     )
     ..subscribe();
 
@@ -84,31 +237,32 @@ final fapmsRealtimeProvider = Provider<void>((ref) {
   });
 });
 
+/// Focused ops tabs — daily HD Homes finance work across the live website.
 enum FapmsCommandTab {
   overview,
-  ledger,
-  ar,
-  ap,
-  invoices,
+  verification,
   payments,
-  banking,
-  budgets,
+  installments,
+  invoices,
   expenses,
-  approvals,
-  ai;
+  banking,
+  investor,
+  leads,
+  commissions,
+  setup;
 
   String get label => switch (this) {
         FapmsCommandTab.overview => 'Overview',
-        FapmsCommandTab.ledger => 'Ledger',
-        FapmsCommandTab.ar => 'AR',
-        FapmsCommandTab.ap => 'AP',
-        FapmsCommandTab.invoices => 'Invoices',
+        FapmsCommandTab.verification => 'Verification',
         FapmsCommandTab.payments => 'Payments',
-        FapmsCommandTab.banking => 'Banking',
-        FapmsCommandTab.budgets => 'Budgets',
+        FapmsCommandTab.installments => 'Installments',
+        FapmsCommandTab.invoices => 'Invoices',
         FapmsCommandTab.expenses => 'Expenses',
-        FapmsCommandTab.approvals => 'Approvals',
-        FapmsCommandTab.ai => 'AI / CFO',
+        FapmsCommandTab.banking => 'Banking',
+        FapmsCommandTab.investor => 'Investor',
+        FapmsCommandTab.leads => 'Leads',
+        FapmsCommandTab.commissions => 'Commissions',
+        FapmsCommandTab.setup => 'Setup',
       };
 }
 
@@ -118,14 +272,12 @@ class FapmsUiState {
     this.statusFilter,
     this.selectedTab = FapmsCommandTab.overview,
     this.lastMessage,
-    this.tickerIndex = 0,
   });
 
   final String searchQuery;
   final String? statusFilter;
   final FapmsCommandTab selectedTab;
   final String? lastMessage;
-  final int tickerIndex;
 
   FapmsUiState copyWith({
     String? searchQuery,
@@ -134,7 +286,6 @@ class FapmsUiState {
     FapmsCommandTab? selectedTab,
     String? lastMessage,
     bool clearMessage = false,
-    int? tickerIndex,
   }) {
     return FapmsUiState(
       searchQuery: searchQuery ?? this.searchQuery,
@@ -142,29 +293,16 @@ class FapmsUiState {
           clearStatusFilter ? null : (statusFilter ?? this.statusFilter),
       selectedTab: selectedTab ?? this.selectedTab,
       lastMessage: clearMessage ? null : (lastMessage ?? this.lastMessage),
-      tickerIndex: tickerIndex ?? this.tickerIndex,
     );
   }
 }
 
 class FapmsController extends Notifier<FapmsUiState> {
-  Timer? _tickerTimer;
-
   @override
   FapmsUiState build() {
-    // CRITICAL: never read `state` here — arm ticker from initial constants only.
-    ref.onDispose(() => _tickerTimer?.cancel());
     ref.watch(fapmsRealtimeProvider);
-    _armTicker();
+    ref.watch(paymentVerificationRealtimeProvider);
     return const FapmsUiState();
-  }
-
-  void _armTicker() {
-    _tickerTimer?.cancel();
-    _tickerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      // Tickers may update state only inside Timer callbacks.
-      state = state.copyWith(tickerIndex: state.tickerIndex + 1);
-    });
   }
 
   void setSearch(String query) {
@@ -193,6 +331,9 @@ class FapmsController extends Notifier<FapmsUiState> {
 
   Future<void> refresh() async {
     ref.invalidate(fapmsSnapshotProvider);
+    ref.invalidate(paymentIntentsProvider);
+    ref.invalidate(pendingPaymentIntentsProvider);
+    ref.invalidate(pendingVerificationCountProvider);
   }
 
   List<FapmsInvoice> filteredInvoices(FapmsCommandCenterSnapshot snap) {
@@ -217,6 +358,16 @@ class FapmsController extends Notifier<FapmsUiState> {
       return e.expenseCode.toLowerCase().contains(q) ||
           e.title.toLowerCase().contains(q) ||
           (e.vendorLabel?.toLowerCase().contains(q) ?? false);
+    }).toList();
+  }
+
+  List<FapmsPaymentTx> filteredPayments(FapmsCommandCenterSnapshot snap) {
+    final q = state.searchQuery.trim().toLowerCase();
+    return snap.paymentTxs.where((tx) {
+      if (q.isEmpty) return true;
+      return tx.provider.toLowerCase().contains(q) ||
+          tx.sourceLabel.toLowerCase().contains(q) ||
+          (tx.providerReference?.toLowerCase().contains(q) ?? false);
     }).toList();
   }
 }

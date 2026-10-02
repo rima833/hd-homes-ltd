@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/ai_models.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/ai_gateway.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/audit_controller.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/auth_controller.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final aiGatewayProvider = Provider<AiGateway>((ref) {
   final configured = ref.watch(supabaseConfiguredProvider);
@@ -13,8 +16,44 @@ final aiGatewayProvider = Provider<AiGateway>((ref) {
   );
 });
 
+void _invalidateAiWorkspace(Ref ref) {
+  ref.invalidate(aiWorkspaceSnapshotProvider);
+}
+
+/// Live invalidation for AI workspace conversations and messages.
+final aiWorkspaceRealtimeProvider = Provider<void>((ref) {
+  ref.keepAlive();
+  if (!ref.watch(supabaseConfiguredProvider)) return;
+  final client = ref.watch(supabaseClientProvider);
+  final channel = client.channel('admin-ai-workspace')
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'ai_conversations',
+      callback: (_) => _invalidateAiWorkspace(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'ai_messages',
+      callback: (_) => _invalidateAiWorkspace(ref),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'ai_feedback',
+      callback: (_) => _invalidateAiWorkspace(ref),
+    )
+    ..subscribe();
+
+  ref.onDispose(() {
+    unawaited(client.removeChannel(channel));
+  });
+});
+
 final aiWorkspaceSnapshotProvider =
     FutureProvider<AiWorkspaceSnapshot?>((ref) async {
+  ref.watch(aiWorkspaceRealtimeProvider);
   final session = ref.watch(identitySessionProvider);
   final userId = session.userId;
   if (userId == null) return null;

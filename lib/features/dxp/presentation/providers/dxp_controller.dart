@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/core/utils/provider_lifecycle.dart';
 import 'package:hdhomesproject/features/dxp/domain/entities/dxp_models.dart';
 import 'package:hdhomesproject/features/dxp/domain/services/dxp_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,67 +14,122 @@ final dxpServiceProvider = Provider<DxpService>((ref) {
   );
 });
 
-final dxpSnapshotProvider =
-    FutureProvider<DxpCommandCenterSnapshot>((ref) async {
+final dxpSnapshotProvider = FutureProvider<DxpCommandCenterSnapshot>((
+  ref,
+) async {
   return ref.watch(dxpServiceProvider).loadCommandCenter();
 });
 
+/// Published marketing landing for public `/lp/:slug`.
+final publishedLandingBySlugProvider =
+    FutureProvider.family<DxpLandingPage?, String>((ref, slug) async {
+      if (!ref.watch(supabaseConfiguredProvider)) return null;
+      return ref.watch(dxpServiceProvider).getPublishedLandingBySlug(slug);
+    });
+
+/// True only after Supabase confirms the Realtime channel subscription.
+final dxpRealtimeConnectedProvider = StateProvider<bool>((ref) => false);
+
 /// Invalidates snapshot when DXP live tables change (after SQL apply + Realtime).
 final dxpRealtimeProvider = Provider<void>((ref) {
-  if (!ref.watch(supabaseConfiguredProvider)) return;
+  if (!ref.watch(supabaseConfiguredProvider)) {
+    deferProviderMutation(
+      () => ref.read(dxpRealtimeConnectedProvider.notifier).state = false,
+    );
+    return;
+  }
   final client = ref.watch(supabaseClientProvider);
+  void refreshSnapshot() =>
+      deferProviderMutation(() => ref.invalidate(dxpSnapshotProvider));
+  void refreshLandingPages() => deferProviderMutation(() {
+    ref.invalidate(dxpSnapshotProvider);
+    ref.invalidate(publishedLandingBySlugProvider);
+  });
+
   final channel = client.channel('dxp-command-center')
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'landing_pages',
-      callback: (_) => ref.invalidate(dxpSnapshotProvider),
+      callback: (_) => refreshLandingPages(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'forms',
-      callback: (_) => ref.invalidate(dxpSnapshotProvider),
+      callback: (_) => refreshSnapshot(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'form_submissions',
-      callback: (_) => ref.invalidate(dxpSnapshotProvider),
+      callback: (_) => refreshSnapshot(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'campaigns',
-      callback: (_) => ref.invalidate(dxpSnapshotProvider),
+      callback: (_) => refreshSnapshot(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'email_campaigns',
-      callback: (_) => ref.invalidate(dxpSnapshotProvider),
+      callback: (_) => refreshSnapshot(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'content_calendar',
-      callback: (_) => ref.invalidate(dxpSnapshotProvider),
+      callback: (_) => refreshSnapshot(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'marketing_activity_logs',
-      callback: (_) => ref.invalidate(dxpSnapshotProvider),
+      callback: (_) => refreshSnapshot(),
     )
     ..onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'blogs',
-      callback: (_) => ref.invalidate(dxpSnapshotProvider),
+      callback: (_) => refreshSnapshot(),
     )
-    ..subscribe();
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'pages',
+      callback: (_) => refreshSnapshot(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'media',
+      callback: (_) => refreshSnapshot(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'seo_metadata',
+      callback: (_) => refreshSnapshot(),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'crm_leads',
+      callback: (_) => refreshSnapshot(),
+    )
+    ..subscribe((status, [error]) {
+      deferProviderMutation(
+        () => ref.read(dxpRealtimeConnectedProvider.notifier).state =
+            status == RealtimeSubscribeStatus.subscribed,
+      );
+    });
 
   ref.onDispose(() {
+    deferProviderMutation(() {
+      ref.read(dxpRealtimeConnectedProvider.notifier).state = false;
+    });
     unawaited(client.removeChannel(channel));
   });
 });
@@ -87,21 +143,19 @@ enum DxpCommandTab {
   campaigns,
   forms,
   seo,
-  calendar,
-  ai;
+  calendar;
 
   String get label => switch (this) {
-        DxpCommandTab.overview => 'Overview',
-        DxpCommandTab.pages => 'Pages',
-        DxpCommandTab.landing => 'Landing',
-        DxpCommandTab.blog => 'Blog',
-        DxpCommandTab.media => 'Media',
-        DxpCommandTab.campaigns => 'Campaigns',
-        DxpCommandTab.forms => 'Forms',
-        DxpCommandTab.seo => 'SEO',
-        DxpCommandTab.calendar => 'Calendar',
-        DxpCommandTab.ai => 'AI Studio',
-      };
+    DxpCommandTab.overview => 'Overview',
+    DxpCommandTab.pages => 'Pages',
+    DxpCommandTab.landing => 'Landing',
+    DxpCommandTab.blog => 'Blog',
+    DxpCommandTab.media => 'Media',
+    DxpCommandTab.campaigns => 'Campaigns',
+    DxpCommandTab.forms => 'Forms',
+    DxpCommandTab.seo => 'SEO',
+    DxpCommandTab.calendar => 'Calendar',
+  };
 }
 
 class DxpUiState {
@@ -110,14 +164,12 @@ class DxpUiState {
     this.statusFilter,
     this.selectedTab = DxpCommandTab.overview,
     this.lastMessage,
-    this.tickerIndex = 0,
   });
 
   final String searchQuery;
   final String? statusFilter;
   final DxpCommandTab selectedTab;
   final String? lastMessage;
-  final int tickerIndex;
 
   DxpUiState copyWith({
     String? searchQuery,
@@ -126,37 +178,23 @@ class DxpUiState {
     DxpCommandTab? selectedTab,
     String? lastMessage,
     bool clearMessage = false,
-    int? tickerIndex,
   }) {
     return DxpUiState(
       searchQuery: searchQuery ?? this.searchQuery,
-      statusFilter:
-          clearStatusFilter ? null : (statusFilter ?? this.statusFilter),
+      statusFilter: clearStatusFilter
+          ? null
+          : (statusFilter ?? this.statusFilter),
       selectedTab: selectedTab ?? this.selectedTab,
       lastMessage: clearMessage ? null : (lastMessage ?? this.lastMessage),
-      tickerIndex: tickerIndex ?? this.tickerIndex,
     );
   }
 }
 
 class DxpController extends Notifier<DxpUiState> {
-  Timer? _tickerTimer;
-
   @override
   DxpUiState build() {
-    // CRITICAL: never read `state` here — arm ticker from initial constants only.
-    ref.onDispose(() => _tickerTimer?.cancel());
     ref.watch(dxpRealtimeProvider);
-    _armTicker();
     return const DxpUiState();
-  }
-
-  void _armTicker() {
-    _tickerTimer?.cancel();
-    _tickerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      // Tickers may update state only inside Timer callbacks.
-      state = state.copyWith(tickerIndex: state.tickerIndex + 1);
-    });
   }
 
   void setSearch(String query) {
@@ -225,5 +263,6 @@ class DxpController extends Notifier<DxpUiState> {
   }
 }
 
-final dxpControllerProvider =
-    NotifierProvider<DxpController, DxpUiState>(DxpController.new);
+final dxpControllerProvider = NotifierProvider<DxpController, DxpUiState>(
+  DxpController.new,
+);

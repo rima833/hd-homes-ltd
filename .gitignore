@@ -1,5 +1,13 @@
 # Local environment secrets
 env.json
+.env
+.env.*
+node_modules/
+.deploy-*
+.mcp-*
+.mcp.json
+.pq-*
+.tmp_deploy/
 
 # Miscellaneous
 *.class

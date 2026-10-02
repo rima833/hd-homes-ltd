@@ -16,10 +16,12 @@ abstract final class SeoResolver {
       RoutePaths.about => SeoMetadata.about,
       RoutePaths.properties => SeoMetadata.marketplace,
       RoutePaths.estates => SeoMetadata.estates,
+      RoutePaths.construction => SeoMetadata.constructionHub,
       RoutePaths.services => SeoMetadata.servicesHub,
       RoutePaths.blog => SeoMetadata.blogHub,
       RoutePaths.contact => SeoMetadata.contactHub,
       RoutePaths.bookInspection => SeoMetadata.contactHub,
+      RoutePaths.bookConsultation => SeoMetadata.contactHub,
       RoutePaths.search => SeoMetadata.searchHub,
       RoutePaths.gallery => SeoMetadata.mediaHub,
       RoutePaths.trust => SeoMetadata.trustHub,
@@ -53,6 +55,10 @@ abstract final class SeoResolver {
       return true;
     }
     if (path.startsWith('${RoutePaths.gallery}/') && path != RoutePaths.gallery) {
+      return true;
+    }
+    if (path.startsWith('${RoutePaths.construction}/') &&
+        path != RoutePaths.construction) {
       return true;
     }
     return false;

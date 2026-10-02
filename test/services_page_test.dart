@@ -24,8 +24,9 @@ void main() {
     expect(find.text('Service categories'), findsOneWidget);
     expect(find.text('Featured services'), findsOneWidget);
     expect(find.text('Why choose HD Homes'), findsOneWidget);
-    expect(find.text('Smart project estimator'), findsOneWidget);
-    expect(find.text('Request a consultation'), findsOneWidget);
+    expect(find.text('How we deliver'), findsOneWidget);
+    expect(find.text('Talk to a specialist'), findsOneWidget);
+    expect(find.text('Book a private consultation'), findsOneWidget);
 
     addTearDown(() => tester.binding.setSurfaceSize(null));
   });

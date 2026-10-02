@@ -1,1046 +1,1678 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/core/constants/permissions.dart';
+import 'package:hdhomesproject/core/widgets/offline_updates_note.dart';
+import 'package:hdhomesproject/features/authentication/presentation/widgets/permission_gate.dart';
 import 'package:hdhomesproject/features/fapms/domain/entities/fapms_models.dart';
 import 'package:hdhomesproject/features/fapms/domain/services/fapms_service.dart';
+import 'package:hdhomesproject/features/fapms/presentation/pages/payment_verification_page.dart';
 import 'package:hdhomesproject/features/fapms/presentation/providers/fapms_controller.dart';
+import 'package:hdhomesproject/features/fapms/presentation/widgets/finance_command_center_shell.dart';
+import 'package:hdhomesproject/features/fapms/presentation/widgets/finance_admin_shared.dart';
+import 'package:hdhomesproject/features/fapms/presentation/widgets/finance_ops_panels.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-/// Volume 4 Part 7 — Finance Command Center™ admin workspace.
-class FinanceCommandCenterPage extends ConsumerWidget {
+/// Admin Finance Command Center — live ops shell for HD Homes money flows.
+class FinanceCommandCenterPage extends ConsumerStatefulWidget {
   const FinanceCommandCenterPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FinanceCommandCenterPage> createState() =>
+      _FinanceCommandCenterPageState();
+}
+
+class _FinanceCommandCenterPageState extends ConsumerState<FinanceCommandCenterPage> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _kpiScroll = ScrollController();
+  final _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _kpiScroll.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    await ref.read(fapmsControllerProvider.notifier).refresh();
+  }
+
+  void _goTab(FapmsCommandTab tab) {
+    ref.read(fapmsControllerProvider.notifier).setTab(tab);
+  }
+
+  void _openKpi(String label) {
+    final l = label.toLowerCase();
+    if (l.contains('cash')) {
+      _goTab(FapmsCommandTab.banking);
+    } else if (l.contains('receivable') ||
+        l.contains(' ar') ||
+        l == 'open ar' ||
+        l.contains('invoice')) {
+      _goTab(FapmsCommandTab.invoices);
+    } else if (l.contains('payable') ||
+        l.contains(' ap') ||
+        l == 'open ap' ||
+        l.contains('approval') ||
+        l.contains('expense')) {
+      _goTab(FapmsCommandTab.expenses);
+    } else if (l.contains('installment') || l.contains('deposit')) {
+      _goTab(FapmsCommandTab.installments);
+    } else if (l.contains('lead')) {
+      _goTab(FapmsCommandTab.leads);
+    } else if (l.contains('commission')) {
+      _goTab(FapmsCommandTab.commissions);
+    } else if (l.contains('investor')) {
+      _goTab(FapmsCommandTab.investor);
+    } else if (l.contains('payment') || l.contains('charge')) {
+      _goTab(FapmsCommandTab.payments);
+    } else if (l.contains('pending') || l.contains('verif')) {
+      _goTab(FapmsCommandTab.verification);
+    }
+  }
+
+  Color _statusColor(String slug) {
+    final s = slug.toLowerCase();
+    if (s.contains('paid') ||
+        s.contains('success') ||
+        s.contains('approv') ||
+        s.contains('confirm') ||
+        s == 'active') {
+      return FinanceAdminUi.success;
+    }
+    if (s.contains('overdue') ||
+        s.contains('fail') ||
+        s.contains('reject') ||
+        s.contains('cancel')) {
+      return FinanceAdminUi.danger;
+    }
+    if (s.contains('pending') || s.contains('draft') || s.contains('sent')) {
+      return FinanceAdminUi.gold;
+    }
+    return FinanceAdminUi.info;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.watch(fapmsRealtimeProvider);
     final asyncSnap = ref.watch(fapmsSnapshotProvider);
     final ui = ref.watch(fapmsControllerProvider);
     final controller = ref.read(fapmsControllerProvider.notifier);
 
     return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: FinanceDeskColors.bg,
+      drawer: MediaQuery.sizeOf(context).width < 1100
+          ? Drawer(
+              backgroundColor: FinanceDeskColors.sidebar,
+              child: FinanceDeskSidebar(
+                sections: asyncSnap.valueOrNull == null
+                    ? const []
+                    : buildFinanceNavSections(asyncSnap.requireValue),
+                selected: ui.selectedTab,
+                onSelect: (tab) {
+                  controller.setTab(tab);
+                  Navigator.pop(context);
+                },
+                live: asyncSnap.valueOrNull?.fromRemote ?? false,
+                onClose: () => Navigator.pop(context),
+              ),
+            )
+          : null,
       body: asyncSnap.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Text('Failed to load Finance Command Center: $e'),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: FinanceDeskColors.gold),
         ),
-        data: (snap) {
-          final tickerKpis = snap.kpis;
-          final ticker = tickerKpis.isEmpty
-              ? 'Finance live'
-              : '${tickerKpis[ui.tickerIndex % tickerKpis.length].label}: '
-                  '${tickerKpis[ui.tickerIndex % tickerKpis.length].displayValue}';
-
-          return RefreshIndicator(
-            onRefresh: controller.refresh,
-            child: CustomScrollView(
-              slivers: [
-                ContainedPadding(
-                  child: _FapmsHeader(
-                    ticker: ticker,
-                    fromRemote: snap.fromRemote,
-                    onRefresh: controller.refresh,
-                    onOpenCashFlow: () =>
-                        controller.setTab(FapmsCommandTab.overview),
-                    onOpenCfo: () => controller.setTab(FapmsCommandTab.ai),
-                  ),
-                ),
-                if (ui.lastMessage != null)
-                  ContainedPadding(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: Material(
-                        color: AppColors.gold.withValues(alpha: 0.15),
-                        borderRadius: AppRadius.cardBorder,
-                        child: ListTile(
-                          leading: const Icon(
-                            LucideIcons.info,
-                            color: AppColors.gold,
-                          ),
-                          title: Text(ui.lastMessage!),
-                          dense: true,
-                          trailing: IconButton(
-                            icon: const Icon(LucideIcons.x, size: 16),
-                            onPressed: controller.clearMessage,
-                          ),
-                        ),
+        error: (_, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Could not load finance data',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
                       ),
-                    ),
-                  ),
-                ContainedPadding(child: _KpiStrip(kpis: snap.kpis)),
-                ContainedPadding(
-                  child: _SearchAndFilters(
-                    ui: ui,
-                    onSearch: controller.setSearch,
-                    onStatus: controller.setStatusFilter,
-                  ),
                 ),
-                ContainedPadding(
-                  child: _TabBar(
-                    selected: ui.selectedTab,
-                    onSelect: controller.setTab,
+                const SizedBox(height: 8),
+                const OfflineUpdatesNote(color: FinanceDeskColors.muted),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _refresh,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: FinanceDeskColors.gold,
+                    foregroundColor: FinanceDeskColors.bg,
                   ),
+                  child: const Text('Retry'),
                 ),
-                ..._tabSlivers(context, ref, snap, ui, controller),
-                const ContainedPadding(child: SizedBox(height: 32)),
               ],
             ),
+          ),
+        ),
+        data: (snap) {
+          final wide = MediaQuery.sizeOf(context).width >= 1100;
+          final navSections = buildFinanceNavSections(snap);
+
+          Widget mainPane() {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FinanceDeskTopBar(
+                  tab: ui.selectedTab,
+                  live: snap.fromRemote,
+                  loadedAt: snap.loadedAt,
+                  showMenu: !wide,
+                  onMenu: wide
+                      ? null
+                      : () => _scaffoldKey.currentState?.openDrawer(),
+                  onRefresh: _refresh,
+                  pendingVerify: snap.pendingClientVerifications,
+                  onOpenVerification: () => _goTab(FapmsCommandTab.verification),
+                  onCreateInvoice: () =>
+                      showCreateInvoiceSheet(context: context, ref: ref),
+                  onCreateExpense: () =>
+                      showCreateExpenseSheet(context: context, ref: ref),
+                ),
+                if (ui.lastMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: _MessageBanner(
+                      message: ui.lastMessage!,
+                      onDismiss: controller.clearMessage,
+                    ),
+                  ),
+                if (financeTabShowsKpis(ui.selectedTab)) ...[
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: FinanceDeskKpiStrip(
+                      kpis: snap.kpis,
+                      scrollController: _kpiScroll,
+                      onKpi: _openKpi,
+                    ),
+                  ),
+                ],
+                if (financeTabUsesSearch(ui.selectedTab)) ...[
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: FinanceDeskSearchBar(
+                      controller: _searchCtrl,
+                      statusFilter: ui.statusFilter,
+                      onSearch: controller.setSearch,
+                      onStatus: controller.setStatusFilter,
+                      showStatus: financeTabUsesStatusFilter(ui.selectedTab),
+                    ),
+                  ),
+                ],
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                    child: _FinanceTabBody(
+                      snap: snap,
+                      ui: ui,
+                      statusColor: _statusColor,
+                      onGoTab: _goTab,
+                      onRefresh: _refresh,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+
+          if (!wide) return mainPane();
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 268,
+                child: FinanceDeskSidebar(
+                  sections: navSections,
+                  selected: ui.selectedTab,
+                  onSelect: controller.setTab,
+                  live: snap.fromRemote,
+                ),
+              ),
+              Expanded(child: mainPane()),
+            ],
           );
         },
       ),
     );
   }
+}
 
-  List<Widget> _tabSlivers(
-    BuildContext context,
-    WidgetRef ref,
-    FapmsCommandCenterSnapshot snap,
-    FapmsUiState ui,
-    FapmsController controller,
-  ) {
-    switch (ui.selectedTab) {
-      case FapmsCommandTab.overview:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Cash Flow Engine™',
-              icon: LucideIcons.waves,
-              child: _CashFlowPanel(snap: snap),
-            ),
-          ),
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Audit Intelligence',
-              icon: LucideIcons.shieldCheck,
-              child: _ActivityList(activities: snap.activities),
-            ),
-          ),
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Finance Alerts',
-              icon: LucideIcons.bell,
-              child: _AlertList(alerts: snap.alerts),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.ledger:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Journal Entries',
-              icon: LucideIcons.bookOpen,
-              child: _JournalList(journals: snap.journals),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.ar:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Accounts Receivable Aging',
-              icon: LucideIcons.arrowDownLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _AgingBucketRow(buckets: snap.arBuckets),
-                  const Divider(height: 24),
-                  _AgingList(rows: snap.arRows),
-                ],
-              ),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.ap:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Accounts Payable Aging',
-              icon: LucideIcons.arrowUpRight,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _AgingBucketRow(buckets: snap.apBuckets),
-                  const Divider(height: 24),
-                  _AgingList(rows: snap.apRows),
-                ],
-              ),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.invoices:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Invoices',
-              icon: LucideIcons.fileText,
-              child: _InvoiceList(
-                invoices: controller.filteredInvoices(snap),
-              ),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.payments:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Payment Gateway Ledger',
-              icon: LucideIcons.creditCard,
-              child: _PaymentTxList(txs: snap.paymentTxs),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.banking:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Bank Accounts',
-              icon: LucideIcons.landmark,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _BankList(accounts: snap.bankAccounts),
-                  const Divider(height: 24),
-                  Text(
-                    'Recent bank transactions',
-                    style: Theme.of(context).textTheme.titleSmall,
+class _FinanceTabBody extends ConsumerWidget {
+  const _FinanceTabBody({
+    required this.snap,
+    required this.ui,
+    required this.statusColor,
+    required this.onGoTab,
+    required this.onRefresh,
+  });
+
+  final FapmsCommandCenterSnapshot snap;
+  final FapmsUiState ui;
+  final Color Function(String) statusColor;
+  final ValueChanged<FapmsCommandTab> onGoTab;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(fapmsControllerProvider.notifier);
+
+    return switch (ui.selectedTab) {
+      FapmsCommandTab.overview => _OverviewTab(
+          snap: snap,
+          onOpenTab: onGoTab,
+          anomalies: FapmsService.detectAnomalies(snap),
+          briefing: ref.read(fapmsServiceProvider).generateFinancialBriefing(snap),
+          alerts: snap.alerts,
+          loadWarnings: snap.loadWarnings,
+          onAddBank: () => showCreateBankAccountSheet(context: context, ref: ref),
+        ),
+      FapmsCommandTab.verification =>
+        const PaymentVerificationPage(embedded: true),
+      FapmsCommandTab.payments => _PaymentsTab(
+          payments: controller.filteredPayments(snap),
+          receipts: snap.receipts,
+          query: ui.searchQuery,
+        ),
+      FapmsCommandTab.installments => FinanceInstallmentsTab(snap: snap),
+      FapmsCommandTab.invoices => _InvoicesTab(
+          invoices: controller.filteredInvoices(snap),
+          statusColor: statusColor,
+          onCreate: () => showCreateInvoiceSheet(context: context, ref: ref),
+          onMarkPaid: (id) async {
+            await ref.read(fapmsServiceProvider).setInvoiceStatus(
+                  invoiceId: id,
+                  status: 'paid',
+                );
+            controller.setMessage('Invoice marked paid.');
+            await onRefresh();
+          },
+        ),
+      FapmsCommandTab.expenses => _ExpensesTab(
+          expenses: controller.filteredExpenses(snap),
+          pending: snap.pendingApprovals,
+          statusColor: statusColor,
+          onCreate: () => showCreateExpenseSheet(context: context, ref: ref),
+          onApprove: (id) async {
+            await ref.read(fapmsServiceProvider).updateExpenseStatus(
+                  expenseId: id,
+                  status: 'approved',
+                );
+            controller.setMessage('Expense approved.');
+            await onRefresh();
+          },
+          onReject: (id) async {
+            await ref.read(fapmsServiceProvider).updateExpenseStatus(
+                  expenseId: id,
+                  status: 'rejected',
+                );
+            controller.setMessage('Expense rejected.');
+            await onRefresh();
+          },
+        ),
+      FapmsCommandTab.banking => _BankingTab(
+          accounts: snap.bankAccounts,
+          txs: snap.bankTxs,
+          onAddAccount: () =>
+              showCreateBankAccountSheet(context: context, ref: ref),
+          onRecordMovement: snap.bankAccounts.isEmpty
+              ? null
+              : () => showRecordBankMovementSheet(
+                    context: context,
+                    ref: ref,
+                    accounts: snap.bankAccounts,
                   ),
-                  const SizedBox(height: 8),
-                  _BankTxList(txs: snap.bankTxs),
-                ],
-              ),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.budgets:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Budget Intelligence™',
-              icon: LucideIcons.pieChart,
-              child: _BudgetPanel(
-                budgets: snap.budgets,
-                lines: snap.budgetLines,
-                variances: snap.budgetVariances,
-              ),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.expenses:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Expenses',
-              icon: LucideIcons.receipt,
-              child: _ExpenseList(
-                expenses: controller.filteredExpenses(snap),
-              ),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.approvals:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'Pending Approvals',
-              icon: LucideIcons.checkCircle,
-              child: _ExpenseList(expenses: snap.pendingApprovals),
-            ),
-          ),
-        ];
-      case FapmsCommandTab.ai:
-        return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'CFO Workspace™',
-              icon: LucideIcons.brain,
-              child: _CfoPanel(
-                snap: snap,
-                onBriefing: () {
-                  final briefing = ref
-                      .read(fapmsServiceProvider)
-                      .generateFinancialBriefing(snap);
-                  controller.setMessage(briefing);
-                },
-                onAnomalies: () {
-                  final items = FapmsService.detectAnomalies(snap);
-                  controller.setMessage(items.join(' · '));
-                },
-              ),
-            ),
-          ),
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'AI Insights',
-              icon: LucideIcons.sparkles,
-              child: _AiList(insights: snap.aiInsights),
-            ),
-          ),
-        ];
-    }
+        ),
+      FapmsCommandTab.investor => FinanceInvestorOpsTab(
+          snap: snap,
+          onConfirmIntent: (id) async {
+            await ref.read(fapmsServiceProvider).confirmInvestorIntent(
+                  intentId: id,
+                  status: 'confirmed',
+                );
+            controller.setMessage(
+              'Investor transfer confirmed — payment, receipt & wallet updated.',
+            );
+            await onRefresh();
+          },
+          onRejectIntent: (id) async {
+            await ref.read(fapmsServiceProvider).confirmInvestorIntent(
+                  intentId: id,
+                  status: 'rejected',
+                );
+            controller.setMessage('Investor transfer rejected.');
+            await onRefresh();
+          },
+        ),
+      FapmsCommandTab.leads => FinanceLeadsTab(snap: snap),
+      FapmsCommandTab.commissions => FinanceCommissionsTab(snap: snap),
+      FapmsCommandTab.setup => ListView(
+          children: [
+            FinancePaymentSettingsCard(settings: snap.paymentSettings),
+            const SizedBox(height: 16),
+            const ClientPaymentsSettingsPanel(),
+          ],
+        ),
+    };
   }
 }
 
-class ContainedPadding extends StatelessWidget {
-  const ContainedPadding({super.key, required this.child});
+class _MessageBanner extends StatelessWidget {
+  const _MessageBanner({required this.message, required this.onDismiss});
 
-  final Widget child;
+  final String message;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
-    return SliverToBoxAdapter(child: child);
+    return Material(
+      color: FinanceDeskColors.gold.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(12),
+      child: ListTile(
+        dense: true,
+        leading: const Icon(
+          LucideIcons.checkCircle2,
+          color: FinanceDeskColors.gold,
+          size: 18,
+        ),
+        title: Text(
+          message,
+          style: const TextStyle(color: Colors.white),
+        ),
+        trailing: IconButton(
+          icon: const Icon(LucideIcons.x, size: 16, color: FinanceDeskColors.muted),
+          onPressed: onDismiss,
+        ),
+      ),
+    );
   }
 }
 
-class _FapmsHeader extends StatelessWidget {
-  const _FapmsHeader({
-    required this.ticker,
-    required this.fromRemote,
-    required this.onRefresh,
-    required this.onOpenCashFlow,
-    required this.onOpenCfo,
-  });
+class _LoadWarningsBanner extends StatelessWidget {
+  const _LoadWarningsBanner({required this.warnings});
 
-  final String ticker;
-  final bool fromRemote;
-  final Future<void> Function() onRefresh;
-  final VoidCallback onOpenCashFlow;
-  final VoidCallback onOpenCfo;
+  final List<String> warnings;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.charcoal,
-            AppColors.deepBlack.withValues(alpha: 0.9),
-          ],
+        color: FinanceAdminUi.danger.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: FinanceAdminUi.danger.withValues(alpha: 0.35),
         ),
-        border: Border(
-          bottom: BorderSide(color: AppColors.gold.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            LucideIcons.alertTriangle,
+            size: 16,
+            color: FinanceAdminUi.danger,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Some finance data could not load',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                for (final w in warnings.take(4))
+                  Text(
+                    w,
+                    style: const TextStyle(
+                      color: FinanceAdminUi.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                if (warnings.length > 4)
+                  Text(
+                    '+ ${warnings.length - 4} more',
+                    style: const TextStyle(
+                      color: FinanceAdminUi.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AlertsBanner extends StatefulWidget {
+  const _AlertsBanner({required this.alerts, required this.onOpenTab});
+
+  final List<FapmsAlert> alerts;
+  final ValueChanged<FapmsCommandTab> onOpenTab;
+
+  @override
+  State<_AlertsBanner> createState() => _AlertsBannerState();
+}
+
+class _AlertsBannerState extends State<_AlertsBanner> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final alerts = widget.alerts;
+    final first = alerts.first;
+    final preview = first.body == null || first.body!.isEmpty
+        ? first.title
+        : '${first.title} — ${first.body}';
+
+    if (!_expanded) {
+      return InkWell(
+        onTap: () => setState(() => _expanded = true),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: FinanceAdminUi.gold.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: FinanceAdminUi.gold.withValues(alpha: 0.35),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                LucideIcons.bell,
+                size: 16,
+                color: FinanceAdminUi.gold,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${alerts.length} live alert${alerts.length == 1 ? '' : 's'}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  preview,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: FinanceAdminUi.muted,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const Icon(
+                LucideIcons.chevronDown,
+                size: 16,
+                color: FinanceAdminUi.muted,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: FinanceAdminUi.gold.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: FinanceAdminUi.gold.withValues(alpha: 0.35),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final narrow = constraints.maxWidth < 640;
-              final title = Text(
-                'Finance Command Center™',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-              );
-              final actions = Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  FilledButton.icon(
-                    onPressed: onOpenCashFlow,
-                    icon: const Icon(LucideIcons.waves, size: 16),
-                    label: const Text('Cash Flow'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.gold,
-                      foregroundColor: AppColors.deepBlack,
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: onOpenCfo,
-                    icon: const Icon(LucideIcons.briefcase, size: 16),
-                    label: const Text('CFO Workspace'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.white,
-                      side: BorderSide(
-                        color: AppColors.gold.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Refresh',
-                    onPressed: () => onRefresh(),
-                    icon: const Icon(
-                      LucideIcons.rotateCcw,
-                      color: AppColors.white,
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withValues(alpha: 0.15),
-                      borderRadius: AppRadius.cardBorder,
-                    ),
-                    child: Text(
-                      fromRemote ? 'LIVE' : 'DEMO',
-                      style: TextStyle(
-                        color:
-                            fromRemote ? Colors.greenAccent : AppColors.gold,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-              if (narrow) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    title,
-                    const SizedBox(height: 8),
-                    Text(
-                      'GL · AR/AP · invoices · banking · budgets',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondaryDark,
-                          ),
-                    ),
-                    const SizedBox(height: 12),
-                    actions,
-                  ],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        title,
-                        const SizedBox(height: 4),
-                        Text(
-                          'Accounting · payments · Cash Flow Engine · Audit Intelligence',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.textSecondaryDark,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  actions,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(LucideIcons.activity, size: 14, color: AppColors.gold),
+              const Icon(
+                LucideIcons.bell,
+                size: 16,
+                color: FinanceAdminUi.gold,
+              ),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  ticker,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.white.withValues(alpha: 0.85),
-                      ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                '${alerts.length} live alert${alerts.length == 1 ? '' : 's'}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
                 ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: () => setState(() => _expanded = false),
+                icon: const Icon(
+                  LucideIcons.chevronUp,
+                  size: 16,
+                  color: FinanceAdminUi.muted,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          for (final a in alerts.take(5))
+            InkWell(
+              onTap: () {
+                final tab = _tabForAlert(a);
+                if (tab != null) widget.onOpenTab(tab);
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  a.body == null || a.body!.isEmpty
+                      ? a.title
+                      : '${a.title} — ${a.body}',
+                  style: const TextStyle(
+                    color: FinanceAdminUi.muted,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _KpiStrip extends StatelessWidget {
-  const _KpiStrip({required this.kpis});
+class _OverviewTab extends StatelessWidget {
+  const _OverviewTab({
+    required this.snap,
+    required this.onOpenTab,
+    required this.anomalies,
+    required this.briefing,
+    required this.alerts,
+    required this.loadWarnings,
+    required this.onAddBank,
+  });
 
-  final List<FapmsKpi> kpis;
+  final FapmsCommandCenterSnapshot snap;
+  final ValueChanged<FapmsCommandTab> onOpenTab;
+  final List<String> anomalies;
+  final String briefing;
+  final List<FapmsAlert> alerts;
+  final List<String> loadWarnings;
+  final VoidCallback onAddBank;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: SizedBox(
-        height: 96,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: kpis.length,
-          separatorBuilder: (_, _) => const SizedBox(width: 10),
-          itemBuilder: (context, i) {
-            final k = kpis[i];
-            return Container(
-              width: 148,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: AppRadius.cardBorder,
-                border: Border.all(
-                  color: AppColors.gold.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    k.label,
-                    style: Theme.of(context).textTheme.labelSmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const Spacer(),
-                  Text(
-                    k.displayValue,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+    return ListView(
+      padding: const EdgeInsets.only(top: 4),
+      children: [
+        if (loadWarnings.isNotEmpty) ...[
+          _LoadWarningsBanner(warnings: loadWarnings),
+          const SizedBox(height: 10),
+        ],
+        if (alerts.isNotEmpty) ...[
+          _AlertsBanner(alerts: alerts, onOpenTab: onOpenTab),
+          const SizedBox(height: 10),
+        ],
+        FinanceAdminCard(
+          title: 'Ops briefing',
+          subtitle: 'What needs attention across the site right now',
+          child: Text(
+            briefing,
+            style: const TextStyle(
+              color: Colors.white,
+              height: 1.45,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, c) {
+            final wide = c.maxWidth >= 900;
+            final queues = _QueuesCard(
+              snap: snap,
+              onOpenTab: onOpenTab,
+            );
+            final cash = FinanceAdminCard(
+              title: 'Cash position',
+              subtitle: 'Bank balances from live accounts',
+              child: snap.bankAccounts.isEmpty
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'No operating account yet. Add one so cash on hand follows the real balance.',
+                          style: TextStyle(color: FinanceAdminUi.muted),
                         ),
-                  ),
+                        const SizedBox(height: 10),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: FinanceAdminUi.gold,
+                            foregroundColor: Colors.black,
+                          ),
+                          onPressed: onAddBank,
+                          icon: const Icon(LucideIcons.plus, size: 16),
+                          label: const Text('Add bank account'),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        for (final b in snap.bankAccounts.take(5))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    b.accountName,
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                Text(
+                                  b.balanceDisplay,
+                                  style: const TextStyle(
+                                    color: FinanceAdminUi.gold,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+            );
+            if (!wide) {
+              return Column(
+                children: [
+                  queues,
+                  const SizedBox(height: 12),
+                  cash,
                 ],
-              ),
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: queues),
+                const SizedBox(width: 12),
+                Expanded(child: cash),
+              ],
             );
           },
         ),
-      ),
-    );
-  }
-}
-
-class _SearchAndFilters extends StatelessWidget {
-  const _SearchAndFilters({
-    required this.ui,
-    required this.onSearch,
-    required this.onStatus,
-  });
-
-  final FapmsUiState ui;
-  final ValueChanged<String> onSearch;
-  final ValueChanged<String?> onStatus;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              onChanged: onSearch,
-              decoration: InputDecoration(
-                hintText: 'Search invoices, expenses, vendors…',
-                prefixIcon: const Icon(LucideIcons.search, size: 18),
-                isDense: true,
-                border: OutlineInputBorder(
-                  borderRadius: AppRadius.cardBorder,
-                ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, c) {
+            final wide = c.maxWidth >= 900;
+            final ar = FinanceAdminCard(
+              title: 'Receivables aging',
+              trailing: TextButton(
+                onPressed: () => onOpenTab(FapmsCommandTab.invoices),
+                child: const Text('Invoices'),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          DropdownButton<String?>(
-            value: ui.statusFilter,
-            hint: const Text('Status'),
-            underline: const SizedBox.shrink(),
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All')),
-              DropdownMenuItem(value: 'paid', child: Text('Paid')),
-              DropdownMenuItem(value: 'overdue', child: Text('Overdue')),
-              DropdownMenuItem(value: 'sent', child: Text('Sent')),
-              DropdownMenuItem(value: 'pending', child: Text('Pending')),
-            ],
-            onChanged: onStatus,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TabBar extends StatelessWidget {
-  const _TabBar({required this.selected, required this.onSelect});
-
-  final FapmsCommandTab selected;
-  final ValueChanged<FapmsCommandTab> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: FapmsCommandTab.values.map((tab) {
-            final active = tab == selected;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(tab.label),
-                selected: active,
-                onSelected: (_) => onSelect(tab),
-                selectedColor: AppColors.gold.withValues(alpha: 0.35),
-              ),
+              child: _AgingBars(buckets: snap.arBuckets),
             );
-          }).toList(),
+            final ap = FinanceAdminCard(
+              title: 'Payables aging',
+              trailing: TextButton(
+                onPressed: () => onOpenTab(FapmsCommandTab.expenses),
+                child: const Text('Expenses'),
+              ),
+              child: _AgingBars(buckets: snap.apBuckets),
+            );
+            if (!wide) {
+              return Column(
+                children: [
+                  ar,
+                  const SizedBox(height: 12),
+                  ap,
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: ar),
+                const SizedBox(width: 12),
+                Expanded(child: ap),
+              ],
+            );
+          },
         ),
-      ),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.icon,
-    required this.child,
-  });
-
-  final String title;
-  final IconData icon;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: AppRadius.cardBorder,
-          border: Border.all(
-            color: AppColors.gold.withValues(alpha: 0.15),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        const SizedBox(height: 12),
+        FinanceAdminCard(
+          title: 'Attention',
+          subtitle: 'Anomalies from live ledger data',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(icon, size: 18, color: AppColors.gold),
-                  const SizedBox(width: 8),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+              for (final a in anomalies.take(8))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Icon(
+                          LucideIcons.alertTriangle,
+                          size: 14,
+                          color: FinanceAdminUi.gold,
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          a,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              child,
+                ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _CashFlowPanel extends StatelessWidget {
-  const _CashFlowPanel({required this.snap});
-
-  final FapmsCommandCenterSnapshot snap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          snap.projectionDisclaimer,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: AppColors.textSecondaryLight,
-              ),
-        ),
         const SizedBox(height: 12),
-        ...snap.cashFlow.map((p) {
-          return ListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text(p.label),
-            subtitle: Text(
-              'In ${formatFapmsMoney(p.inflow)} · Out ${formatFapmsMoney(p.outflow)}'
-              '${p.isProjection ? ' · PROJECTION' : ''}',
+        FinanceAdminCard(
+          title: 'Recent activity',
+          child: snap.activities.isEmpty
+              ? const Text(
+                  'No finance activity logged yet.',
+                  style: TextStyle(color: FinanceAdminUi.muted),
+                )
+              : Column(
+                  children: [
+                    for (final a in snap.activities.take(10))
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        leading: const Icon(
+                          LucideIcons.activity,
+                          size: 16,
+                          color: FinanceAdminUi.muted,
+                        ),
+                        title: Text(
+                          a.summary,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: Text(
+                          [
+                            if (a.actorLabel != null) a.actorLabel!,
+                            if (a.occurredAt != null)
+                              DateFormat('dd MMM · HH:mm')
+                                  .format(a.occurredAt!.toLocal()),
+                          ].join(' · '),
+                          style: const TextStyle(
+                            color: FinanceAdminUi.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        if (snap.budgets.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          FinanceAdminCard(
+            title: 'Budgets',
+            child: Column(
+              children: [
+                for (final b in snap.budgets.take(5))
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(
+                      b.name,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    subtitle: Text(
+                      b.budgetCode,
+                      style: const TextStyle(
+                        color: FinanceAdminUi.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                    trailing: Text(
+                      b.totalDisplay,
+                      style: const TextStyle(
+                        color: FinanceAdminUi.gold,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            trailing: Text(
-              p.netDisplay,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: p.net >= 0 ? Colors.green.shade700 : Colors.red.shade700,
-              ),
-            ),
-          );
-        }),
+          ),
+        ],
+        const SizedBox(height: 24),
       ],
     );
   }
 }
 
-class _ActivityList extends StatelessWidget {
-  const _ActivityList({required this.activities});
+class _QueuesCard extends StatelessWidget {
+  const _QueuesCard({required this.snap, required this.onOpenTab});
 
-  final List<FapmsActivity> activities;
+  final FapmsCommandCenterSnapshot snap;
+  final ValueChanged<FapmsCommandTab> onOpenTab;
 
   @override
   Widget build(BuildContext context) {
-    if (activities.isEmpty) {
-      return const Text('No activity yet.');
-    }
-    final fmt = DateFormat.MMMd().add_jm();
-    return Column(
-      children: activities.map((a) {
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          leading: const Icon(LucideIcons.gitCommit, size: 16),
-          title: Text(a.summary),
-          subtitle: Text(
-            [
-              if (a.actorLabel != null) a.actorLabel!,
-              if (a.occurredAt != null) fmt.format(a.occurredAt!),
-            ].join(' · '),
+    return FinanceAdminCard(
+      title: 'Work queues',
+      subtitle: 'Jump into the backlog that moves money',
+      child: Column(
+        children: [
+          _QueueRow(
+            label: 'Client payment verification',
+            count: snap.pendingClientVerifications,
+            onTap: () => onOpenTab(FapmsCommandTab.verification),
           ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _AlertList extends StatelessWidget {
-  const _AlertList({required this.alerts});
-
-  final List<FapmsAlert> alerts;
-
-  @override
-  Widget build(BuildContext context) {
-    if (alerts.isEmpty) return const Text('No alerts.');
-    return Column(
-      children: alerts.map((a) {
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          leading: Icon(
-            LucideIcons.alertTriangle,
-            size: 16,
-            color: a.severity == 'warning' || a.severity == 'critical'
-                ? Colors.orange
-                : AppColors.gold,
+          _QueueRow(
+            label: 'Investor transfer confirmations',
+            count: snap.pendingInvestorIntents,
+            onTap: () => onOpenTab(FapmsCommandTab.investor),
           ),
-          title: Text(a.title),
-          subtitle: a.body == null ? null : Text(a.body!),
-        );
-      }).toList(),
+          _QueueRow(
+            label: 'Deposit / installment schedules',
+            count: snap.depositApplications.length,
+            onTap: () => onOpenTab(FapmsCommandTab.installments),
+          ),
+          _QueueRow(
+            label: 'Website calculator leads',
+            count: snap.openLeadCount,
+            onTap: () => onOpenTab(FapmsCommandTab.leads),
+          ),
+          _QueueRow(
+            label: 'Expense approvals',
+            count: snap.pendingApprovals.length,
+            onTap: () => onOpenTab(FapmsCommandTab.expenses),
+          ),
+          _QueueRow(
+            label: 'Open commissions',
+            count: snap.openCommissionCount,
+            onTap: () => onOpenTab(FapmsCommandTab.commissions),
+          ),
+          _QueueRow(
+            label: 'Overdue invoices',
+            count: snap.invoices
+                .where((i) => i.status == InvoiceStatus.overdue)
+                .length,
+            onTap: () => onOpenTab(FapmsCommandTab.invoices),
+          ),
+          _QueueRow(
+            label: 'Overdue installments',
+            count: snap.overdueInstallmentCount,
+            onTap: () => onOpenTab(FapmsCommandTab.installments),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _JournalList extends StatelessWidget {
-  const _JournalList({required this.journals});
+class _QueueRow extends StatelessWidget {
+  const _QueueRow({
+    required this.label,
+    required this.count,
+    required this.onTap,
+  });
 
-  final List<FapmsJournalSummary> journals;
+  final String label;
+  final int count;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    if (journals.isEmpty) return const Text('No journal entries.');
-    return Column(
-      children: journals.map((j) {
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text('${j.entryNumber} · ${j.status}'),
-          subtitle: Text(j.memo ?? '—'),
-          trailing: Text(j.debitDisplay),
-        );
-      }).toList(),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+            ),
+            FinanceStatusPill(
+              label: '$count',
+              color: count > 0 ? FinanceAdminUi.gold : FinanceAdminUi.muted,
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              LucideIcons.chevronRight,
+              size: 16,
+              color: FinanceAdminUi.muted,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _AgingBucketRow extends StatelessWidget {
-  const _AgingBucketRow({required this.buckets});
+class _AgingBars extends StatelessWidget {
+  const _AgingBars({required this.buckets});
 
   final List<FapmsAgingBucket> buckets;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: buckets.map((b) {
-        return Chip(
-          label: Text('${b.kind.label}: ${b.amountDisplay} (${b.count})'),
-        );
-      }).toList(),
+    if (buckets.isEmpty) {
+      return const Text(
+        'No aging rows yet.',
+        style: TextStyle(color: FinanceAdminUi.muted),
+      );
+    }
+    final max = buckets.fold<double>(
+      0,
+      (m, b) => b.amount > m ? b.amount : m,
     );
-  }
-}
-
-class _AgingList extends StatelessWidget {
-  const _AgingList({required this.rows});
-
-  final List<FapmsAgingRow> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    if (rows.isEmpty) return const Text('No aging rows.');
     return Column(
-      children: rows.map((r) {
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text(r.partyName),
-          subtitle: Text('${r.bucket.label} · ${r.status}'),
-          trailing: Text(r.amountDisplay),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _InvoiceList extends StatelessWidget {
-  const _InvoiceList({required this.invoices});
-
-  final List<FapmsInvoice> invoices;
-
-  @override
-  Widget build(BuildContext context) {
-    if (invoices.isEmpty) return const Text('No invoices match filters.');
-    return Column(
-      children: invoices.map((inv) {
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text('${inv.invoiceNumber} · ${inv.partyName}'),
-          subtitle: Text('${inv.status.label} · bal ${inv.balanceDisplay}'),
-          trailing: Text(inv.amountDisplay),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _PaymentTxList extends StatelessWidget {
-  const _PaymentTxList({required this.txs});
-
-  final List<FapmsPaymentTx> txs;
-
-  @override
-  Widget build(BuildContext context) {
-    if (txs.isEmpty) return const Text('No payment transactions.');
-    return Column(
-      children: txs.map((tx) {
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text('${tx.provider} · ${tx.status.label}'),
-          subtitle: Text(tx.providerReference ?? tx.id),
-          trailing: Text(tx.amountDisplay),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _BankList extends StatelessWidget {
-  const _BankList({required this.accounts});
-
-  final List<FapmsBankAccount> accounts;
-
-  @override
-  Widget build(BuildContext context) {
-    if (accounts.isEmpty) return const Text('No bank accounts.');
-    return Column(
-      children: accounts.map((a) {
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text(a.accountName),
-          subtitle: Text('${a.bankName} · ${a.accountNumberMasked ?? ''}'),
-          trailing: Text(a.balanceDisplay),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _BankTxList extends StatelessWidget {
-  const _BankTxList({required this.txs});
-
-  final List<FapmsBankTx> txs;
-
-  @override
-  Widget build(BuildContext context) {
-    if (txs.isEmpty) return const Text('No bank transactions.');
-    return Column(
-      children: txs.map((t) {
-        final sign = t.direction == 'debit' ? '-' : '+';
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text(t.description),
-          subtitle: Text('${t.status} · ${t.reference ?? ''}'),
-          trailing: Text('$sign${t.amountDisplay}'),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _BudgetPanel extends StatelessWidget {
-  const _BudgetPanel({
-    required this.budgets,
-    required this.lines,
-    required this.variances,
-  });
-
-  final List<FapmsBudget> budgets;
-  final List<FapmsBudgetLine> lines;
-  final List<FapmsBudgetVariance> variances;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...budgets.map((b) {
-          return ListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text('${b.budgetCode} · ${b.name}'),
-            subtitle: Text(b.status),
-            trailing: Text(b.totalDisplay),
-          );
-        }),
-        const Divider(height: 24),
-        Text('Lines', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        ...lines.map((l) {
-          return ListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text(l.category),
-            subtitle: Text(
-              'Budget ${formatFapmsMoney(l.budgetedAmount)} · '
-              'Actual ${formatFapmsMoney(l.actualAmount)}',
+        for (final b in buckets)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        b.kind.label,
+                        style: const TextStyle(
+                          color: FinanceAdminUi.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      formatFapmsMoney(b.amount),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: max <= 0 ? 0 : (b.amount / max).clamp(0.0, 1.0),
+                    minHeight: 6,
+                    backgroundColor: Colors.white10,
+                    color: FinanceAdminUi.gold,
+                  ),
+                ),
+              ],
             ),
-          );
-        }),
-        if (variances.isNotEmpty) ...[
-          const Divider(height: 24),
-          Text('Variances', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          ...variances.map((v) {
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text('${v.category} · ${v.severity}'),
-              subtitle: Text(v.notes ?? ''),
-              trailing: Text(formatFapmsMoney(v.varianceAmount)),
-            );
-          }),
-        ],
+          ),
       ],
     );
   }
 }
 
-class _ExpenseList extends StatelessWidget {
-  const _ExpenseList({required this.expenses});
+class _PaymentsTab extends StatelessWidget {
+  const _PaymentsTab({
+    required this.payments,
+    required this.receipts,
+    required this.query,
+  });
 
-  final List<FapmsExpense> expenses;
+  final List<FapmsPaymentTx> payments;
+  final List<FapmsReceipt> receipts;
+  final String query;
 
   @override
   Widget build(BuildContext context) {
-    if (expenses.isEmpty) return const Text('No expenses in this view.');
-    return Column(
-      children: expenses.map((e) {
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          title: Text('${e.expenseCode} · ${e.title}'),
-          subtitle: Text(
-            '${e.status.label} · ${e.vendorLabel ?? ''} · ${e.submittedByLabel ?? ''}',
-          ),
-          trailing: Text(e.amountDisplay),
-        );
-      }).toList(),
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        if (payments.isEmpty)
+          FinanceEmptyState(
+            title: 'No payments yet',
+            message: query.isEmpty
+                ? 'Client, investor, and gateway payments appear here in realtime.'
+                : 'No payments match “$query”.',
+            icon: LucideIcons.banknote,
+          )
+        else
+          for (final tx in payments)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: FinanceAdminUi.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: FinanceAdminUi.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: FinanceAdminUi.surfaceElevated,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      tx.source == 'client'
+                          ? LucideIcons.user
+                          : tx.source == 'investor'
+                              ? LucideIcons.trendingUp
+                              : LucideIcons.creditCard,
+                      size: 18,
+                      color: FinanceAdminUi.gold,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${tx.sourceLabel} · ${tx.provider}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            if (tx.providerReference != null)
+                              tx.providerReference!,
+                            if (tx.occurredAt != null)
+                              DateFormat('dd MMM yyyy · HH:mm')
+                                  .format(tx.occurredAt!.toLocal()),
+                          ].join(' · '),
+                          style: const TextStyle(
+                            color: FinanceAdminUi.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        tx.amountDisplay,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      FinanceStatusPill(label: tx.status.label),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        FinanceReceiptsSection(receipts: receipts),
+      ],
     );
   }
 }
 
-class _CfoPanel extends StatelessWidget {
-  const _CfoPanel({
-    required this.snap,
-    required this.onBriefing,
-    required this.onAnomalies,
+class _InvoicesTab extends StatelessWidget {
+  const _InvoicesTab({
+    required this.invoices,
+    required this.statusColor,
+    this.onCreate,
+    this.onMarkPaid,
   });
 
-  final FapmsCommandCenterSnapshot snap;
-  final VoidCallback onBriefing;
-  final VoidCallback onAnomalies;
+  final List<FapmsInvoice> invoices;
+  final Color Function(String) statusColor;
+  final VoidCallback? onCreate;
+  final Future<void> Function(String id)? onMarkPaid;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      padding: EdgeInsets.zero,
       children: [
-        Text(
-          'Executive finance stubs — briefing & anomaly scan (Phase 1).',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          snap.projectionDisclaimer,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontStyle: FontStyle.italic,
-              ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        Row(
           children: [
-            FilledButton.icon(
-              onPressed: onBriefing,
-              icon: const Icon(LucideIcons.fileBarChart, size: 16),
-              label: const Text('AI Briefing'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.gold,
-                foregroundColor: AppColors.deepBlack,
+            const Expanded(
+              child: Text(
+                'Invoices',
+                style: TextStyle(
+                  color: FinanceAdminUi.muted,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-            OutlinedButton.icon(
-              onPressed: onAnomalies,
-              icon: const Icon(LucideIcons.radar, size: 16),
-              label: const Text('Detect Anomalies'),
+            if (onCreate != null)
+              PermissionGateAny(
+                permissions: const [
+                  PermissionSlugs.financeInvoices,
+                  PermissionSlugs.financeWrite,
+                ],
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: FinanceAdminUi.gold,
+                    foregroundColor: Colors.black,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: onCreate,
+                  icon: const Icon(LucideIcons.plus, size: 16),
+                  label: const Text('Create'),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (invoices.isEmpty)
+          const FinanceEmptyState(
+            title: 'No invoices',
+            message: 'Create an invoice or convert a website calculator lead.',
+            icon: LucideIcons.fileText,
+          )
+        else
+          for (final inv in invoices) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: FinanceAdminUi.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: FinanceAdminUi.border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          inv.invoiceNumber,
+                          style: const TextStyle(
+                            color: FinanceAdminUi.gold,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          inv.partyName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (inv.dueDate != null)
+                          Text(
+                            'Due ${DateFormat('dd MMM yyyy').format(inv.dueDate!)}',
+                            style: const TextStyle(
+                              color: FinanceAdminUi.muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        inv.amountDisplay,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'Bal ${inv.balanceDisplay}',
+                        style: const TextStyle(
+                          color: FinanceAdminUi.muted,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      FinanceStatusPill(
+                        label: inv.status.label,
+                        color: statusColor(inv.status.slug),
+                      ),
+                      if (onMarkPaid != null &&
+                          inv.status != InvoiceStatus.paid &&
+                          inv.status != InvoiceStatus.cancelled)
+                        PermissionGateAny(
+                          permissions: const [
+                            PermissionSlugs.financePayments,
+                            PermissionSlugs.financeWrite,
+                          ],
+                          child: TextButton(
+                            onPressed: () => onMarkPaid!(inv.id),
+                            child: const Text('Mark paid'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+      ],
+    );
+  }
+}
+
+class _ExpensesTab extends StatelessWidget {
+  const _ExpensesTab({
+    required this.expenses,
+    required this.pending,
+    required this.statusColor,
+    required this.onApprove,
+    required this.onReject,
+    this.onCreate,
+  });
+
+  final List<FapmsExpense> expenses;
+  final List<FapmsExpense> pending;
+  final Color Function(String) statusColor;
+  final Future<void> Function(String id) onApprove;
+  final Future<void> Function(String id) onReject;
+  final VoidCallback? onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Expenses',
+                style: TextStyle(
+                  color: FinanceAdminUi.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (onCreate != null)
+              PermissionGateAny(
+                permissions: const [
+                  PermissionSlugs.financeExpenses,
+                  PermissionSlugs.financeWrite,
+                ],
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: FinanceAdminUi.gold,
+                    foregroundColor: Colors.black,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: onCreate,
+                  icon: const Icon(LucideIcons.plus, size: 16),
+                  label: const Text('Submit'),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (pending.isNotEmpty) ...[
+          FinanceAdminCard(
+            title: 'Needs approval',
+            subtitle: '${pending.length} waiting',
+            child: Column(
+              children: [
+                for (final e in pending)
+                  _ExpenseTile(
+                    expense: e,
+                    statusColor: statusColor,
+                    denseActions: true,
+                    onApprove: () => onApprove(e.id),
+                    onReject: () => onReject(e.id),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        Text(
+          'All expenses',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: FinanceAdminUi.muted,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 8),
+        if (expenses.isEmpty)
+          const FinanceEmptyState(
+            title: 'No expenses',
+            message: 'Approved and pending expenses from Supabase appear here.',
+            icon: LucideIcons.receipt,
+          )
+        else
+          for (final e in expenses) ...[
+            _ExpenseTile(
+              expense: e,
+              statusColor: statusColor,
+              onApprove: e.status == ExpenseStatus.pending
+                  ? () => onApprove(e.id)
+                  : null,
+              onReject: e.status == ExpenseStatus.pending
+                  ? () => onReject(e.id)
+                  : null,
+            ),
+            const SizedBox(height: 8),
+          ],
+      ],
+    );
+  }
+}
+
+class _ExpenseTile extends StatelessWidget {
+  const _ExpenseTile({
+    required this.expense,
+    required this.statusColor,
+    this.onApprove,
+    this.onReject,
+    this.denseActions = false,
+  });
+
+  final FapmsExpense expense;
+  final Color Function(String) statusColor;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+  final bool denseActions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: denseActions ? 8 : 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: FinanceAdminUi.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: FinanceAdminUi.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      expense.expenseCode.isEmpty
+                          ? 'Expense'
+                          : expense.expenseCode,
+                      style: const TextStyle(
+                        color: FinanceAdminUi.gold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      expense.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      [
+                        if (expense.vendorLabel != null) expense.vendorLabel!,
+                        if (expense.submittedByLabel != null)
+                          expense.submittedByLabel!,
+                      ].join(' · '),
+                      style: const TextStyle(
+                        color: FinanceAdminUi.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    expense.amountDisplay,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  FinanceStatusPill(
+                    label: expense.status.label,
+                    color: statusColor(expense.status.slug),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (onApprove != null || onReject != null) ...[
+            const SizedBox(height: 10),
+            PermissionGate(
+              permission: PermissionSlugs.financeApprovals,
+              child: Row(
+                children: [
+                  if (onApprove != null)
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: FinanceAdminUi.success,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: onApprove,
+                      child: const Text('Approve'),
+                    ),
+                  if (onReject != null) ...[
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: FinanceAdminUi.danger,
+                        side: const BorderSide(color: FinanceAdminUi.danger),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: onReject,
+                      child: const Text('Reject'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+FapmsCommandTab? _tabForAlert(FapmsAlert alert) {
+  final haystack = '${alert.category ?? ''} ${alert.title}'.toLowerCase();
+  if (haystack.contains('invoice') || haystack.contains('receivable') || haystack == 'ar') {
+    return FapmsCommandTab.invoices;
+  }
+  if (haystack.contains('expense') || haystack.contains('approval')) {
+    return FapmsCommandTab.expenses;
+  }
+  if (haystack.contains('bank') || haystack.contains('cash')) {
+    return FapmsCommandTab.banking;
+  }
+  if (haystack.contains('investor')) return FapmsCommandTab.investor;
+  if (haystack.contains('commission')) return FapmsCommandTab.commissions;
+  if (haystack.contains('payment') || haystack.contains('verif')) {
+    return FapmsCommandTab.verification;
+  }
+  return null;
+}
+
+class _BankingTab extends StatelessWidget {
+  const _BankingTab({
+    required this.accounts,
+    required this.txs,
+    required this.onAddAccount,
+    this.onRecordMovement,
+  });
+
+  final List<FapmsBankAccount> accounts;
+  final List<FapmsBankTx> txs;
+  final VoidCallback onAddAccount;
+  final VoidCallback? onRecordMovement;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        Row(
+          children: [
+            const Spacer(),
+            if (onRecordMovement != null) ...[
+              OutlinedButton.icon(
+                onPressed: onRecordMovement,
+                icon: const Icon(LucideIcons.arrowLeftRight, size: 16),
+                label: const Text('Record movement'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: FinanceAdminUi.border),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: FinanceAdminUi.gold,
+                foregroundColor: Colors.black,
+              ),
+              onPressed: onAddAccount,
+              icon: const Icon(LucideIcons.plus, size: 16),
+              label: const Text('Add account'),
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        FinanceAdminCard(
+          title: 'Bank accounts',
+          child: accounts.isEmpty
+              ? const Text(
+                  'No operating account yet. Add one and cash on hand updates with each movement.',
+                  style: TextStyle(color: FinanceAdminUi.muted),
+                )
+              : Column(
+                  children: [
+                    for (final a in accounts)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          LucideIcons.landmark,
+                          color: FinanceAdminUi.gold,
+                          size: 20,
+                        ),
+                        title: Text(
+                          a.accountName,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          [
+                            if (a.bankName.isNotEmpty) a.bankName,
+                            if (a.accountNumberMasked != null)
+                              a.accountNumberMasked!,
+                          ].join(' · '),
+                          style: const TextStyle(
+                            color: FinanceAdminUi.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: Text(
+                          a.balanceDisplay,
+                          style: const TextStyle(
+                            color: FinanceAdminUi.gold,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 12),
+        FinanceAdminCard(
+          title: 'Recent bank movements',
+          child: txs.isEmpty
+              ? const Text(
+                  'No bank transactions yet.',
+                  style: TextStyle(color: FinanceAdminUi.muted),
+                )
+              : Column(
+                  children: [
+                    for (final t in txs.take(40))
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          t.description.isNotEmpty
+                              ? t.description
+                              : (t.reference ?? t.id),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: t.transactionDate == null
+                            ? null
+                            : Text(
+                                DateFormat('dd MMM yyyy · HH:mm')
+                                    .format(t.transactionDate!.toLocal()),
+                                style: const TextStyle(
+                                  color: FinanceAdminUi.muted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                        trailing: Text(
+                          t.amountDisplay,
+                          style: TextStyle(
+                            color: t.direction == 'debit' || t.amount < 0
+                                ? FinanceAdminUi.danger
+                                : FinanceAdminUi.success,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
       ],
-    );
-  }
-}
-
-class _AiList extends StatelessWidget {
-  const _AiList({required this.insights});
-
-  final List<FapmsAiInsight> insights;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: insights.map((i) {
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          dense: true,
-          leading: const Icon(LucideIcons.sparkles, size: 16),
-          title: Text(i.title),
-          subtitle: Text(
-            '${i.body}\n'
-            'AI-generated · ${i.confidencePct?.toStringAsFixed(0) ?? 'n/a'}% · '
-            '${i.disclaimer}',
-          ),
-          isThreeLine: true,
-        );
-      }).toList(),
     );
   }
 }

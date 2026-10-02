@@ -22,25 +22,36 @@ abstract final class AppTheme {
       secondary: AppColors.charcoal,
       onSecondary: AppColors.white,
       surface: isDark ? AppColors.deepBlack : AppColors.lightBackground,
-      onSurface: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-      onSurfaceVariant:
-          isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+      onSurface: isDark
+          ? AppColors.textPrimaryDark
+          : AppColors.textPrimaryLight,
+      onSurfaceVariant: isDark
+          ? AppColors.textSecondaryDark
+          : AppColors.textSecondaryLight,
       error: AppColors.error,
       onError: AppColors.white,
       outline: AppColors.gray,
-      surfaceContainerHighest:
-          isDark ? AppColors.darkElevated : AppColors.white,
+      surfaceContainerHighest: isDark
+          ? AppColors.darkElevated
+          : AppColors.white,
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
-      fontFamily: AppTypography.fontFamily,
+      // Keep Manrope on text styles only. A theme-wide fontFamily replaces
+      // Material and Lucide on Flutter web, so icons paint as blank squares.
       textTheme: textTheme,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colorScheme.surface,
       dividerColor: AppColors.gray.withValues(alpha: 0.5),
       splashFactory: InkRipple.splashFactory,
+      scrollbarTheme: const ScrollbarThemeData(
+        thumbVisibility: WidgetStatePropertyAll(false),
+        trackVisibility: WidgetStatePropertyAll(false),
+        thickness: WidgetStatePropertyAll(0),
+        interactive: false,
+      ),
       extensions: [
         HdHomesThemeExtension(
           spacing: const AppSpacingTokens(),
@@ -145,17 +156,16 @@ abstract final class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.charcoal,
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: AppColors.white),
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: AppColors.white,
+        ),
         shape: RoundedRectangleBorder(borderRadius: AppRadius.buttonBorder),
         behavior: SnackBarBehavior.floating,
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.gold,
       ),
-      iconTheme: IconThemeData(
-        color: colorScheme.onSurface,
-        size: AppIcons.md,
-      ),
+      iconTheme: IconThemeData(color: colorScheme.onSurface, size: AppIcons.md),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),

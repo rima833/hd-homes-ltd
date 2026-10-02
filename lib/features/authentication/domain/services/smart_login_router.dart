@@ -23,7 +23,9 @@ abstract final class SmartLoginRouter {
     final profile = context.profile;
     final status = profile.status;
 
-    if (!profile.emailConfirmed || status == AccountStatus.pendingVerification) {
+    // Email confirmation only — account_status pending_verification is separate
+    // (onboarding / admin review) and must not trap users on /verify-email.
+    if (!profile.emailConfirmed) {
       final email = Uri.encodeComponent(profile.email);
       final type = profile.primaryRole == AppRole.investor ? 'investor' : 'client';
       return '${RoutePaths.verifyEmail}?email=$email&type=$type';
@@ -46,6 +48,9 @@ abstract final class SmartLoginRouter {
     }
 
     if (!context.profileComplete) {
+      if (profile.isStaff) {
+        return RoutePaths.staffOnboarding;
+      }
       return profile.primaryRole == AppRole.investor
           ? RoutePaths.investorSettings
           : RoutePaths.clientSettings;

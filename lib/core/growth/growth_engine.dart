@@ -24,5 +24,4 @@ export 'personalization/visitor_profile.dart';
 export 'providers/growth_cms_provider.dart';
 export 'recommendations/recommendation_engine.dart';
 export 'seo/seo_engine.dart';
-export 'widgets/ai_concierge_fab.dart';
 export 'widgets/growth_route_tracker.dart';

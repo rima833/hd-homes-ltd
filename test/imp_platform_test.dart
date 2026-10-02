@@ -3,26 +3,16 @@ import 'package:hdhomesproject/features/imp/domain/entities/imp_models.dart';
 import 'package:hdhomesproject/features/imp/domain/services/imp_service.dart';
 
 void main() {
-  group('ImpDemo', () {
-    test('snapshot is non-empty across command-center surfaces', () {
-      final snap = ImpDemo.snapshot();
-      expect(snap.investors.length, greaterThanOrEqualTo(3));
-      expect(snap.opportunities, isNotEmpty);
-      expect(snap.commitments, isNotEmpty);
-      expect(snap.holdings, isNotEmpty);
-      expect(snap.distributions, isNotEmpty);
-      expect(snap.wallets, isNotEmpty);
-      expect(snap.activities, isNotEmpty);
-      expect(snap.alerts, isNotEmpty);
-      expect(snap.kpis, isNotEmpty);
-      expect(snap.aiInsights, isNotEmpty);
-      expect(snap.fromRemote, isFalse);
-    });
-
+  group('ImpMetrics', () {
     test('KPI strip includes expected labels and formats', () {
-      final snap = ImpDemo.snapshot();
+      final kpis = ImpMetrics.aggregateKpis(
+        investors: const [],
+        opportunities: const [],
+        distributions: const [],
+        commitments: const [],
+      );
       expect(
-        snap.kpis.map((k) => k.label),
+        kpis.map((k) => k.label),
         containsAll([
           'AUM',
           'Active Investors',
@@ -37,59 +27,95 @@ void main() {
       expect(aum.displayValue, contains('₦'));
       expect(aum.displayValue, contains('B'));
 
-      const capital =
-          ImpKpi(label: 'Capital Raised', value: 96000000, unit: 'ngn');
+      const capital = ImpKpi(
+        label: 'Capital Raised',
+        value: 96000000,
+        unit: 'ngn',
+      );
       expect(capital.displayValue, contains('M'));
     });
 
-    test('aggregate KPIs produce positive AUM and open opportunities', () {
-      final snap = ImpDemo.snapshot();
-      final kpis = ImpDemo.aggregateKpis(
-        investors: snap.investors,
-        opportunities: snap.opportunities,
-        distributions: snap.distributions,
-        commitments: snap.commitments,
+    test('aggregate KPIs use supplied records without synthetic fallback', () {
+      const investors = [
+        ImpInvestor(
+          id: 'investor-1',
+          investorCode: 'INV-1',
+          fullName: 'Investor One',
+          lifecycleStatus: InvestorLifecycleStatus.active,
+          aum: 12000000,
+        ),
+      ];
+      const opportunities = [
+        ImpOpportunity(
+          id: 'opportunity-1',
+          code: 'OPP-1',
+          title: 'Production opportunity',
+          targetRaise: 10000000,
+          amountRaised: 5000000,
+        ),
+      ];
+      final kpis = ImpMetrics.aggregateKpis(
+        investors: investors,
+        opportunities: opportunities,
+        distributions: const [],
+        commitments: const [],
       );
       final aum = kpis.firstWhere((k) => k.label == 'AUM').value;
-      final open =
-          kpis.firstWhere((k) => k.label == 'Open Opportunities').value;
-      expect(aum, greaterThan(0));
-      expect(open, greaterThan(0));
+      final open = kpis
+          .firstWhere((k) => k.label == 'Open Opportunities')
+          .value;
+      expect(aum, 12000000);
+      expect(open, 1);
     });
 
     test('projected return disclaimer present on opportunities', () {
-      final snap = ImpDemo.snapshot();
-      expect(snap.opportunities, isNotEmpty);
-      for (final opp in snap.opportunities) {
-        expect(opp.returnDisclaimer.toLowerCase(), contains('estimate'));
-        expect(opp.projectedReturnLabel.toLowerCase(), contains('est'));
-      }
+      const opportunity = ImpOpportunity(
+        id: 'opportunity-1',
+        code: 'OPP-1',
+        title: 'Production opportunity',
+        projectedReturnPct: 12,
+      );
+      expect(opportunity.returnDisclaimer.toLowerCase(), contains('estimate'));
+      expect(opportunity.projectedReturnLabel.toLowerCase(), contains('est'));
     });
   });
 
-  group('ImpService', () {
-    test('offline client returns demo command center', () async {
+  group('ImpService production behavior', () {
+    test('offline client fails instead of returning fabricated data', () async {
       final service = ImpService();
-      final snap = await service.loadCommandCenter();
-      expect(snap.fromRemote, isFalse);
-      expect(snap.investors, isNotEmpty);
-      expect(snap.kpis.length, greaterThanOrEqualTo(6));
+      await expectLater(service.loadCommandCenter(), throwsStateError);
     });
 
-    test('generatePortfolioSummary stub is informative', () {
+    test('deferred AI summary does not fabricate advice', () {
       final service = ImpService();
-      final investor = ImpDemo.snapshot().investors.first;
+      const investor = ImpInvestor(
+        id: 'investor-1',
+        investorCode: 'INV-1',
+        fullName: 'Investor One',
+      );
       final summary = service.generatePortfolioSummary(investor);
-      expect(summary, contains('AI Investment summary'));
-      expect(summary.toLowerCase(), contains('hnwi'));
-      expect(summary, contains(investor.aumDisplay));
+      expect(summary, isEmpty);
     });
 
     test('computePortfolioValue sums holdings', () {
-      final snap = ImpDemo.snapshot();
-      final total = ImpService.computePortfolioValue(snap.holdings);
-      expect(total, greaterThan(0));
-      expect(total, equals(78000000 + 275000000));
+      const holdings = [
+        ImpHolding(
+          id: 'holding-1',
+          portfolioId: 'portfolio-1',
+          label: 'Holding one',
+          currentValue: 78000000,
+        ),
+        ImpHolding(
+          id: 'holding-2',
+          portfolioId: 'portfolio-1',
+          label: 'Holding two',
+          currentValue: 275000000,
+        ),
+      ];
+      expect(
+        ImpService.computePortfolioValue(holdings),
+        equals(78000000 + 275000000),
+      );
     });
   });
 }

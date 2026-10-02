@@ -34,6 +34,9 @@ abstract interface class AuthRepository {
   /// Resends the signup confirmation email (Supabase Auth).
   Future<void> resendSignupEmail(String email);
 
+  /// Reloads Auth user + profile so `emailConfirmed` is up to date.
+  Future<UserProfile?> refreshEmailVerificationStatus();
+
   Future<UserProfile?> fetchCurrentProfile();
   Future<Set<String>> refreshPermissions();
 }

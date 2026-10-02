@@ -75,12 +75,12 @@ void main() {
   });
 
   group('DdcmsService', () {
-    test('offline client returns demo command center', () async {
+    test('offline client returns empty live-ready command center', () async {
       final service = DdcmsService();
       final snap = await service.loadCommandCenter();
       expect(snap.fromRemote, isFalse);
       expect(snap.kpis.length, greaterThanOrEqualTo(7));
-      expect(snap.documents, isNotEmpty);
+      expect(snap.documents, isEmpty);
     });
 
     test('AI intelligence briefing stub includes disclaimer and signals', () {

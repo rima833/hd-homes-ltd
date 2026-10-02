@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/core/utils/provider_lifecycle.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/personalization_models.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/profile_models.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/personalization_service.dart';
@@ -17,18 +20,101 @@ final personalizationServiceProvider = Provider<PersonalizationService>((ref) {
 
 final personalizationSnapshotProvider =
     FutureProvider<PersonalizationSnapshot?>((ref) async {
-  final session = ref.watch(identitySessionProvider);
-  final userId = session.userId;
-  if (userId == null) return null;
-  final name = [
-    session.profile?.firstName,
-    session.profile?.lastName,
-  ].whereType<String>().where((e) => e.isNotEmpty).join(' ');
-  return ref.watch(personalizationServiceProvider).load(
-        userId,
-        role: session.primaryRole,
-        displayName: name.isEmpty ? (session.email ?? 'there') : name,
+      final session = ref.watch(identitySessionProvider);
+      final userId = session.userId;
+      if (userId == null) return null;
+      final name = [
+        session.profile?.firstName,
+        session.profile?.lastName,
+      ].whereType<String>().where((e) => e.isNotEmpty).join(' ');
+      return ref
+          .watch(personalizationServiceProvider)
+          .load(
+            userId,
+            role: session.primaryRole,
+            displayName: name.isEmpty ? (session.email ?? 'there') : name,
+          );
+    });
+
+final personalizationAnalyticsDaysProvider = StateProvider<int>((ref) => 30);
+
+final personalizationAnalyticsProvider =
+    FutureProvider<PersonalizationAnalyticsSnapshot>((ref) {
+      final days = ref.watch(personalizationAnalyticsDaysProvider);
+      return ref
+          .watch(personalizationServiceProvider)
+          .loadAdminAnalytics(days: days);
+    });
+
+enum PersonalizationAnalyticsRealtimeState { offline, connecting, live, error }
+
+final personalizationAnalyticsRealtimeStateProvider =
+    StateProvider<PersonalizationAnalyticsRealtimeState>(
+      (ref) => PersonalizationAnalyticsRealtimeState.offline,
+    );
+
+/// Invalidates aggregate analytics after daily counter changes.
+final personalizationAnalyticsRealtimeProvider = Provider<void>((ref) {
+  void setState(PersonalizationAnalyticsRealtimeState value) {
+    deferProviderMutation(
+      () =>
+          ref
+                  .read(personalizationAnalyticsRealtimeStateProvider.notifier)
+                  .state =
+              value,
+    );
+  }
+
+  if (!ref.watch(supabaseConfiguredProvider)) {
+    setState(PersonalizationAnalyticsRealtimeState.offline);
+    return;
+  }
+  final userId = ref.watch(identitySessionProvider.select((s) => s.userId));
+  if (userId == null || userId.isEmpty) {
+    setState(PersonalizationAnalyticsRealtimeState.offline);
+    return;
+  }
+
+  setState(PersonalizationAnalyticsRealtimeState.connecting);
+  final client = ref.watch(supabaseClientProvider);
+  Timer? debounce;
+  void refresh() {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 400), () {
+      deferProviderMutation(
+        () => ref.invalidate(personalizationAnalyticsProvider),
       );
+    });
+  }
+
+  final token = client.auth.currentSession?.accessToken;
+  if (token != null && token.isNotEmpty) {
+    unawaited(client.realtime.setAuth(token));
+  }
+
+  final channel = client.channel('admin-personalization-analytics')
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'personalization_analytics_daily',
+      callback: (_) => refresh(),
+    );
+  channel.subscribe((status, _) {
+    setState(switch (status) {
+      RealtimeSubscribeStatus.subscribed =>
+        PersonalizationAnalyticsRealtimeState.live,
+      RealtimeSubscribeStatus.timedOut ||
+      RealtimeSubscribeStatus.channelError =>
+        PersonalizationAnalyticsRealtimeState.error,
+      RealtimeSubscribeStatus.closed =>
+        PersonalizationAnalyticsRealtimeState.offline,
+    });
+  });
+  ref.onDispose(() {
+    debounce?.cancel();
+    unawaited(client.removeChannel(channel));
+    setState(PersonalizationAnalyticsRealtimeState.offline);
+  });
 });
 
 final personalizationRealtimeProvider = Provider<void>((ref) {
@@ -37,7 +123,9 @@ final personalizationRealtimeProvider = Provider<void>((ref) {
   if (userId == null) return;
   RealtimeChannel? channel;
   channel = ref.read(personalizationServiceProvider).subscribe(userId, () {
-    ref.invalidate(personalizationSnapshotProvider);
+    deferProviderMutation(
+      () => ref.invalidate(personalizationSnapshotProvider),
+    );
   });
   ref.onDispose(() => channel?.unsubscribe());
 });
@@ -74,8 +162,8 @@ class PersonalizationUiState {
 
 final personalizationControllerProvider =
     NotifierProvider<PersonalizationController, PersonalizationUiState>(
-  PersonalizationController.new,
-);
+      PersonalizationController.new,
+    );
 
 class PersonalizationController extends Notifier<PersonalizationUiState> {
   @override
@@ -118,6 +206,18 @@ class PersonalizationController extends Notifier<PersonalizationUiState> {
     state = state.copyWith(isBusy: false, message: 'Dashboard layout saved.');
   }
 
+  Future<void> switchWorkspace(DashboardLayout workspace) async {
+    final userId = _userId;
+    if (userId == null || state.isBusy) return;
+    state = state.copyWith(isBusy: true, clearError: true);
+    await _service.switchWorkspace(userId, workspace);
+    ref.invalidate(personalizationSnapshotProvider);
+    state = state.copyWith(
+      isBusy: false,
+      message: '${workspace.name} selected.',
+    );
+  }
+
   Future<void> toggleWidget(DashboardWidgetId id) async {
     final snap = ref.read(personalizationSnapshotProvider).valueOrNull;
     if (snap == null) return;
@@ -149,20 +249,6 @@ class PersonalizationController extends Notifier<PersonalizationUiState> {
     await _service.saveInterests(userId, interests);
     ref.invalidate(personalizationSnapshotProvider);
     state = state.copyWith(isBusy: false, message: 'Property interests saved.');
-  }
-
-  Future<void> addDemoFavorite() async {
-    final userId = _userId;
-    if (userId == null) return;
-    await _service.addFavorite(
-      userId: userId,
-      type: FavoriteItemType.property,
-      entityId: 'demo-property',
-      title: 'Bookmarked property',
-      subtitle: 'Added from Preference Center',
-    );
-    ref.invalidate(personalizationSnapshotProvider);
-    state = state.copyWith(message: 'Favorite added.');
   }
 
   Future<void> createSavedSearch({

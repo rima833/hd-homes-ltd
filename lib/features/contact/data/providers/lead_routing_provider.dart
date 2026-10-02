@@ -1,7 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hdhomesproject/core/growth/analytics/journey_tracker.dart';
-import 'package:hdhomesproject/core/growth/lead_scoring/smart_lead_scoring.dart';
-import 'package:hdhomesproject/core/growth/personalization/visitor_profile.dart';
 import 'package:hdhomesproject/features/contact/data/models/contact_content.dart';
 
 /// Smart lead routing engine — assigns score, department, and staff (CRM placeholder).
@@ -111,8 +108,6 @@ SubmittedLead submitLead(
   bool generatePass = false,
 }) {
   final routing = routeLead(qualification, inquiryType: type);
-  final profile = ref.read(visitorProfileProvider);
-  final smart = computeSmartLeadScore(baseRouting: routing, profile: profile);
   final lead = SubmittedLead(
     id: 'lead-${DateTime.now().millisecondsSinceEpoch}',
     type: type,
@@ -121,6 +116,5 @@ SubmittedLead submitLead(
     visitorPassCode: generatePass ? generateVisitorPassCode() : null,
   );
   ref.read(submittedLeadsProvider.notifier).update((state) => [lead, ...state]);
-  trackGrowthLeadSubmitted(ref, lead, smart);
   return lead;
 }

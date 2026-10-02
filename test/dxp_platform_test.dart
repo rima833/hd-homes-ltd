@@ -1,144 +1,175 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/core/theme/app_theme.dart';
 import 'package:hdhomesproject/features/dxp/domain/entities/dxp_models.dart';
 import 'package:hdhomesproject/features/dxp/domain/services/dxp_service.dart';
+import 'package:hdhomesproject/features/dxp/presentation/pages/marketing_command_center_page.dart';
 import 'package:hdhomesproject/features/dxp/presentation/providers/dxp_controller.dart';
 
+DxpCommandCenterSnapshot dashboardSnapshot() {
+  final empty = DxpCommandCenterSnapshot.empty(fromRemote: true);
+  return DxpCommandCenterSnapshot(
+    kpis: empty.kpis,
+    funnel: const [
+      DxpFunnelStage(label: 'CRM leads', value: 12, stageKey: 'leads'),
+      DxpFunnelStage(label: 'Qualified', value: 1, stageKey: 'qualified'),
+      DxpFunnelStage(label: 'Won / clients', value: 1, stageKey: 'won'),
+    ],
+    campaigns: const [],
+    landingPages: const [],
+    cmsPages: const [],
+    blogPosts: const [],
+    mediaAssets: const [],
+    formSubmissions: const [],
+    seoHealth: const [],
+    calendar: const [],
+    abTests: const [],
+    activities: [
+      DxpActivity(
+        id: 'activity-1',
+        summary: 'Published a new website article from the marketing workspace',
+        actorLabel: 'Marketing team',
+        occurredAt: DateTime.now().subtract(const Duration(minutes: 5)),
+      ),
+    ],
+    alerts: const [],
+    aiInsights: const [],
+    fromRemote: true,
+    loadedAt: DateTime.now(),
+    crmLeadCount: 12,
+    crmQualifiedCount: 1,
+  );
+}
+
 void main() {
-  group('DxpDemo', () {
-    test('snapshot is non-empty across command-center surfaces', () {
-      final snap = DxpDemo.snapshot();
-      expect(snap.landingPages.length, greaterThanOrEqualTo(2));
-      expect(snap.campaigns, isNotEmpty);
-      expect(snap.blogPosts, isNotEmpty);
-      expect(snap.mediaAssets, isNotEmpty);
-      expect(snap.formSubmissions, isNotEmpty);
-      expect(snap.seoHealth, isNotEmpty);
-      expect(snap.calendar, isNotEmpty);
-      expect(snap.abTests, isNotEmpty);
-      expect(snap.funnel.length, greaterThanOrEqualTo(3));
-      expect(snap.activities, isNotEmpty);
-      expect(snap.alerts, isNotEmpty);
-      expect(snap.kpis, isNotEmpty);
-      expect(snap.aiInsights, isNotEmpty);
+  group('DxpService live-safe behavior', () {
+    test('offline client returns an empty snapshot without fixtures', () async {
+      final snap = await DxpService().loadCommandCenter();
+
       expect(snap.fromRemote, isFalse);
+      expect(snap.campaigns, isEmpty);
+      expect(snap.landingPages, isEmpty);
+      expect(snap.formSubmissions, isEmpty);
+      expect(snap.activities, isEmpty);
+      expect(snap.alerts, isEmpty);
+      expect(snap.kpis.every((kpi) => kpi.value == 0), isTrue);
     });
 
-    test('KPI strip includes conversion funnel labels', () {
-      final snap = DxpDemo.snapshot();
-      expect(
-        snap.kpis.map((k) => k.label),
-        containsAll([
-          'Published LPs',
-          'Active Campaigns',
-          'Form Leads',
-          'Funnel CVR',
-          'Conversions',
-        ]),
+    test('operational KPIs only use supplied live records', () {
+      final kpis = DxpKpiBuilder.build(
+        campaigns: const [
+          DxpCampaign(
+            id: 'campaign-1',
+            name: 'Real campaign',
+            status: CampaignStatus.active,
+            budgetAmount: 250000,
+          ),
+        ],
+        formSubmissions: const [
+          DxpFormSubmission(
+            id: 'synced',
+            formId: 'form-1',
+            crmLeadId: 'lead-1',
+          ),
+          DxpFormSubmission(id: 'awaiting', formId: 'form-1'),
+        ],
+        seoHealth: const [
+          DxpSeoHealth(id: 'seo-1', path: '/', healthScore: 80, issueCount: 2),
+        ],
+        crmLeadCount: 14,
+        crmQualifiedCount: 3,
+        crmWonCount: 1,
+        publishedContentCount: 4,
+        mediaCount: 7,
+        scheduledContentCount: 2,
       );
-      expect(snap.funnel.map((f) => f.stageKey), containsAll([
-        'awareness',
-        'consideration',
-        'conversion',
-      ]));
-      final awareness =
-          snap.funnel.firstWhere((f) => f.stageKey == 'awareness').value;
-      final conversion =
-          snap.funnel.firstWhere((f) => f.stageKey == 'conversion').value;
-      expect(awareness, greaterThan(conversion));
-      expect(conversion, greaterThan(0));
-    });
 
-    test('AI insights carry editable disclaimer', () {
-      final snap = DxpDemo.snapshot();
-      expect(snap.aiDisclaimer.toLowerCase(), contains('ai-generated'));
-      expect(snap.aiDisclaimer.toLowerCase(), contains('editable'));
-      for (final insight in snap.aiInsights) {
-        expect(insight.disclaimer.toLowerCase(), contains('ai-generated'));
-        expect(insight.disclaimer.toLowerCase(), contains('editable'));
-        expect(insight.editable, isTrue);
-        expect(insight.confidencePct, isNotNull);
-      }
-      final draft = snap.blogPosts.firstWhere((b) => b.aiGenerated);
-      expect(draft.aiDisclaimer, isNotNull);
-      expect(draft.aiEditable, isTrue);
-    });
+      double value(String label) =>
+          kpis.firstWhere((kpi) => kpi.label == label).value;
 
-    test('campaign channels and landing statuses are present', () {
-      final snap = DxpDemo.snapshot();
+      // Synced forms are already CRM leads and must not be double-counted.
+      expect(value('CRM Leads'), 15);
+      expect(value('Qualified Leads'), 3);
+      expect(value('Won / Clients'), 1);
+      expect(value('Active Campaigns'), 1);
+      expect(value('Planned Budget'), 250000);
+      expect(value('Awaiting CRM Sync'), 1);
+      expect(value('SEO Issues'), 2);
+      expect(kpis.map((kpi) => kpi.label), isNot(contains('Website Visitors')));
+      expect(kpis.map((kpi) => kpi.label), isNot(contains('Campaign Spend')));
       expect(
-        snap.campaigns.map((c) => c.channel),
-        containsAll(['email', 'sms', 'whatsapp']),
-      );
-      expect(
-        snap.landingPages.any((p) => p.status == LandingPageStatus.published),
-        isTrue,
-      );
-      expect(
-        snap.landingPages.any((p) => p.status == LandingPageStatus.draft),
-        isTrue,
-      );
-      expect(
-        snap.blogPosts.any((b) => b.status == BlogPostStatus.draft),
-        isTrue,
-      );
-    });
-  });
-
-  group('DxpService', () {
-    test('offline client returns demo command center', () async {
-      final service = DxpService();
-      final snap = await service.loadCommandCenter();
-      expect(snap.fromRemote, isFalse);
-      expect(snap.landingPages, isNotEmpty);
-      expect(snap.kpis.length, greaterThanOrEqualTo(7));
-      expect(snap.funnel.length, greaterThanOrEqualTo(3));
-    });
-
-    test('AI content briefing stub includes disclaimer and leads', () {
-      final service = DxpService();
-      final snap = DxpDemo.snapshot();
-      final briefing = service.generateContentBriefing(snap);
-      expect(briefing, contains('AI content briefing'));
-      expect(briefing.toLowerCase(), contains('ai-generated'));
-      expect(briefing.toLowerCase(), contains('editable'));
-      expect(briefing.toLowerCase(), contains('lead'));
-    });
-
-    test('conversion signals flag funnel CVR and running A/B', () {
-      final snap = DxpDemo.snapshot();
-      final signals = DxpService.detectConversionSignals(snap);
-      expect(signals, isNotEmpty);
-      expect(
-        signals.any((s) => s.toLowerCase().contains('funnel')),
-        isTrue,
-      );
-      expect(
-        signals.any((s) => s.toLowerCase().contains('a/b')),
-        isTrue,
+        kpis.map((kpi) => kpi.label),
+        isNot(contains('Revenue Attributed')),
       );
     });
   });
 
   group('DxpController contract', () {
-    test('tabs cover required surfaces without state-in-build', () {
-      // Conceptual guard: tabs match deliverable; Notifier.build must return
-      // initial DxpUiState without reading `state` (see dxp_controller.dart).
-      expect(DxpCommandTab.values.map((t) => t.name), containsAll([
-        'overview',
-        'pages',
-        'landing',
-        'blog',
-        'media',
-        'campaigns',
-        'forms',
-        'seo',
-        'calendar',
-        'ai',
-      ]));
-      const initial = DxpUiState();
-      expect(initial.selectedTab, DxpCommandTab.overview);
-      expect(initial.tickerIndex, 0);
-      expect(initial.copyWith(tickerIndex: 1).tickerIndex, 1);
+    test('tabs expose only working management surfaces', () {
+      expect(
+        DxpCommandTab.values.map((tab) => tab.name),
+        containsAll([
+          'overview',
+          'pages',
+          'landing',
+          'blog',
+          'media',
+          'campaigns',
+          'forms',
+          'seo',
+          'calendar',
+        ]),
+      );
+      expect(
+        DxpCommandTab.values.map((tab) => tab.name),
+        isNot(contains('ai')),
+      );
+      expect(const DxpUiState().selectedTab, DxpCommandTab.overview);
     });
+  });
+
+  testWidgets('command center renders the live operational workspace', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    for (final size in const [
+      Size(1280, 1200),
+      Size(1024, 576),
+      Size(900, 1600),
+      Size(768, 700),
+      Size(390, 2600),
+    ]) {
+      await tester.binding.setSurfaceSize(size);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            supabaseConfiguredProvider.overrideWith((ref) => false),
+            dxpSnapshotProvider.overrideWith(
+              (ref) async => dashboardSnapshot(),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark,
+            home: const MarketingCommandCenterPage(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'overflow at $size');
+    }
+
+    expect(
+      find.text('Here’s what’s happening across marketing today.'),
+      findsOneWidget,
+    );
+    expect(find.text('CRM Leads'), findsOneWidget);
+    expect(find.text('Sales pipeline'), findsOneWidget);
+    expect(find.text('Lead Pipeline'), findsOneWidget);
+    expect(find.text('Website Visitors'), findsNothing);
+    expect(find.text('Campaign Spend'), findsNothing);
+    expect(find.text('AI Studio'), findsNothing);
   });
 }

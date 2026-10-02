@@ -59,6 +59,24 @@ final ddcmsRealtimeProvider = Provider<void>((ref) {
       table: 'document_notifications',
       callback: (_) => ref.invalidate(ddcmsSnapshotProvider),
     )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'contract_records',
+      callback: (_) => ref.invalidate(ddcmsSnapshotProvider),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'digital_assets',
+      callback: (_) => ref.invalidate(ddcmsSnapshotProvider),
+    )
+    ..onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'document_shares',
+      callback: (_) => ref.invalidate(ddcmsSnapshotProvider),
+    )
     ..subscribe();
 
   ref.onDispose(() {
@@ -190,6 +208,59 @@ class DdcmsController extends Notifier<DdcmsUiState> {
   }
 
   Future<void> refresh() async {
+    ref.invalidate(ddcmsSnapshotProvider);
+  }
+
+  Future<void> uploadDocument({
+    required String title,
+    required String fileName,
+    required List<int> bytes,
+    String? description,
+    String? category,
+  }) async {
+    await ref.read(ddcmsServiceProvider).uploadDocument(
+          title: title,
+          fileName: fileName,
+          bytes: bytes,
+          description: description,
+          category: category,
+          status: 'published',
+        );
+    ref.invalidate(ddcmsSnapshotProvider);
+    state = state.copyWith(
+      lastMessage: 'Document uploaded to the enterprise vault.',
+      selectedTab: DdcmsCommandTab.repository,
+    );
+  }
+
+  Future<void> publishDocument({
+    required DdcmsDocument document,
+    required String audience, // client | investor
+    required String targetId,
+    String documentType = 'shared',
+  }) async {
+    final service = ref.read(ddcmsServiceProvider);
+    if (audience == 'investor') {
+      await service.publishToInvestor(
+        documentId: document.id,
+        investorId: targetId,
+        documentType: documentType,
+        title: document.title,
+      );
+      state = state.copyWith(
+        lastMessage: 'Published “${document.title}” to investor portal.',
+      );
+    } else {
+      await service.publishToClient(
+        documentId: document.id,
+        clientId: targetId,
+        documentType: documentType,
+        title: document.title,
+      );
+      state = state.copyWith(
+        lastMessage: 'Published “${document.title}” to client portal.',
+      );
+    }
     ref.invalidate(ddcmsSnapshotProvider);
   }
 

@@ -1,5 +1,6 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:hdhomesproject/core/media/widgets/delivery_image.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/features/properties/data/models/property_detail_content.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -22,6 +23,12 @@ class _PropertyMediaGalleryState extends State<PropertyMediaGallery> {
   @override
   Widget build(BuildContext context) {
     final count = widget.media.images.length;
+    if (count == 0) {
+      return SizedBox(
+        height: MediaQuery.sizeOf(context).width < 720 ? 320 : 480,
+        child: _galleryPlaceholder(0),
+      );
+    }
 
     return Stack(
       children: [
@@ -34,35 +41,22 @@ class _PropertyMediaGalleryState extends State<PropertyMediaGallery> {
             onPageChanged: (i, _) => setState(() => _index = i),
           ),
           itemBuilder: (context, index, _) {
-            return Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.charcoal,
-                    AppColors.gold.withValues(alpha: 0.15 + index * 0.02),
-                  ],
+            final src = widget.media.images[index];
+            final isNetwork =
+                src.startsWith('http://') || src.startsWith('https://');
+            if (isNetwork) {
+              return MediaDeliveryImage(
+                url: src,
+                fit: BoxFit.cover,
+                placeholder: Container(
+                  color: AppColors.charcoal,
+                  alignment: Alignment.center,
+                  child: const CircularProgressIndicator(color: AppColors.gold),
                 ),
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      index == 0 && widget.media.hasDroneFootage
-                          ? LucideIcons.plane
-                          : LucideIcons.image,
-                      size: 48,
-                      color: AppColors.gold,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Gallery ${index + 1} of $count',
-                      style: const TextStyle(color: AppColors.white),
-                    ),
-                  ],
-                ),
-              ),
-            );
+                errorWidget: _galleryPlaceholder(index),
+              );
+            }
+            return _galleryPlaceholder(index);
           },
         ),
         Positioned(
@@ -110,6 +104,39 @@ class _PropertyMediaGalleryState extends State<PropertyMediaGallery> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _galleryPlaceholder(int index) {
+    final count = widget.media.images.length;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.charcoal,
+            AppColors.gold.withValues(alpha: 0.15 + index * 0.02),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              index == 0 && widget.media.hasDroneFootage
+                  ? LucideIcons.plane
+                  : LucideIcons.image,
+              size: 48,
+              color: AppColors.gold,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Gallery ${index + 1} of $count',
+              style: const TextStyle(color: AppColors.white),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

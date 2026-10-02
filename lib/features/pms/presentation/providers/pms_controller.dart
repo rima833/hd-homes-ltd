@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/pms/domain/entities/pms_models.dart';
 import 'package:hdhomesproject/features/pms/domain/services/pms_service.dart';
+import 'package:hdhomesproject/features/pms/domain/services/property_wizard_persistence.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final pmsServiceProvider = Provider<PmsService>((ref) {
@@ -78,6 +80,7 @@ class PmsUiState {
     this.selectedPropertyIds = const {},
     this.lastMessage,
     this.tickerIndex = 0,
+    this.wizardSubmitting = false,
   });
 
   final String searchQuery;
@@ -87,6 +90,7 @@ class PmsUiState {
   final Set<String> selectedPropertyIds;
   final String? lastMessage;
   final int tickerIndex;
+  final bool wizardSubmitting;
 
   PmsUiState copyWith({
     String? searchQuery,
@@ -98,6 +102,7 @@ class PmsUiState {
     String? lastMessage,
     bool clearMessage = false,
     int? tickerIndex,
+    bool? wizardSubmitting,
   }) {
     return PmsUiState(
       searchQuery: searchQuery ?? this.searchQuery,
@@ -107,6 +112,7 @@ class PmsUiState {
       selectedPropertyIds: selectedPropertyIds ?? this.selectedPropertyIds,
       lastMessage: clearMessage ? null : (lastMessage ?? this.lastMessage),
       tickerIndex: tickerIndex ?? this.tickerIndex,
+      wizardSubmitting: wizardSubmitting ?? this.wizardSubmitting,
     );
   }
 }
@@ -149,15 +155,34 @@ class PmsController extends Notifier<PmsUiState> {
     state = state.copyWith(wizardDraft: draft);
   }
 
-  void submitWizardDraft() {
+  Future<void> submitWizardDraft() async {
+    if (state.wizardSubmitting) return;
     final draft = state.wizardDraft;
-    final title = draft.title.trim().isEmpty ? 'Untitled property' : draft.title.trim();
-    state = state.copyWith(
-      lastMessage:
-          'Queued “$title” — apply PMS SQL for persistence',
-      wizardDraft: const PmsWizardDraft(),
-      selectedTab: PmsCommandTab.inventory,
-    );
+    final title =
+        draft.title.trim().isEmpty ? 'Untitled property' : draft.title.trim();
+    state = state.copyWith(wizardSubmitting: true, clearMessage: true);
+    try {
+      final cms = ref.read(cmsServiceProvider);
+      final created = await persistWizardDraft(cms: cms, draft: draft);
+      final published = created.isPublished;
+      state = state.copyWith(
+        wizardSubmitting: false,
+        lastMessage: published
+            ? 'Published “${created.title}” — live on /properties'
+            : 'Saved “${created.title}” as draft in Listings',
+        wizardDraft: const PmsWizardDraft(),
+        selectedTab: PmsCommandTab.inventory,
+      );
+      ref.invalidate(pmsSnapshotProvider);
+      ref.invalidate(cmsFeaturedPropertiesProvider(null));
+      ref.invalidate(publishedFeaturedPropertiesProvider);
+      ref.invalidate(publishedPropertiesCatalogProvider);
+    } catch (e) {
+      state = state.copyWith(
+        wizardSubmitting: false,
+        lastMessage: 'Could not save “$title”: $e',
+      );
+    }
   }
 
   void toggleSelect(String propertyId) {
@@ -172,6 +197,54 @@ class PmsController extends Notifier<PmsUiState> {
 
   void clearSelection() {
     state = state.copyWith(selectedPropertyIds: {});
+  }
+
+  Future<void> publishSelected() async {
+    final ids = state.selectedPropertyIds.toList();
+    if (ids.isEmpty) return;
+    final cms = ref.read(cmsServiceProvider);
+    try {
+      for (final id in ids) {
+        await cms.setPropertyPublished(id, true);
+      }
+      state = state.copyWith(
+        selectedPropertyIds: {},
+        lastMessage:
+            'Published ${ids.length} ${ids.length == 1 ? 'listing' : 'listings'}.',
+      );
+      ref.invalidate(pmsSnapshotProvider);
+      ref.invalidate(cmsFeaturedPropertiesProvider(null));
+      ref.invalidate(publishedFeaturedPropertiesProvider);
+      ref.invalidate(publishedPropertiesCatalogProvider);
+    } catch (error) {
+      state = state.copyWith(
+        lastMessage: 'Could not publish the selection: $error',
+      );
+    }
+  }
+
+  Future<void> archiveSelected() async {
+    final ids = state.selectedPropertyIds.toList();
+    if (ids.isEmpty) return;
+    final cms = ref.read(cmsServiceProvider);
+    try {
+      for (final id in ids) {
+        await cms.archiveProperty(id);
+      }
+      state = state.copyWith(
+        selectedPropertyIds: {},
+        lastMessage:
+            'Archived ${ids.length} ${ids.length == 1 ? 'listing' : 'listings'}. They are off the public site.',
+      );
+      ref.invalidate(pmsSnapshotProvider);
+      ref.invalidate(cmsFeaturedPropertiesProvider(null));
+      ref.invalidate(publishedFeaturedPropertiesProvider);
+      ref.invalidate(publishedPropertiesCatalogProvider);
+    } catch (error) {
+      state = state.copyWith(
+        lastMessage: 'Could not archive the selection: $error',
+      );
+    }
   }
 
   void setMessage(String message) {

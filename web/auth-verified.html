@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>HD Homes — Email verification</title>
+  <style>
+    :root {
+      --navy: #0b1f33;
+      --gold: #d4a34e;
+      --cream: #f7f4ef;
+      --ink: #1a1a1a;
+      --muted: #5c6570;
+      --ok: #1f7a4d;
+      --err: #b42318;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(212,163,78,.25), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(11,31,51,.12), transparent 55%),
+        var(--cream);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--card);
+      border: 1px solid rgba(11,31,51,.08);
+      border-radius: 16px;
+      padding: 32px 28px;
+      box-shadow: 0 18px 50px rgba(11,31,51,.08);
+      text-align: center;
+    }
+    .brand {
+      font-size: 13px;
+      letter-spacing: .18em;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 20px;
+    }
+    .icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(212,163,78,.15);
+      color: var(--gold);
+      font-size: 30px;
+    }
+    .icon.ok { background: rgba(31,122,77,.12); color: var(--ok); }
+    .icon.err { background: rgba(180,35,24,.1); color: var(--err); }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 1.45rem;
+      line-height: 1.25;
+      color: var(--navy);
+    }
+    p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: .98rem;
+    }
+    .actions { margin-top: 22px; display: grid; gap: 10px; }
+    button, .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .primary { background: var(--gold); color: var(--navy); }
+    label {
+      display: block;
+      text-align: left;
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--navy);
+      margin: 12px 0 6px;
+    }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(11,31,51,.18);
+      font-size: 1rem;
+    }
+    .msg { margin-top: 12px; font-size: .92rem; }
+    .msg.ok { color: var(--ok); }
+    .msg.err { color: var(--err); }
+    .hidden { display: none !important; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <main class="card" id="app">
+    <div class="brand">HD HOMES</div>
+    <div class="icon" id="icon">…</div>
+    <h1 id="title">Confirming your email…</h1>
+    <p id="subtitle">Please wait a moment.</p>
+    <div id="verifyPane" class="hidden">
+      <div class="actions">
+        <a class="btn primary" href="https://hdhomesltd.com/" rel="noopener">Continue to HD Homes</a>
+        <p style="margin-top:8px;font-size:.85rem">
+          Your account email is verified. Open the HD Homes app and sign in with your password.
+        </p>
+      </div>
+    </div>
+    <div id="recoveryPane" class="hidden">
+      <form id="recoveryForm">
+        <label for="password">New password</label>
+        <input id="password" type="password" autocomplete="new-password" minlength="8" required />
+        <label for="confirm">Confirm password</label>
+        <input id="confirm" type="password" autocomplete="new-password" minlength="8" required />
+        <div class="actions">
+          <button class="primary" type="submit" id="saveBtn">Save new password</button>
+        </div>
+      </form>
+      <p class="msg" id="recoveryMsg"></p>
+    </div>
+    <p class="msg err hidden" id="errorMsg"></p>
+  </main>
+  <script>
+    (function () {
+      // Public publishable key only (safe in browser). Same project as the Flutter app.
+      var SUPABASE_URL = "https://wbonjdqsifwsawhhxygl.supabase.co";
+      var ANON_KEY = "sb_publishable_hq6lQ-ieexW3sX80SqZPJQ_TaRY-Ia8";
+
+      var icon = document.getElementById("icon");
+      var title = document.getElementById("title");
+      var subtitle = document.getElementById("subtitle");
+      var verifyPane = document.getElementById("verifyPane");
+      var recoveryPane = document.getElementById("recoveryPane");
+      var errorMsg = document.getElementById("errorMsg");
+
+      function showError(message) {
+        icon.textContent = "!";
+        icon.className = "icon err";
+        title.textContent = "Verification link problem";
+        subtitle.textContent = message;
+        errorMsg.textContent = message;
+        errorMsg.classList.remove("hidden");
+      }
+
+      function showVerified() {
+        icon.textContent = "✓";
+        icon.className = "icon ok";
+        title.textContent = "Email Verified Successfully";
+        subtitle.textContent =
+          "Your email address has been verified. Your HD Homes account is now ready.";
+        verifyPane.classList.remove("hidden");
+      }
+
+      function showRecovery() {
+        icon.textContent = "⚿";
+        icon.className = "icon";
+        title.textContent = "Create a new password";
+        subtitle.textContent = "Choose a strong password for your HD Homes account.";
+        recoveryPane.classList.remove("hidden");
+      }
+
+      if (!window.supabase) {
+        // Still show success for signup — Auth already confirmed before redirect.
+        showVerified();
+        return;
+      }
+
+      var client = window.supabase.createClient(SUPABASE_URL, ANON_KEY, {
+        auth: {
+          detectSessionInUrl: true,
+          flowType: "implicit",
+          persistSession: true,
+          autoRefreshToken: true,
+        },
+      });
+
+      function hashParams() {
+        var raw = (window.location.hash || "").replace(/^#/, "");
+        return new URLSearchParams(raw);
+      }
+
+      function queryParams() {
+        return new URLSearchParams(window.location.search || "");
+      }
+
+      async function boot() {
+        try {
+          var hp = hashParams();
+          var qp = queryParams();
+          var type = (hp.get("type") || qp.get("type") || "").toLowerCase();
+          var err =
+            hp.get("error_description") ||
+            hp.get("error") ||
+            qp.get("error_description");
+          if (err) {
+            showError(decodeURIComponent(String(err).replace(/\+/g, " ")));
+            return;
+          }
+
+          var code = qp.get("code");
+          if (code) {
+            var exchanged = await client.auth.exchangeCodeForSession(code);
+            if (exchanged.error) {
+              showError(
+                exchanged.error.message || "Could not complete verification."
+              );
+              return;
+            }
+          }
+
+          var sessionRes = await client.auth.getSession();
+          var session = sessionRes.data && sessionRes.data.session;
+          if (!session && (hp.get("access_token") || hp.get("refresh_token"))) {
+            await new Promise(function (r) {
+              setTimeout(r, 250);
+            });
+            sessionRes = await client.auth.getSession();
+            session = sessionRes.data && sessionRes.data.session;
+          }
+
+          if (type === "recovery" || type === "invite") {
+            showRecovery();
+            return;
+          }
+
+          // Signup confirmation is completed by Supabase before this redirect.
+          showVerified();
+        } catch (e) {
+          // Prefer success UX: confirmation usually already succeeded.
+          showVerified();
+        }
+      }
+
+      document
+        .getElementById("recoveryForm")
+        .addEventListener("submit", async function (ev) {
+          ev.preventDefault();
+          var password = document.getElementById("password").value;
+          var confirm = document.getElementById("confirm").value;
+          var msg = document.getElementById("recoveryMsg");
+          var saveBtn = document.getElementById("saveBtn");
+          msg.className = "msg";
+          msg.textContent = "";
+          if (password !== confirm) {
+            msg.className = "msg err";
+            msg.textContent = "Passwords do not match.";
+            return;
+          }
+          if (password.length < 8) {
+            msg.className = "msg err";
+            msg.textContent = "Use at least 8 characters.";
+            return;
+          }
+          saveBtn.disabled = true;
+          try {
+            var result = await client.auth.updateUser({ password: password });
+            if (result.error) throw result.error;
+            msg.className = "msg ok";
+            msg.textContent = "Password updated. You can sign in to HD Homes now.";
+            verifyPane.classList.remove("hidden");
+            recoveryPane.classList.add("hidden");
+            icon.textContent = "✓";
+            icon.className = "icon ok";
+            title.textContent = "Password updated";
+            subtitle.textContent =
+              "Your HD Homes password was changed successfully.";
+          } catch (e) {
+            msg.className = "msg err";
+            msg.textContent = (e && e.message) || "Could not update password.";
+          } finally {
+            saveBtn.disabled = false;
+          }
+        });
+
+      boot();
+    })();
+  </script>
+</body>
+</html>

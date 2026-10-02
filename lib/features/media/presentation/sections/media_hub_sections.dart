@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hdhomesproject/core/media/widgets/delivery_image.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
@@ -14,11 +15,13 @@ class MediaHubSections extends StatelessWidget {
   const MediaHubSections({
     super.key,
     required this.cms,
+    this.isLoading = false,
     this.experiencesKey,
     this.pressKitKey,
   });
 
   final MediaHubCms cms;
+  final bool isLoading;
   final GlobalKey? experiencesKey;
   final GlobalKey? pressKitKey;
 
@@ -32,11 +35,26 @@ class MediaHubSections extends StatelessWidget {
             children: [
               const AnimatedSectionTitle(
                 overline: 'SHOWROOMS',
-                title: 'Featured media experiences',
-                subtitle: 'Explore estates and properties through immersive digital showrooms.',
+                title: 'Published galleries',
+                subtitle:
+                    'Live photos from estates and properties as soon as the team publishes them.',
               ),
               const SizedBox(height: AppSpacing.xl),
-              LayoutBuilder(
+              if (isLoading && cms.featuredExperiences.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                  child: CircularProgressIndicator(color: AppColors.gold),
+                )
+              else if (cms.featuredExperiences.isEmpty)
+                Text(
+                  'No published estate or property photos yet. Publish media in admin to see it here in real time.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.slate500,
+                      ),
+                )
+              else
+                LayoutBuilder(
                 builder: (context, constraints) {
                   final cross = context.isMobile ? 1 : 3;
                   return GridView.builder(
@@ -67,26 +85,30 @@ class MediaHubSections extends StatelessWidget {
           child: Column(
             children: [
               const AnimatedSectionTitle(
-                overline: 'ANALYTICS',
-                title: 'Smart media analytics preview',
-                subtitle: 'Engagement insights that feed the Admin Analytics Dashboard.',
+                overline: 'LIVE CATALOG',
+                title: 'Published media at a glance',
+                subtitle: 'These counts refresh when admin publishes or updates photos.',
               ),
               const SizedBox(height: AppSpacing.lg),
               Wrap(
                 spacing: AppSpacing.base,
                 runSpacing: AppSpacing.base,
                 children: [
-                  _AnalyticsChip(label: 'Top photo', value: cms.analytics.topPhoto),
-                  _AnalyticsChip(label: 'Top video', value: cms.analytics.topVideo),
-                  _AnalyticsChip(label: 'Avg view', value: cms.analytics.avgViewDuration),
-                  _AnalyticsChip(label: 'Tour completion', value: cms.analytics.tourCompletionRate),
-                  _AnalyticsChip(label: 'Downloads', value: '${cms.analytics.downloadCount}'),
-                  _AnalyticsChip(label: 'Shares', value: '${cms.analytics.shareCount}'),
+                  _AnalyticsChip(label: 'Photos', value: cms.analytics.topPhoto),
+                  _AnalyticsChip(
+                    label: 'Estate albums',
+                    value: '${cms.analytics.downloadCount}',
+                  ),
+                  _AnalyticsChip(
+                    label: 'Property albums',
+                    value: '${cms.analytics.shareCount}',
+                  ),
                 ],
               ),
             ],
           ),
         ),
+        if (cms.pressKitItems.isNotEmpty || cms.brandAssets.isNotEmpty)
         SectionWrapper(
           key: pressKitKey,
           child: Column(
@@ -220,20 +242,50 @@ class _ExperienceCardState extends State<_ExperienceCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    height: 100,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: AppRadius.cardBorder,
-                      gradient: LinearGradient(
-                        colors: [AppColors.charcoal, AppColors.gold.withValues(alpha: 0.15)],
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        s.thumbnailLabel,
-                        style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.w600),
-                      ),
+                  ClipRRect(
+                    borderRadius: AppRadius.cardBorder,
+                    child: SizedBox(
+                      height: 100,
+                      width: double.infinity,
+                      child: s.imageUrl == null || s.imageUrl!.isEmpty
+                          ? DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.charcoal,
+                                    AppColors.gold.withValues(alpha: 0.15),
+                                  ],
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  s.thumbnailLabel,
+                                  style: const TextStyle(
+                                    color: AppColors.gold,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : MediaDeliveryImage(
+                              url: s.imageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: const ColoredBox(
+                                color: AppColors.charcoal,
+                              ),
+                              errorWidget: ColoredBox(
+                                color: AppColors.charcoal,
+                                child: Center(
+                                  child: Text(
+                                    s.thumbnailLabel,
+                                    style: const TextStyle(
+                                      color: AppColors.gold,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.base),

@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/website/components/animated_section_title.dart';
-import 'package:hdhomesproject/core/website/components/page_container.dart';
 import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
 import 'package:hdhomesproject/features/estates/data/models/estate_detail_content.dart';
-import 'package:hdhomesproject/features/estates/presentation/widgets/interactive_master_plan.dart';
 import 'package:hdhomesproject/features/home/presentation/widgets/animated_statistic.dart';
 
 /// Sections 2–4 — Overview, statistics, master plan.
@@ -21,8 +19,7 @@ class EstateOverviewSections extends StatelessWidget {
     return Column(
       children: [
         SectionWrapper(
-          child: PageContainer(
-            child: Column(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const AnimatedSectionTitle(
@@ -48,12 +45,10 @@ class EstateOverviewSections extends StatelessWidget {
                 ),
               ],
             ),
-          ),
         ),
         SectionWrapper(
           backgroundColor: AppColors.charcoal,
-          child: PageContainer(
-            child: Column(
+          child: Column(
               children: [
                 const AnimatedSectionTitle(
                   overline: 'STATISTICS',
@@ -80,26 +75,38 @@ class EstateOverviewSections extends StatelessWidget {
                 ),
               ],
             ),
-          ),
         ),
         SectionWrapper(
-          child: PageContainer(
-            child: Column(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const AnimatedSectionTitle(
                   overline: 'MASTER PLAN',
-                  title: 'Interactive master plan',
-                  subtitle: 'Zoom, pan, search plots, and reserve directly from the map.',
+                  title: 'Master plan',
+                  subtitle: 'Plot layout and reservation overview.',
                   alignment: TextAlign.start,
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Text(detail.masterPlan.description),
-                const SizedBox(height: AppSpacing.xl),
-                InteractiveMasterPlan(masterPlan: detail.masterPlan),
+                if (detail.masterPlan.plots.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.xl),
+                  Wrap(
+                    spacing: AppSpacing.base,
+                    runSpacing: AppSpacing.base,
+                    children: [
+                      for (final plot in detail.masterPlan.plots.take(24))
+                        Chip(
+                          label: Text(
+                            plot.label.isNotEmpty
+                                ? plot.label
+                                : plot.plotNumber,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
-          ),
         ),
       ],
     );

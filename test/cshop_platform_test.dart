@@ -64,12 +64,13 @@ void main() {
   });
 
   group('CshopService', () {
-    test('offline client returns demo command center', () async {
+    test('offline client never substitutes demo command-center data', () async {
       final service = CshopService();
       final snap = await service.loadCommandCenter();
       expect(snap.fromRemote, isFalse);
-      expect(snap.kpis.length, greaterThanOrEqualTo(7));
-      expect(snap.tickets, isNotEmpty);
+      expect(snap.kpis, isEmpty);
+      expect(snap.tickets, isEmpty);
+      expect(snap.liveChatError, isNotNull);
     });
 
     test('AI resolution briefing stub includes disclaimer and signals', () {
@@ -85,35 +86,32 @@ void main() {
       final snap = CshopDemo.snapshot();
       final signals = CshopService.detectSupportSignals(snap);
       expect(signals, isNotEmpty);
-      expect(
-        signals.any((s) => s.toLowerCase().contains('sla')),
-        isTrue,
-      );
-      expect(
-        signals.any((s) => s.toLowerCase().contains('chat')),
-        isTrue,
-      );
+      expect(signals.any((s) => s.toLowerCase().contains('sla')), isTrue);
+      expect(signals.any((s) => s.toLowerCase().contains('chat')), isTrue);
     });
   });
 
   group('CshopController contract', () {
     test('tabs cover required support surfaces without state-in-build', () {
-      expect(CshopCommandTab.values.map((t) => t.name), containsAll([
-        'overview',
-        'tickets',
-        'inbox',
-        'liveChat',
-        'email',
-        'whatsapp',
-        'knowledge',
-        'sla',
-        'agents',
-        'analytics',
-        'ai',
-        'feedback',
-      ]));
+      expect(
+        CshopCommandTab.values.map((t) => t.name),
+        containsAll([
+          'overview',
+          'tickets',
+          'inbox',
+          'liveChat',
+          'email',
+          'whatsapp',
+          'knowledge',
+          'sla',
+          'agents',
+          'analytics',
+          'ai',
+          'feedback',
+        ]),
+      );
       const initial = CshopUiState();
-      expect(initial.selectedTab, CshopCommandTab.overview);
+      expect(initial.selectedTab, CshopCommandTab.tickets);
       expect(initial.tickerIndex, 0);
       expect(initial.copyWith(tickerIndex: 1).tickerIndex, 1);
     });

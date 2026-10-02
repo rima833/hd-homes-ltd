@@ -12,6 +12,7 @@ import 'package:hdhomesproject/features/authentication/domain/repositories/sessi
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/device_fingerprint_service.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/login_validator.dart';
+import 'package:hdhomesproject/features/authentication/domain/services/mfa_service.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/smart_login_router.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/identity_provider.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/mfa_controller.dart';
@@ -93,12 +94,13 @@ class AuthController extends AsyncNotifier<UserProfile?> {
       return null;
     }
 
+    state = const AsyncLoading();
+
     final delay = security.progressiveDelay();
     if (delay > Duration.zero) {
       await Future<void>.delayed(delay);
     }
 
-    state = const AsyncLoading();
     LoginResult? result;
     state = await AsyncValue.guard(() async {
       try {
@@ -126,10 +128,18 @@ class AuthController extends AsyncNotifier<UserProfile?> {
           ),
         );
 
-        // MFA gate — Adaptive Security Engine™
-        final mfa = ref.read(mfaServiceProvider);
+        // Ensure fingerprint is minted so trust lookups hit the same device id.
+        final fpService = await ref.read(deviceFingerprintServiceProvider.future);
+        await fpService.fingerprint();
+        final configured = ref.read(supabaseConfiguredProvider);
+        final mfa = MfaService(
+          security: ref.read(securityServiceProvider),
+          client: configured ? ref.read(supabaseClientProvider) : null,
+          fingerprint: fpService,
+        );
         final mfaStatus = await mfa.status(role: profile.primaryRole);
-        final trusted = await mfa.isCurrentDeviceTrusted();
+        final trusted = mfaStatus.currentDeviceTrusted ||
+            await mfa.isCurrentDeviceTrusted();
         final decision = mfa.evaluateLogin(
           role: profile.primaryRole,
           status: mfaStatus,
@@ -156,6 +166,12 @@ class AuthController extends AsyncNotifier<UserProfile?> {
           }
         }
 
+        // Always refresh the MFA gate with fingerprint-aware status so the
+        // router agrees (trusted skip must not be overridden by a stale null-FP
+        // snapshot that still reports needsChallenge).
+        ref.invalidate(mfaStatusProvider);
+        await ref.read(mfaStatusProvider.future);
+
         result = LoginResult(
           profile: profile,
           destination: nextPath,
@@ -168,11 +184,12 @@ class AuthController extends AsyncNotifier<UserProfile?> {
         ref.read(goRouterProvider).go(nextPath);
         return profile;
       } catch (e) {
+        final mapped = mapToAppException(e);
         security.recordFailedLogin(
           email: credentials.email,
-          reason: e is AppException ? e.message : 'auth_error',
+          reason: mapped.message,
         );
-        rethrow;
+        throw mapped;
       }
     });
     return result;
@@ -204,14 +221,17 @@ class AuthController extends AsyncNotifier<UserProfile?> {
 
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final profile = await repository.signUpWithEmail(
-        email: email,
-        password: password,
-        firstName: firstName,
-        lastName: lastName,
-        metadata: metadata,
-      );
-      return profile;
+      try {
+        return await repository.signUpWithEmail(
+          email: email,
+          password: password,
+          firstName: firstName,
+          lastName: lastName,
+          metadata: metadata,
+        );
+      } catch (e) {
+        throw mapToAppException(e);
+      }
     });
   }
 

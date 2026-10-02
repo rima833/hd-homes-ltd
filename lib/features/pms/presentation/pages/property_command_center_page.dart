@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/config/ai_features.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/core/widgets/offline_updates_note.dart';
 import 'package:hdhomesproject/features/pms/domain/entities/pms_models.dart';
-import 'package:hdhomesproject/features/pms/domain/services/pms_service.dart';
 import 'package:hdhomesproject/features/pms/presentation/providers/pms_controller.dart';
+import 'package:hdhomesproject/features/pms/presentation/widgets/property_creation_wizard.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -118,10 +122,24 @@ class PropertyCommandCenterPage extends ConsumerWidget {
             child: _SectionCard(
               title: 'Property Creation Wizard',
               icon: LucideIcons.sparkles,
-              child: _PropertyWizard(
-                draft: ui.wizardDraft,
-                onChanged: controller.updateWizardStep,
-                onSubmit: controller.submitWizardDraft,
+              child: SizedBox(
+                height: 860,
+                child: PropertyCreationWizard(
+                  draft: ui.wizardDraft,
+                  onChanged: controller.updateWizardStep,
+                  onSubmit: () {
+                    unawaited(controller.submitWizardDraft());
+                  },
+                  onSaveDraft: () {
+                    controller.updateWizardStep(
+                      ui.wizardDraft.copyWith(
+                        publishStatus: PublishWorkflowStatus.draft,
+                      ),
+                    );
+                    unawaited(controller.submitWizardDraft());
+                  },
+                  isSubmitting: ui.wizardSubmitting,
+                ),
               ),
             ),
           ),
@@ -143,17 +161,6 @@ class PropertyCommandCenterPage extends ConsumerWidget {
               title: 'Smart Inventory Intelligence™',
               icon: LucideIcons.brain,
               child: _IntelligenceList(items: snap.inventoryIntelligence),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: _SectionCard(
-              title: 'AI Property Assistant™',
-              icon: LucideIcons.sparkles,
-              child: _AiAssistantPanel(
-                insights: snap.aiInsights,
-                properties: snap.properties,
-                service: ref.read(pmsServiceProvider),
-              ),
             ),
           ),
         ];
@@ -235,23 +242,8 @@ class _PmsHeader extends StatelessWidget {
                       color: AppColors.white,
                     ),
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withValues(alpha: 0.15),
-                      borderRadius: AppRadius.cardBorder,
-                    ),
-                    child: Text(
-                      fromRemote ? 'LIVE' : 'DEMO',
-                      style: TextStyle(
-                        color:
-                            fromRemote ? Colors.greenAccent : AppColors.gold,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
+                  if (!fromRemote)
+                    const OfflineUpdatesNote(color: Colors.white70),
                 ],
               );
               if (narrow) {
@@ -392,12 +384,15 @@ class _TabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleTabs = kAiFeaturesEnabled
+        ? PmsCommandTab.values
+        : PmsCommandTab.values.where((t) => t.name != 'ai').toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: PmsCommandTab.values.map((tab) {
+          children: visibleTabs.map((tab) {
             final active = tab == selected;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -524,28 +519,32 @@ class _InventoryPanel extends StatelessWidget {
                 Text('${ui.selectedPropertyIds.length} selected'),
                 ActionChip(
                   avatar: const Icon(LucideIcons.upload, size: 14),
-                  label: const Text('Bulk Publish'),
-                  onPressed: () {
-                    controller.setMessage(
-                      'Bulk Publish queued for ${ui.selectedPropertyIds.length} '
-                      'properties (placeholder).',
+                  label: const Text('Publish'),
+                  onPressed: () async {
+                    final count = ui.selectedPropertyIds.length;
+                    final ok = await _confirmSelection(
+                      context,
+                      title: 'Publish listings?',
+                      message:
+                          '$count selected ${count == 1 ? 'listing' : 'listings'} will go live on /properties.',
+                      confirmLabel: 'Publish',
                     );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Bulk Publish — coming soon')),
-                    );
+                    if (ok) await controller.publishSelected();
                   },
                 ),
                 ActionChip(
                   avatar: const Icon(LucideIcons.archive, size: 14),
                   label: const Text('Archive'),
-                  onPressed: () {
-                    controller.setMessage(
-                      'Archive queued for ${ui.selectedPropertyIds.length} '
-                      'properties (placeholder).',
+                  onPressed: () async {
+                    final count = ui.selectedPropertyIds.length;
+                    final ok = await _confirmSelection(
+                      context,
+                      title: 'Archive listings?',
+                      message:
+                          '$count selected ${count == 1 ? 'listing' : 'listings'} will leave the public site. The records stay in inventory.',
+                      confirmLabel: 'Archive',
                     );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Archive — coming soon')),
-                    );
+                    if (ok) await controller.archiveSelected();
                   },
                 ),
                 TextButton(
@@ -819,310 +818,28 @@ class _ApprovalList extends StatelessWidget {
   }
 }
 
-class _AiAssistantPanel extends StatelessWidget {
-  const _AiAssistantPanel({
-    required this.insights,
-    required this.properties,
-    required this.service,
-  });
-
-  final List<PmsAiInsight> insights;
-  final List<PmsProperty> properties;
-  final PmsService service;
-
-  @override
-  Widget build(BuildContext context) {
-    final sample = properties.isNotEmpty ? properties.first : null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ...insights.map(
-          (i) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(LucideIcons.sparkles, color: AppColors.gold),
-            title: Text(i.title),
-            subtitle: Text('${i.body}\nAI-generated · ${i.category}'),
-            isThreeLine: true,
-            dense: true,
-          ),
+Future<bool> _confirmSelection(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
         ),
-        if (sample != null) ...[
-          const Divider(),
-          Text(
-            'Live stub summary',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 6),
-          Text(service.generateAiSummary(sample)),
-        ],
-      ],
-    );
-  }
-}
-
-class _PropertyWizard extends StatelessWidget {
-  const _PropertyWizard({
-    required this.draft,
-    required this.onChanged,
-    required this.onSubmit,
-  });
-
-  final PmsWizardDraft draft;
-  final ValueChanged<PmsWizardDraft> onChanged;
-  final VoidCallback onSubmit;
-
-  static const _steps = [
-    'Basic',
-    'Location',
-    'Specs',
-    'Amenities',
-    'Pricing',
-    'Media',
-    'Documents',
-    'Publishing',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final step = draft.step.clamp(0, _steps.length - 1);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Stepper(
-          currentStep: step,
-          onStepTapped: (i) => onChanged(draft.copyWith(step: i)),
-          controlsBuilder: (context, details) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Wrap(
-                spacing: 8,
-                children: [
-                  if (step < _steps.length - 1)
-                    FilledButton(
-                      onPressed: () =>
-                          onChanged(draft.copyWith(step: step + 1)),
-                      child: const Text('Continue'),
-                    )
-                  else
-                    FilledButton(
-                      onPressed: onSubmit,
-                      child: const Text('Finish'),
-                    ),
-                  if (step > 0)
-                    TextButton(
-                      onPressed: () =>
-                          onChanged(draft.copyWith(step: step - 1)),
-                      child: const Text('Back'),
-                    ),
-                ],
-              ),
-            );
-          },
-          steps: [
-            for (var i = 0; i < _steps.length; i++)
-              Step(
-                title: Text(_steps[i]),
-                isActive: i <= step,
-                state: i < step
-                    ? StepState.complete
-                    : i == step
-                        ? StepState.editing
-                        : StepState.indexed,
-                content: _stepContent(context, i),
-              ),
-          ],
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: Text(confirmLabel),
         ),
       ],
-    );
-  }
-
-  Widget _stepContent(BuildContext context, int i) {
-    switch (i) {
-      case 0:
-        return Column(
-          children: [
-            TextFormField(
-              initialValue: draft.title,
-              decoration: const InputDecoration(labelText: 'Title'),
-              onChanged: (v) => onChanged(draft.copyWith(title: v)),
-            ),
-            TextFormField(
-              initialValue: draft.propertyCode,
-              decoration: const InputDecoration(labelText: 'Property code'),
-              onChanged: (v) => onChanged(draft.copyWith(propertyCode: v)),
-            ),
-            DropdownButtonFormField<String>(
-              key: ValueKey('type-${draft.propertyType}'),
-              initialValue: draft.propertyType,
-              decoration: const InputDecoration(labelText: 'Type'),
-              items: const [
-                'apartment',
-                'duplex',
-                'penthouse',
-                'maisonette',
-                'studio',
-                'land',
-              ]
-                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) onChanged(draft.copyWith(propertyType: v));
-              },
-            ),
-          ],
-        );
-      case 1:
-        return Column(
-          children: [
-            TextFormField(
-              initialValue: draft.estateName,
-              decoration: const InputDecoration(labelText: 'Estate'),
-              onChanged: (v) => onChanged(draft.copyWith(estateName: v)),
-            ),
-            TextFormField(
-              initialValue: draft.city,
-              decoration: const InputDecoration(labelText: 'City'),
-              onChanged: (v) => onChanged(draft.copyWith(city: v)),
-            ),
-            TextFormField(
-              initialValue: draft.addressLine,
-              decoration: const InputDecoration(labelText: 'Address'),
-              onChanged: (v) => onChanged(draft.copyWith(addressLine: v)),
-            ),
-          ],
-        );
-      case 2:
-        return Column(
-          children: [
-            _numField(
-              label: 'Bedrooms',
-              value: draft.bedrooms,
-              onChanged: (v) => onChanged(draft.copyWith(bedrooms: v)),
-            ),
-            _numField(
-              label: 'Bathrooms',
-              value: draft.bathrooms,
-              onChanged: (v) => onChanged(draft.copyWith(bathrooms: v)),
-            ),
-            _numField(
-              label: 'Built-up area (sqm)',
-              value: draft.builtUpAreaSqm ?? 0,
-              onChanged: (v) => onChanged(draft.copyWith(builtUpAreaSqm: v)),
-            ),
-          ],
-        );
-      case 3:
-        return Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: PmsWizardDraft.amenityCatalog.map((a) {
-            final selected = draft.amenities.contains(a);
-            return FilterChip(
-              label: Text(a),
-              selected: selected,
-              onSelected: (on) {
-                final next = [...draft.amenities];
-                if (on) {
-                  next.add(a);
-                } else {
-                  next.remove(a);
-                }
-                onChanged(draft.copyWith(amenities: next));
-              },
-            );
-          }).toList(),
-        );
-      case 4:
-        return Column(
-          children: [
-            _numField(
-              label: 'Listing price (NGN)',
-              value: draft.listingPrice ?? 0,
-              onChanged: (v) => onChanged(draft.copyWith(listingPrice: v)),
-            ),
-            _numField(
-              label: 'Promo price',
-              value: draft.promoPrice ?? 0,
-              onChanged: (v) => onChanged(draft.copyWith(promoPrice: v)),
-            ),
-            _numField(
-              label: 'Investor price',
-              value: draft.investorPrice ?? 0,
-              onChanged: (v) => onChanged(draft.copyWith(investorPrice: v)),
-            ),
-          ],
-        );
-      case 5:
-        return TextFormField(
-          initialValue: draft.mediaNote,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Media notes',
-            helperText:
-                'Upload adapters land after PMS SQL apply — note gallery / tour URLs here.',
-          ),
-          onChanged: (v) => onChanged(draft.copyWith(mediaNote: v)),
-        );
-      case 6:
-        return TextFormField(
-          initialValue: draft.documentsNote,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Documents',
-            helperText: 'Title, survey, C of O refs (placeholder storage).',
-          ),
-          onChanged: (v) => onChanged(draft.copyWith(documentsNote: v)),
-        );
-      default:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DropdownButtonFormField<PublishWorkflowStatus>(
-              key: ValueKey('publish-${draft.publishStatus}'),
-              initialValue: draft.publishStatus,
-              decoration: const InputDecoration(labelText: 'Publish status'),
-              items: PublishWorkflowStatus.values
-                  .map(
-                    (s) => DropdownMenuItem(value: s, child: Text(s.label)),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) onChanged(draft.copyWith(publishStatus: v));
-              },
-            ),
-            DropdownButtonFormField<InventoryStatus>(
-              key: ValueKey('inventory-${draft.inventoryStatus}'),
-              initialValue: draft.inventoryStatus,
-              decoration: const InputDecoration(labelText: 'Inventory status'),
-              items: InventoryStatus.values
-                  .map(
-                    (s) => DropdownMenuItem(value: s, child: Text(s.label)),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) onChanged(draft.copyWith(inventoryStatus: v));
-              },
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Finish queues the draft locally until PMS SQL is approved.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        );
-    }
-  }
-
-  Widget _numField({
-    required String label,
-    required double value,
-    required ValueChanged<double> onChanged,
-  }) {
-    return TextFormField(
-      initialValue: value == 0 ? '' : value.toString(),
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(labelText: label),
-      onChanged: (v) => onChanged(double.tryParse(v) ?? 0),
-    );
-  }
+    ),
+  );
+  return result == true;
 }

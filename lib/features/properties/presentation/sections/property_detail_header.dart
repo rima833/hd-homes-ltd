@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
+import 'package:hdhomesproject/features/client/presentation/pages/reserve_property_page.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/website/components/breadcrumbs.dart';
 import 'package:hdhomesproject/core/website/components/page_container.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/core/widgets/feedback/app_badge.dart';
+import 'package:hdhomesproject/features/client/presentation/providers/marketplace_favorites_bridge.dart';
 import 'package:hdhomesproject/features/properties/data/models/marketplace_property.dart';
 import 'package:hdhomesproject/features/properties/data/models/property_detail_content.dart';
 import 'package:hdhomesproject/features/properties/data/providers/marketplace_controller.dart';
@@ -89,14 +91,20 @@ class PropertyDetailHeader extends ConsumerWidget {
             if (p.isVerified) const AppBadge(label: 'Verified', variant: BadgeVariant.info),
             if (p.purpose == PropertyPurpose.invest)
               const AppBadge(label: 'Investment', variant: BadgeVariant.gold),
-            MatchScoreBadge(score: p.matchScore),
+            if (p.matchScore > 0) MatchScoreBadge(score: p.matchScore),
           ],
         ),
         const SizedBox(height: AppSpacing.base),
         Text(p.title, style: Theme.of(context).textTheme.displaySmall),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          '${p.propertyCode} · ${p.estate} · ${p.location}',
+          [
+            if (p.propertyCodeOverride != null &&
+                p.propertyCodeOverride!.trim().isNotEmpty)
+              p.propertyCodeOverride!.trim(),
+            if (p.estate.trim().isNotEmpty) p.estate.trim(),
+            if (p.location.trim().isNotEmpty) p.location.trim(),
+          ].join(' · '),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppColors.textSecondaryLight,
               ),
@@ -129,11 +137,11 @@ class PropertyDetailHeader extends ConsumerWidget {
           spacing: AppSpacing.sm,
           children: [
             IconButton(
-              onPressed: () {
-                final set = {...ref.read(marketplaceFavoritesProvider)};
-                isFavorite ? set.remove(p.id) : set.add(p.id);
-                ref.read(marketplaceFavoritesProvider.notifier).state = set;
-              },
+              onPressed: () => toggleMarketplaceFavorite(
+                ref,
+                propertyId: p.id,
+                title: p.title,
+              ),
               icon: Icon(isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded),
               color: AppColors.gold,
             ),
@@ -163,14 +171,15 @@ class PropertyDetailHeader extends ConsumerWidget {
       '${d.day}/${d.month}/${d.year}';
 }
 
-class PropertyStickyActions extends StatelessWidget {
+class PropertyStickyActions extends ConsumerWidget {
   const PropertyStickyActions({super.key, required this.detail, this.compact = false});
 
   final PropertyDetailContent detail;
   final bool compact;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = detail.listing;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -195,7 +204,15 @@ class PropertyStickyActions extends StatelessWidget {
             label: 'Reserve Property',
             variant: ButtonVariant.secondary,
             expand: true,
-            onPressed: () => context.go(RoutePaths.contact),
+            onPressed: () => ReservePropertyDialog.show(
+              context,
+              ref,
+              propertyId: p.id,
+              propertyTitle: p.title,
+              propertyPrice: double.tryParse(
+                p.price.replaceAll(RegExp(r'[^0-9.]'), ''),
+              ),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
           if (!compact)

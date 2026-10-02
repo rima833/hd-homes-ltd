@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/core/website/components/cms_hero_media_background.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -11,12 +12,16 @@ class SearchHeroSection extends StatelessWidget {
     required this.headline,
     required this.subheadline,
     required this.searchBar,
+    this.backgroundImageUrl,
+    this.backgroundVideoUrl,
     this.onAdvancedFilters,
   });
 
   final String headline;
   final String subheadline;
   final Widget searchBar;
+  final String? backgroundImageUrl;
+  final String? backgroundVideoUrl;
   final VoidCallback? onAdvancedFilters;
 
   @override
@@ -27,14 +32,20 @@ class SearchHeroSection extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.charcoal, AppColors.gold.withValues(alpha: 0.18), AppColors.deepBlack],
+          CmsHeroMediaBackground(
+            imageUrl: backgroundImageUrl,
+            videoUrl: backgroundVideoUrl,
+            fallbackColors: [
+              AppColors.charcoal,
+              AppColors.gold.withValues(alpha: 0.18),
+              AppColors.deepBlack,
+            ],
+            fallbackChild: Center(
+              child: Icon(
+                LucideIcons.sparkles,
+                size: 72,
+                color: AppColors.gold.withValues(alpha: 0.25),
               ),
-            ),
-            child: Center(
-              child: Icon(LucideIcons.sparkles, size: 72, color: AppColors.gold.withValues(alpha: 0.25)),
             ),
           ),
           DecoratedBox(
@@ -42,12 +53,18 @@ class SearchHeroSection extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.transparent, AppColors.deepBlack.withValues(alpha: 0.92)],
+                colors: [
+                  Colors.transparent,
+                  AppColors.deepBlack.withValues(alpha: 0.92),
+                ],
               ),
             ),
           ),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: context.pagePadding, vertical: AppSpacing.xxl),
+            padding: EdgeInsets.symmetric(
+              horizontal: context.pagePadding,
+              vertical: AppSpacing.xxl,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,9 +77,17 @@ class SearchHeroSection extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: AppSpacing.base),
-                Text(subheadline, style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.textSecondaryDark)),
+                Text(
+                  subheadline,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppColors.textSecondaryDark,
+                      ),
+                ),
                 const SizedBox(height: AppSpacing.xl),
-                ConstrainedBox(constraints: const BoxConstraints(maxWidth: 720), child: searchBar),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: searchBar,
+                ),
                 const SizedBox(height: AppSpacing.base),
                 PrimaryButton(
                   label: 'Advanced filters',

@@ -7,6 +7,7 @@ import 'package:hdhomesproject/core/validators/email_validator.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/verification_models.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/verification_controller.dart';
+import 'package:hdhomesproject/features/authentication/presentation/widgets/account_portal_scaffold.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -31,8 +32,8 @@ class VerificationCenterPage extends HookConsumerWidget {
       return null;
     }, const []);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Verification Center')),
+    return AccountPortalScaffold(
+      title: 'Verification Center',
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.xl),
         children: [
@@ -74,15 +75,13 @@ class VerificationCenterPage extends HookConsumerWidget {
           _StatusCard(
             title: 'Phone',
             subtitle: snap.phone ?? 'Not added',
-            status: snap.phoneVerified
-                ? 'Verified'
-                : (snap.policy.phoneRequired ? 'Required' : 'Optional'),
+            status: snap.phoneVerified ? 'On file' : 'Not added',
             icon: LucideIcons.smartphone,
             ok: snap.phoneVerified,
             actions: [
               TextButton(
-                onPressed: () => context.go(RoutePaths.verifyPhone),
-                child: Text(snap.phoneVerified ? 'Update' : 'Verify phone'),
+                onPressed: () => context.go(RoutePaths.profileCenter),
+                child: Text(snap.phoneVerified ? 'Edit in profile' : 'Add phone'),
               ),
             ],
           ),
@@ -132,10 +131,12 @@ class VerificationCenterPage extends HookConsumerWidget {
               leading: Icon(LucideIcons.shieldAlert, color: AppColors.warning),
               title: Text('Verify your email to unlock full account access.'),
             ),
-          if (snap.policy.phoneRequired && !snap.phoneVerified)
+          if (!snap.phoneVerified)
             const ListTile(
-              leading: Icon(LucideIcons.shieldAlert, color: AppColors.warning),
-              title: Text('Phone verification is required for your role.'),
+              leading: Icon(LucideIcons.smartphone, color: AppColors.info),
+              title: Text(
+                'Add a phone number on your profile (collected at registration).',
+              ),
             ),
           if (snap.policy.mfaRecommended)
             const ListTile(

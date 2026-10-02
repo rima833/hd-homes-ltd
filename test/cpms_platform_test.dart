@@ -64,19 +64,19 @@ void main() {
   });
 
   group('CpmsService', () {
-    test('offline client returns demo command center', () async {
+    test('offline client returns an empty production command center', () async {
       final service = CpmsService();
       final snap = await service.loadCommandCenter();
       expect(snap.fromRemote, isFalse);
-      expect(snap.projects, isNotEmpty);
+      expect(snap.projects, isEmpty);
       expect(snap.kpis.length, greaterThanOrEqualTo(7));
     });
 
-    test('generateProgressSummary stub is informative', () {
+    test('generateProgressSummary is informative', () {
       final service = CpmsService();
       final project = CpmsDemo.snapshot().projects.first;
       final summary = service.generateProgressSummary(project);
-      expect(summary, contains('AI progress summary'));
+      expect(summary, startsWith('Progress summary:'));
       expect(summary, contains(project.name));
       expect(summary.toLowerCase(), contains('estimate'));
     });

@@ -9,11 +9,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Centralized Preference / Personalization Engine service.
 class PersonalizationService {
-  PersonalizationService({
-    required AuditService audit,
-    SupabaseClient? client,
-  })  : _audit = audit,
-        _client = client;
+  PersonalizationService({required AuditService audit, SupabaseClient? client})
+    : _audit = audit,
+      _client = client;
 
   final AuditService _audit;
   final SupabaseClient? _client;
@@ -21,6 +19,27 @@ class PersonalizationService {
   final Map<String, PersonalizationSnapshot> _local = {};
 
   bool get isConfigured => _client != null;
+
+  Future<PersonalizationAnalyticsSnapshot> loadAdminAnalytics({
+    int days = 30,
+  }) async {
+    final client = _client;
+    if (client == null) {
+      throw StateError('Personalization analytics is not configured.');
+    }
+    final response = await client.rpc(
+      'get_admin_personalization_analytics',
+      params: {'p_days': days.clamp(7, 365)},
+    );
+    if (response is! Map) {
+      throw const FormatException(
+        'Personalization analytics returned an invalid response.',
+      );
+    }
+    return PersonalizationAnalyticsSnapshot.fromJson(
+      Map<String, dynamic>.from(response),
+    );
+  }
 
   Future<PersonalizationSnapshot> load(
     String userId, {
@@ -57,8 +76,7 @@ class PersonalizationService {
           .length,
       unusedWidgetDays: 0,
     );
-    final recommendations =
-        PreferenceEngine.recommendProperties(interests);
+    final recommendations = PreferenceEngine.recommendProperties(interests);
 
     final snap = PersonalizationSnapshot(
       appPreferences: appPrefs,
@@ -83,8 +101,18 @@ class PersonalizationService {
     String userId,
     AppearancePreferences appearance,
   ) async {
-    await _upsertPreferenceBucket(userId, 'appearance', appearance.toJson());
-    await _mirrorTheme(userId, appearance.theme.slug);
+    final bucketSaved = await _upsertPreferenceBucket(
+      userId,
+      'appearance',
+      appearance.toJson(),
+    );
+    final themeSaved = await _mirrorTheme(userId, appearance.theme.slug);
+    if (bucketSaved || themeSaved) {
+      await _recordEvent(
+        PersonalizationEventMetric.themeChanged,
+        appearance.theme.slug,
+      );
+    }
     await _auditPref(userId, 'appearance_updated', appearance.toJson());
     return appearance;
   }
@@ -98,17 +126,25 @@ class PersonalizationService {
       _patchLocal(userId, accessibility: settings);
       return settings;
     }
+    var saved = false;
     try {
       await client.from('accessibility_settings').upsert({
         'user_id': userId,
         ...settings.toJson(),
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
+      saved = true;
     } catch (_) {
-      await _upsertPreferenceBucket(
+      saved = await _upsertPreferenceBucket(
         userId,
         'accessibility',
         settings.toJson(),
+      );
+    }
+    if (saved) {
+      await _recordEvent(
+        PersonalizationEventMetric.accessibilityUpdated,
+        'customized',
       );
     }
     await _auditPref(userId, 'accessibility_updated', settings.toJson());
@@ -124,6 +160,7 @@ class PersonalizationService {
       _patchLocal(userId, layout: layout);
       return layout;
     }
+    var saved = false;
     try {
       await client.from('dashboard_layouts').upsert({
         'id': layout.id,
@@ -134,14 +171,51 @@ class PersonalizationService {
         'widgets': layout.widgets.map((w) => w.toJson()).toList(),
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
+      saved = true;
     } catch (_) {
-      await _upsertPreferenceBucket(userId, 'dashboard_layout', layout.toJson());
+      saved = await _upsertPreferenceBucket(
+        userId,
+        'dashboard_layout',
+        layout.toJson(),
+      );
+    }
+    if (saved) {
+      await _recordEvent(
+        PersonalizationEventMetric.layoutUpdated,
+        layout.workspaceSlug == null ? 'default' : 'workspace',
+      );
     }
     await _auditPref(userId, 'dashboard_layout_updated', {
       'layout': layout.name,
       'widgets': layout.widgets.length,
     });
     return layout;
+  }
+
+  Future<DashboardLayout> switchWorkspace(
+    String userId,
+    DashboardLayout workspace,
+  ) async {
+    final client = _client;
+    if (client == null) {
+      _patchLocal(userId, layout: workspace);
+      return workspace;
+    }
+    final saved = await _upsertPreferenceBucket(userId, 'active_workspace', {
+      'layout_id': workspace.id,
+      'workspace_slug': workspace.workspaceSlug,
+    });
+    if (saved) {
+      await _recordEvent(
+        PersonalizationEventMetric.workspaceSwitched,
+        _workspaceDimension(workspace.workspaceSlug),
+      );
+      _patchLocal(userId, layout: workspace);
+      await _auditPref(userId, 'workspace_switched', {
+        'workspace_slug': workspace.workspaceSlug ?? 'default',
+      });
+    }
+    return workspace;
   }
 
   Future<FavoriteItem> addFavorite({
@@ -182,13 +256,18 @@ class PersonalizationService {
       return item;
     }
 
-    final row = await client.from('favorite_items').insert({
-      'user_id': userId,
-      'item_type': type.slug,
-      'entity_id': entityId,
-      'title': title,
-      'subtitle': subtitle,
-    }).select().single();
+    final row = await client
+        .from('favorite_items')
+        .insert({
+          'user_id': userId,
+          'item_type': type.slug,
+          'entity_id': entityId,
+          'title': title,
+          'subtitle': subtitle,
+        })
+        .select()
+        .single();
+    await _recordEvent(PersonalizationEventMetric.favoriteAdded, type.slug);
     await _auditPref(userId, 'favorite_added', {
       'type': type.slug,
       'entity_id': entityId,
@@ -208,16 +287,7 @@ class PersonalizationService {
   Future<List<FavoriteItem>> listFavorites(String userId) async {
     final client = _client;
     if (client == null) {
-      return _local[userId]?.favorites ??
-          const [
-            FavoriteItem(
-              id: 'demo-1',
-              type: FavoriteItemType.property,
-              entityId: 'prop-1',
-              title: 'Ocean View Residence',
-              subtitle: 'Victoria Island · ₦185M',
-            ),
-          ];
+      return _local[userId]?.favorites ?? const [];
     }
     try {
       final rows = await client
@@ -250,12 +320,20 @@ class PersonalizationService {
         createdAt: DateTime.now().toUtc(),
       );
     }
-    final row = await client.from('saved_searches').insert({
-      'user_id': userId,
-      'name': name,
-      'criteria': criteria,
-      'alerts_enabled': alertsEnabled,
-    }).select().single();
+    final row = await client
+        .from('saved_searches')
+        .insert({
+          'user_id': userId,
+          'name': name,
+          'criteria': criteria,
+          'alerts_enabled': alertsEnabled,
+        })
+        .select()
+        .single();
+    await _recordEvent(
+      PersonalizationEventMetric.savedSearchCreated,
+      alertsEnabled ? 'alerts_enabled' : 'alerts_disabled',
+    );
     await _auditPref(userId, 'saved_search_created', {'name': name});
     return SavedSearch.fromRow(Map<String, dynamic>.from(row));
   }
@@ -363,7 +441,11 @@ class PersonalizationService {
     String userId,
     PropertyInterestProfile interests,
   ) async {
-    await _upsertPreferenceBucket(userId, 'property_interests', interests.toJson());
+    await _upsertPreferenceBucket(
+      userId,
+      'property_interests',
+      interests.toJson(),
+    );
     await _auditPref(userId, 'interests_updated', interests.toJson());
     return interests;
   }
@@ -441,9 +523,7 @@ class PersonalizationService {
             .eq('user_id', userId)
             .maybeSingle();
         if (row != null) {
-          return AccessibilitySettings.fromJson(
-            Map<String, dynamic>.from(row),
-          );
+          return AccessibilitySettings.fromJson(Map<String, dynamic>.from(row));
         }
       } catch (_) {}
     }
@@ -499,7 +579,10 @@ class PersonalizationService {
           .eq('user_id', userId)
           .order('name');
       final list = (rows as List)
-          .map((e) => DashboardLayout.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) =>
+                DashboardLayout.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
           .toList();
       return list.isEmpty ? defaults : list;
     } catch (_) {
@@ -536,13 +619,13 @@ class PersonalizationService {
     }
   }
 
-  Future<void> _upsertPreferenceBucket(
+  Future<bool> _upsertPreferenceBucket(
     String userId,
     String key,
     Map<String, dynamic> value,
   ) async {
     final client = _client;
-    if (client == null) return;
+    if (client == null) return false;
     try {
       final existing = await client
           .from('user_preferences')
@@ -558,19 +641,57 @@ class PersonalizationService {
         'extras': extras,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
-  Future<void> _mirrorTheme(String userId, String theme) async {
+  Future<bool> _mirrorTheme(String userId, String theme) async {
     final client = _client;
-    if (client == null) return;
+    if (client == null) return false;
     try {
       await client.from('user_preferences').upsert({
         'user_id': userId,
         'theme': theme,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _workspaceDimension(String? slug) {
+    const allowed = {
+      'investor_analysis',
+      'sales',
+      'marketing',
+      'finance',
+      'default',
+    };
+    final normalized = slug?.trim().toLowerCase() ?? 'default';
+    return allowed.contains(normalized) ? normalized : 'other';
+  }
+
+  Future<void> _recordEvent(
+    PersonalizationEventMetric metric,
+    String dimension,
+  ) async {
+    final client = _client;
+    if (client == null) return;
+    try {
+      await client.rpc(
+        'record_personalization_event',
+        params: {
+          'p_metric_key': metric.rpcValue,
+          'p_dimension_key': dimension,
+          'p_metric_value': 1,
+        },
+      );
+    } catch (_) {
+      // Analytics must never make an already-successful preference write fail.
+    }
   }
 
   void _patchLocal(

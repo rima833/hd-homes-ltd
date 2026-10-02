@@ -50,8 +50,6 @@ abstract final class DynamicUserIdentity {
     if (showCompany) {
       base.insert(3, ProfileSection.company);
     }
-    // Connected accounts — future OAuth; always listed as coming soon.
-    base.insert(base.length - 1, ProfileSection.connected);
     return base;
   }
 }
@@ -564,6 +562,7 @@ abstract final class ProfileCompletionEngine {
     required CommunicationPreferences communication,
     required bool mfaEnabled,
     required bool isInvestor,
+    bool kycCompleted = false,
   }) {
     final items = <ProfileCompletionItem>[
       ProfileCompletionItem(
@@ -575,11 +574,12 @@ abstract final class ProfileCompletionEngine {
       ),
       ProfileCompletionItem(
         id: 'phone',
-        label: 'Verify your phone number',
+        label: 'Add your phone number',
         weight: 10,
-        completed: profile.phoneVerified,
-        actionLabel: 'Verify phone',
-        actionPath: '/account/verify-phone',
+        completed: (profile.phone?.trim().isNotEmpty ?? false) ||
+            profile.phoneVerified,
+        actionLabel: 'Add phone',
+        actionPath: '/account/profile',
       ),
       ProfileCompletionItem(
         id: 'address',
@@ -626,12 +626,12 @@ abstract final class ProfileCompletionEngine {
             (profile.lastName?.trim().isNotEmpty ?? false),
         actionLabel: 'Edit name',
       ),
-      const ProfileCompletionItem(
+      ProfileCompletionItem(
         id: 'kyc',
         label: 'Complete KYC verification',
         weight: 10,
-        completed: false,
-        actionLabel: 'Start KYC',
+        completed: kycCompleted,
+        actionLabel: kycCompleted ? 'View KYC' : 'Start KYC',
         actionPath: '/account/kyc',
       ),
     ];

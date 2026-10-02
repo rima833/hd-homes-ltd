@@ -50,46 +50,73 @@ class PermissionEngine {
     return snapshot.copyWith(permissions: resolved);
   }
 
-  static const Map<AppRole, Set<String>> _roleDefaults = {
-    AppRole.admin: {
-      PermissionSlugs.viewProperties,
-      PermissionSlugs.createProperty,
-      PermissionSlugs.editProperty,
-      PermissionSlugs.deleteProperty,
-      PermissionSlugs.publishProperty,
-      PermissionSlugs.manageUsers,
-      PermissionSlugs.managePayments,
-      PermissionSlugs.manageBlog,
-      PermissionSlugs.manageMarketing,
-      PermissionSlugs.manageConstruction,
-      PermissionSlugs.manageCrm,
-      PermissionSlugs.manageReports,
-      PermissionSlugs.manageSettings,
-    },
+  static Map<AppRole, Set<String>> get _roleDefaults {
+    final adminPerms = PermissionSlugs.all
+        .where((slug) => slug != PermissionSlugs.manageRoles)
+        .toSet();
+
+    return {
+    AppRole.admin: adminPerms,
     AppRole.salesTeam: {
       PermissionSlugs.viewProperties,
+      PermissionSlugs.propertiesRead,
+      PermissionSlugs.propertiesWrite,
+      PermissionSlugs.propertiesInspections,
       PermissionSlugs.manageCrm,
+      PermissionSlugs.crmRead,
+      PermissionSlugs.crmWrite,
+      PermissionSlugs.salesRead,
+      PermissionSlugs.investorsRead,
+      PermissionSlugs.documentsRead,
+      PermissionSlugs.documentsUpload,
+      PermissionSlugs.documentsShare,
+      PermissionSlugs.supportRead,
+      PermissionSlugs.supportTickets,
+      PermissionSlugs.marketingRead,
       PermissionSlugs.constructionRead,
-      PermissionSlugs.constructionAnalytics,
+      PermissionSlugs.financeRead,
+      PermissionSlugs.consultationsView,
+      PermissionSlugs.consultationsManage,
+      PermissionSlugs.callbacksView,
+      PermissionSlugs.callbacksManage,
     },
     AppRole.finance: {
       PermissionSlugs.viewProperties,
+      PermissionSlugs.propertiesRead,
       PermissionSlugs.managePayments,
       PermissionSlugs.manageReports,
+      PermissionSlugs.financeRead,
+      PermissionSlugs.financeWrite,
       PermissionSlugs.constructionRead,
       PermissionSlugs.constructionBudget,
       PermissionSlugs.constructionAnalytics,
       PermissionSlugs.constructionApprovals,
+      PermissionSlugs.documentsRead,
+      PermissionSlugs.documentsContracts,
+      PermissionSlugs.investorsRead,
+      PermissionSlugs.crmRead,
+      PermissionSlugs.analyticsRead,
+      PermissionSlugs.analyticsReports,
+      PermissionSlugs.supportRead,
     },
     AppRole.marketing: {
       PermissionSlugs.viewProperties,
+      PermissionSlugs.propertiesRead,
       PermissionSlugs.manageBlog,
       PermissionSlugs.manageMarketing,
+      PermissionSlugs.marketingRead,
+      PermissionSlugs.marketingWrite,
+      PermissionSlugs.marketingCms,
+      PermissionSlugs.crmRead,
+      PermissionSlugs.documentsRead,
+      PermissionSlugs.documentsUpload,
+      PermissionSlugs.documentsDam,
+      PermissionSlugs.supportRead,
       PermissionSlugs.constructionRead,
-      PermissionSlugs.constructionAi,
     },
     AppRole.constructionManager: {
       PermissionSlugs.viewProperties,
+      PermissionSlugs.propertiesRead,
       PermissionSlugs.manageConstruction,
       PermissionSlugs.constructionRead,
       PermissionSlugs.constructionWrite,
@@ -103,6 +130,13 @@ class PermissionEngine {
       PermissionSlugs.constructionAnalytics,
       PermissionSlugs.constructionAi,
       PermissionSlugs.constructionApprovals,
+      PermissionSlugs.documentsRead,
+      PermissionSlugs.documentsUpload,
+      PermissionSlugs.documentsContracts,
+      PermissionSlugs.financeRead,
+      PermissionSlugs.financeExpenses,
+      PermissionSlugs.financeBudgets,
+      PermissionSlugs.supportRead,
     },
     AppRole.client: {
       PermissionSlugs.viewProperties,
@@ -111,5 +145,6 @@ class PermissionEngine {
       PermissionSlugs.viewProperties,
       PermissionSlugs.manageReports,
     },
-  };
+    };
+  }
 }

@@ -1,5 +1,7 @@
 // Volume 4 Part 2 — Enterprise Property Management System domain models.
 
+import 'package:hdhomesproject/features/properties/data/models/property_detail_extras.dart';
+
 enum InventoryStatus {
   available,
   reserved,
@@ -424,6 +426,11 @@ class PmsInspection {
   final String? reportSummary;
 
   factory PmsInspection.fromJson(Map<String, dynamic> json) {
+    String? title = json['property_title'] as String?;
+    final prop = json['properties'];
+    if ((title == null || title.isEmpty) && prop is Map) {
+      title = prop['title'] as String?;
+    }
     return PmsInspection(
       id: json['id']?.toString() ?? '',
       propertyId: json['property_id']?.toString() ?? '',
@@ -432,7 +439,7 @@ class PmsInspection {
       status: InspectionStatus.fromSlug(json['status'] as String?),
       scheduledAt: DateTime.tryParse(json['scheduled_at'] as String? ?? '') ??
           DateTime.now(),
-      propertyTitle: json['property_title'] as String?,
+      propertyTitle: title,
       visitorName: json['visitor_name'] as String?,
       assignedStaffName: json['assigned_staff_name'] as String?,
       reportSummary: json['report_summary'] as String?,
@@ -542,46 +549,102 @@ class PmsCommandCenterSnapshot {
   final DateTime? loadedAt;
 }
 
-/// Eight-step property creation wizard draft (local until SQL applied).
+/// Pending gallery upload held in the wizard until submit.
+class PmsWizardMediaFile {
+  const PmsWizardMediaFile({
+    required this.name,
+    required this.bytes,
+    required this.contentType,
+    this.isCover = false,
+  });
+
+  final String name;
+  final List<int> bytes;
+  final String contentType;
+  final bool isCover;
+}
+
+/// Pending document / floor-plan / tour file held until property id exists.
+class PmsWizardPendingFile {
+  const PmsWizardPendingFile({
+    required this.name,
+    required this.bytes,
+    required this.contentType,
+  });
+
+  final String name;
+  final List<int> bytes;
+  final String contentType;
+}
+
+/// Nine-step property creation wizard draft (persists via CmsService).
 class PmsWizardDraft {
   const PmsWizardDraft({
+    this.existingId,
     this.step = 0,
     this.title = '',
+    this.slug = '',
     this.propertyCode = '',
     this.propertyType = 'apartment',
-    this.estateName = 'Victoria Crest',
-    this.city = 'Lekki, Lagos',
+    this.description = '',
+    this.estateName = '',
+    this.city = '',
+    this.state = '',
     this.addressLine = '',
     this.latitude,
     this.longitude,
-    this.bedrooms = 3,
-    this.bathrooms = 3,
-    this.toilets = 4,
+    this.bedrooms = 0,
+    this.bathrooms = 0,
+    this.toilets = 0,
+    this.kitchens = 0,
     this.builtUpAreaSqm,
-    this.parkingSpaces = 2,
+    this.landSizeSqm,
+    this.parkingSpaces = 0,
+    this.floors = 0,
+    this.yearBuilt = '',
+    this.powerSupply = '',
+    this.waterSupply = '',
+    this.internetConnectivity = '',
+    this.architecturalConcept = '',
+    this.investmentPotential = '',
     this.amenities = const [],
     this.listingPrice,
     this.promoPrice,
     this.investorPrice,
     this.rentalPrice,
+    this.priceLabel = '',
     this.mediaNote = '',
+    this.mediaFiles = const [],
+    this.existingGalleryUrls = const [],
     this.documentsNote = '',
+    this.detailExtras,
+    this.pendingDocumentFiles = const [],
+    this.pendingFloorPlanFiles = const [],
+    this.pendingVideoTour,
+    this.pendingDroneTour,
     this.publishStatus = PublishWorkflowStatus.draft,
     this.inventoryStatus = InventoryStatus.available,
     this.marketingStatus = MarketingStatus.newListing,
+    this.featureOnHomepage = false,
   });
 
-  /// Current wizard step index (0–7).
+  /// When set, wizard updates this property instead of creating a new one.
+  final String? existingId;
+
+  /// Current wizard step index (0–8).
   final int step;
 
   // Step 1 — Basic
   final String title;
+  final String slug;
   final String propertyCode;
   final String propertyType;
+  final String description;
 
   // Step 2 — Location
   final String estateName;
   final String city;
+  final String state;
   final String addressLine;
   final double? latitude;
   final double? longitude;
@@ -590,8 +653,17 @@ class PmsWizardDraft {
   final double bedrooms;
   final double bathrooms;
   final double toilets;
+  final double kitchens;
   final double? builtUpAreaSqm;
+  final double? landSizeSqm;
   final int parkingSpaces;
+  final int floors;
+  final String yearBuilt;
+  final String powerSupply;
+  final String waterSupply;
+  final String internetConnectivity;
+  final String architecturalConcept;
+  final String investmentPotential;
 
   // Step 4 — Amenities
   final List<String> amenities;
@@ -601,69 +673,142 @@ class PmsWizardDraft {
   final double? promoPrice;
   final double? investorPrice;
   final double? rentalPrice;
+  final String priceLabel;
 
   // Step 6 — Media
   final String mediaNote;
+  final List<PmsWizardMediaFile> mediaFiles;
+  final List<String> existingGalleryUrls;
 
-  // Step 7 — Documents
+  // Step 7 — Documents (internal notes)
   final String documentsNote;
 
-  // Step 8 — Publishing
+  /// Public detail-page extras (tours, vault, plans, nearby, FAQs, etc.).
+  final PropertyDetailExtras? detailExtras;
+
+  /// Parallel to [detailExtras.documents] — uploaded on save.
+  final List<PmsWizardPendingFile?> pendingDocumentFiles;
+
+  /// Parallel to [detailExtras.floorPlans] — uploaded on save.
+  final List<PmsWizardPendingFile?> pendingFloorPlanFiles;
+
+  final PmsWizardPendingFile? pendingVideoTour;
+  final PmsWizardPendingFile? pendingDroneTour;
+
+  // Step 9 — Publishing
   final PublishWorkflowStatus publishStatus;
   final InventoryStatus inventoryStatus;
   final MarketingStatus marketingStatus;
+  final bool featureOnHomepage;
+
+  bool get isEditing => existingId != null && existingId!.isNotEmpty;
 
   PmsWizardDraft copyWith({
+    String? existingId,
     int? step,
     String? title,
+    String? slug,
     String? propertyCode,
     String? propertyType,
+    String? description,
     String? estateName,
     String? city,
+    String? state,
     String? addressLine,
     double? latitude,
     double? longitude,
     double? bedrooms,
     double? bathrooms,
     double? toilets,
+    double? kitchens,
     double? builtUpAreaSqm,
+    double? landSizeSqm,
     int? parkingSpaces,
+    int? floors,
+    String? yearBuilt,
+    String? powerSupply,
+    String? waterSupply,
+    String? internetConnectivity,
+    String? architecturalConcept,
+    String? investmentPotential,
     List<String>? amenities,
     double? listingPrice,
     double? promoPrice,
     double? investorPrice,
     double? rentalPrice,
+    String? priceLabel,
     String? mediaNote,
+    List<PmsWizardMediaFile>? mediaFiles,
+    List<String>? existingGalleryUrls,
     String? documentsNote,
+    PropertyDetailExtras? detailExtras,
+    List<PmsWizardPendingFile?>? pendingDocumentFiles,
+    List<PmsWizardPendingFile?>? pendingFloorPlanFiles,
+    PmsWizardPendingFile? pendingVideoTour,
+    PmsWizardPendingFile? pendingDroneTour,
+    bool clearPendingVideoTour = false,
+    bool clearPendingDroneTour = false,
     PublishWorkflowStatus? publishStatus,
     InventoryStatus? inventoryStatus,
     MarketingStatus? marketingStatus,
+    bool? featureOnHomepage,
   }) {
     return PmsWizardDraft(
+      existingId: existingId ?? this.existingId,
       step: step ?? this.step,
       title: title ?? this.title,
+      slug: slug ?? this.slug,
       propertyCode: propertyCode ?? this.propertyCode,
       propertyType: propertyType ?? this.propertyType,
+      description: description ?? this.description,
       estateName: estateName ?? this.estateName,
       city: city ?? this.city,
+      state: state ?? this.state,
       addressLine: addressLine ?? this.addressLine,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       bedrooms: bedrooms ?? this.bedrooms,
       bathrooms: bathrooms ?? this.bathrooms,
       toilets: toilets ?? this.toilets,
+      kitchens: kitchens ?? this.kitchens,
       builtUpAreaSqm: builtUpAreaSqm ?? this.builtUpAreaSqm,
+      landSizeSqm: landSizeSqm ?? this.landSizeSqm,
       parkingSpaces: parkingSpaces ?? this.parkingSpaces,
+      floors: floors ?? this.floors,
+      yearBuilt: yearBuilt ?? this.yearBuilt,
+      powerSupply: powerSupply ?? this.powerSupply,
+      waterSupply: waterSupply ?? this.waterSupply,
+      internetConnectivity:
+          internetConnectivity ?? this.internetConnectivity,
+      architecturalConcept:
+          architecturalConcept ?? this.architecturalConcept,
+      investmentPotential:
+          investmentPotential ?? this.investmentPotential,
       amenities: amenities ?? this.amenities,
       listingPrice: listingPrice ?? this.listingPrice,
       promoPrice: promoPrice ?? this.promoPrice,
       investorPrice: investorPrice ?? this.investorPrice,
       rentalPrice: rentalPrice ?? this.rentalPrice,
+      priceLabel: priceLabel ?? this.priceLabel,
       mediaNote: mediaNote ?? this.mediaNote,
+      mediaFiles: mediaFiles ?? this.mediaFiles,
+      existingGalleryUrls: existingGalleryUrls ?? this.existingGalleryUrls,
       documentsNote: documentsNote ?? this.documentsNote,
+      detailExtras: detailExtras ?? this.detailExtras,
+      pendingDocumentFiles:
+          pendingDocumentFiles ?? this.pendingDocumentFiles,
+      pendingFloorPlanFiles:
+          pendingFloorPlanFiles ?? this.pendingFloorPlanFiles,
+      pendingVideoTour: clearPendingVideoTour
+          ? null
+          : (pendingVideoTour ?? this.pendingVideoTour),
+      pendingDroneTour: clearPendingDroneTour
+          ? null
+          : (pendingDroneTour ?? this.pendingDroneTour),
       publishStatus: publishStatus ?? this.publishStatus,
       inventoryStatus: inventoryStatus ?? this.inventoryStatus,
       marketingStatus: marketingStatus ?? this.marketingStatus,
+      featureOnHomepage: featureOnHomepage ?? this.featureOnHomepage,
     );
   }
 

@@ -88,7 +88,7 @@ void main() {
       expect(decision.redirectLocation, contains(RoutePaths.login));
     });
 
-    test('authenticated users bounce off login', () {
+    test('authenticated users stay on login until routing resolves MFA', () {
       final session = AuthSessionSnapshot(
         status: AuthStatus.authenticated,
         profile: const UserProfile(
@@ -105,8 +105,53 @@ void main() {
         session: session,
         supabaseConfigured: true,
       );
+      expect(decision.allowed, isTrue);
+      expect(decision.redirectLocation, isNull);
+    });
+
+    test('email-pending users cannot enter protected portals', () {
+      final session = AuthSessionSnapshot(
+        status: AuthStatus.emailPending,
+        email: 'pending@hdhomesltd.com',
+        emailConfirmed: false,
+        profile: const UserProfile(
+          id: 'u2',
+          email: 'pending@hdhomesltd.com',
+          emailConfirmed: false,
+          primaryRole: AppRole.client,
+          roles: [AppRole.client],
+          accountStatus: 'pending_verification',
+        ),
+      );
+      final decision = RouteAuthorization.evaluate(
+        path: RoutePaths.client,
+        session: session,
+        supabaseConfigured: true,
+      );
       expect(decision.allowed, isFalse);
-      expect(decision.redirectLocation, RoutePaths.client);
+      expect(decision.redirectLocation, contains(RoutePaths.verifyEmail));
+    });
+
+    test('authenticated users may stay on verify-email success screen', () {
+      final session = AuthSessionSnapshot(
+        status: AuthStatus.authenticated,
+        emailConfirmed: true,
+        profile: const UserProfile(
+          id: 'u3',
+          email: 'ok@hdhomesltd.com',
+          emailConfirmed: true,
+          primaryRole: AppRole.client,
+          roles: [AppRole.client],
+          accountStatus: 'active',
+        ),
+        permissions: const {'view_properties'},
+      );
+      final decision = RouteAuthorization.evaluate(
+        path: RoutePaths.verifyEmail,
+        session: session,
+        supabaseConfigured: true,
+      );
+      expect(decision.allowed, isTrue);
     });
   });
 

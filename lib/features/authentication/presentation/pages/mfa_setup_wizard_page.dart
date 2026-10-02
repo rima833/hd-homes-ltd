@@ -7,7 +7,9 @@ import 'package:hdhomesproject/core/theme/app_theme.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/mfa_models.dart';
+import 'package:hdhomesproject/features/authentication/presentation/providers/auth_controller.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/mfa_controller.dart';
+import 'package:hdhomesproject/features/authentication/presentation/widgets/account_portal_scaffold.dart';
 import 'package:hdhomesproject/features/authentication/presentation/widgets/otp_code_input.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -44,16 +46,16 @@ class MfaSetupWizardPage extends HookConsumerWidget {
       context.go(dest);
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Enable MFA'),
-        leading: required
-            ? null
-            : IconButton(
+    return AccountPortalScaffold(
+      title: 'Enable MFA',
+      actions: required
+          ? null
+          : [
+              IconButton(
                 icon: const Icon(LucideIcons.x),
                 onPressed: () => context.go(RoutePaths.securityCenter),
               ),
-      ),
+            ],
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -103,24 +105,20 @@ class MfaSetupWizardPage extends HookConsumerWidget {
       case 0:
         return _IntroStep(
           required: required,
-          onContinue: () => controller.setStep(1),
+          onContinue: () => controller.setStep(2),
         );
       case 1:
-        return _MethodStep(
-          selected: ui.selectedMethod,
-          onSelect: controller.selectMethod,
-          onContinue: () {
-            if (ui.selectedMethod == MfaMethodKind.totp) {
-              controller.setStep(2);
-            }
-          },
+        // Method chooser removed — TOTP only. Keep step index for indicator.
+        return _PrepareTotpStep(
+          isBusy: ui.isBusy,
+          onContinue: controller.startEnrollment,
           onBack: () => controller.setStep(0),
         );
       case 2:
         return _PrepareTotpStep(
           isBusy: ui.isBusy,
           onContinue: controller.startEnrollment,
-          onBack: () => controller.setStep(1),
+          onBack: () => controller.setStep(0),
         );
       case 3:
         return _ConfigureTotpStep(
@@ -131,6 +129,7 @@ class MfaSetupWizardPage extends HookConsumerWidget {
       case 4:
         return _VerifyTotpStep(
           isBusy: ui.isBusy,
+          error: ui.error,
           onVerified: (code) => controller.confirmEnrollment(code),
           onBack: () => controller.setStep(3),
         );
@@ -144,7 +143,11 @@ class MfaSetupWizardPage extends HookConsumerWidget {
       default:
         return _DoneStep(
           message: ui.message ?? 'MFA successfully enabled.',
-          onFinish: finish,
+          onFinish: () async {
+            await ref.read(identitySessionProvider.notifier).refreshPermissions();
+            ref.invalidate(mfaStatusProvider);
+            finish();
+          },
         );
     }
   }
@@ -157,8 +160,17 @@ class _StepIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labels = ['Intro', 'Method', 'Setup', 'Verify', 'Backup', 'Done'];
-    final active = step.clamp(0, labels.length - 1);
+    final labels = ['Intro', 'Setup', 'QR', 'Verify', 'Backup', 'Done'];
+    // Map wizard steps (0,2,3,4,5,6) onto a 6-dot indicator.
+    final mapped = switch (step) {
+      0 => 0,
+      1 || 2 => 1,
+      3 => 2,
+      4 => 3,
+      5 => 4,
+      _ => 5,
+    };
+    final active = mapped.clamp(0, labels.length - 1);
     return Row(
       children: [
         for (var i = 0; i < labels.length; i++) ...[
@@ -223,63 +235,6 @@ class _IntroStep extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         PrimaryButton(label: 'Get started', expand: true, onPressed: onContinue),
-      ],
-    );
-  }
-}
-
-class _MethodStep extends StatelessWidget {
-  const _MethodStep({
-    required this.selected,
-    required this.onSelect,
-    required this.onContinue,
-    required this.onBack,
-  });
-
-  final MfaMethodKind selected;
-  final ValueChanged<MfaMethodKind> onSelect;
-  final VoidCallback onContinue;
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Choose a method', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: AppSpacing.md),
-        RadioGroup<MfaMethodKind>(
-          groupValue: selected,
-          onChanged: (v) {
-            if (v != null) onSelect(v);
-          },
-          child: Column(
-            children: [
-              RadioListTile<MfaMethodKind>(
-                value: MfaMethodKind.totp,
-                title: const Text('Authenticator app'),
-                subtitle: const Text(
-                  'Recommended — Google Authenticator, Microsoft Authenticator, Authy',
-                ),
-              ),
-              RadioListTile<MfaMethodKind>(
-                value: MfaMethodKind.emailOtp,
-                enabled: false,
-                title: const Text('Email code'),
-                subtitle: const Text('Available as fallback when policy allows'),
-              ),
-              RadioListTile<MfaMethodKind>(
-                value: MfaMethodKind.smsOtp,
-                enabled: false,
-                title: const Text('SMS code'),
-                subtitle: const Text('Optional — enable in Admin Panel'),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        PrimaryButton(label: 'Continue', expand: true, onPressed: onContinue),
-        TextButton(onPressed: onBack, child: const Text('Back')),
       ],
     );
   }
@@ -380,38 +335,81 @@ class _ConfigureTotpStep extends StatelessWidget {
   }
 }
 
-class _VerifyTotpStep extends StatelessWidget {
+class _VerifyTotpStep extends StatefulWidget {
   const _VerifyTotpStep({
     required this.isBusy,
     required this.onVerified,
     required this.onBack,
+    this.error,
   });
 
   final bool isBusy;
+  final String? error;
   final Future<bool> Function(String code) onVerified;
   final VoidCallback onBack;
 
   @override
+  State<_VerifyTotpStep> createState() => _VerifyTotpStepState();
+}
+
+class _VerifyTotpStepState extends State<_VerifyTotpStep> {
+  String _code = '';
+  var _otpKey = UniqueKey();
+
+  Future<void> _submit([String? code]) async {
+    final value = (code ?? _code).replaceAll(RegExp(r'\D'), '');
+    if (value.length != 6 || widget.isBusy) return;
+    final ok = await widget.onVerified(value);
+    if (!ok && mounted) {
+      setState(() {
+        _code = '';
+        _otpKey = UniqueKey();
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final ready = _code.replaceAll(RegExp(r'\D'), '').length == 6;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Enter verification code', style: Theme.of(context).textTheme.titleLarge),
+        Text(
+          'Enter verification code',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: AppColors.white,
+              ),
+        ),
         const SizedBox(height: AppSpacing.sm),
-        const Text('Enter the 6-digit code from your authenticator app.'),
+        const Text(
+          'Open your authenticator app and enter the current 6-digit code.',
+          style: TextStyle(color: AppColors.slate400),
+        ),
+        if (widget.error != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            widget.error!,
+            style: const TextStyle(color: AppColors.error),
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         OtpCodeInput(
-          enabled: !isBusy,
-          onCompleted: (code) async {
-            await onVerified(code);
+          key: _otpKey,
+          enabled: !widget.isBusy,
+          onCompleted: (code) {
+            setState(() => _code = code);
+            _submit(code);
           },
         ),
-        if (isBusy) ...[
-          const SizedBox(height: AppSpacing.md),
-          const Center(child: CircularProgressIndicator()),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        TextButton(onPressed: onBack, child: const Text('Back')),
+        const SizedBox(height: AppSpacing.lg),
+        PrimaryButton(
+          label: 'Verify and enable MFA',
+          expand: true,
+          isLoading: widget.isBusy,
+          onPressed: widget.isBusy || !ready ? null : () => _submit(),
+        ),
+        TextButton(onPressed: widget.onBack, child: const Text('Back')),
       ],
     );
   }

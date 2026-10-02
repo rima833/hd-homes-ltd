@@ -459,11 +459,18 @@ class CrmLead {
     this.stageName,
     this.status = CrmLeadStatus.open,
     this.assignedTo,
+    this.assignedToName,
     this.priority = CrmPriority.medium,
     this.conversionProbability = 0,
     this.estimatedValue,
     this.notes,
     this.capturedAt,
+    this.propertyId,
+    this.propertyTitle,
+    this.preferredLocation,
+    this.interestSummary,
+    this.lastContactedAt,
+    this.nextFollowUpAt,
   });
 
   final String id;
@@ -477,11 +484,18 @@ class CrmLead {
   final String? stageName;
   final CrmLeadStatus status;
   final String? assignedTo;
+  final String? assignedToName;
   final CrmPriority priority;
   final double conversionProbability;
   final double? estimatedValue;
   final String? notes;
   final DateTime? capturedAt;
+  final String? propertyId;
+  final String? propertyTitle;
+  final String? preferredLocation;
+  final String? interestSummary;
+  final DateTime? lastContactedAt;
+  final DateTime? nextFollowUpAt;
 
   String get valueDisplay {
     final n = estimatedValue;
@@ -496,6 +510,7 @@ class CrmLead {
     final stageRel = json['crm_pipeline_stages'];
     final sourceRel = json['crm_lead_sources'];
     final clientRel = json['crm_clients'];
+    final propertyRel = json['properties'];
     String? stageName;
     String? stageSlug;
     if (stageRel is Map) {
@@ -516,12 +531,23 @@ class CrmLead {
       stageName: json['stage_name'] as String? ?? stageName,
       status: CrmLeadStatus.fromSlug(json['status'] as String?),
       assignedTo: json['assigned_to']?.toString(),
+      assignedToName: json['assigned_to_name'] as String?,
       priority: CrmPriority.fromSlug(json['priority'] as String?),
       conversionProbability:
           (json['conversion_probability'] as num?)?.toDouble() ?? 0,
       estimatedValue: (json['estimated_value'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
       capturedAt: DateTime.tryParse(json['captured_at'] as String? ?? ''),
+      propertyId: json['property_id']?.toString(),
+      propertyTitle: propertyRel is Map
+          ? propertyRel['title'] as String?
+          : null,
+      preferredLocation: json['preferred_location'] as String?,
+      interestSummary: json['interest_summary'] as String?,
+      lastContactedAt:
+          DateTime.tryParse(json['last_contacted_at'] as String? ?? ''),
+      nextFollowUpAt:
+          DateTime.tryParse(json['next_follow_up_at'] as String? ?? ''),
     );
   }
 }
@@ -724,6 +750,42 @@ class CrmRelationshipNode {
   final List<String> connectedTo;
 }
 
+/// Cross-module row surfaced in Sales Command Center.
+class SalesBridgeRow {
+  const SalesBridgeRow({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.status,
+    this.subtitle,
+    this.when,
+    this.clientName,
+    this.propertyTitle,
+    this.amount,
+    this.linkId,
+    this.crmClientId,
+    this.profileId,
+    this.clientEmail,
+    this.clientPhone,
+  });
+
+  final String id;
+  final String kind; // inspection | application | callback | consultation | property | payment
+  final String title;
+  final String status;
+  final String? subtitle;
+  final DateTime? when;
+  final String? clientName;
+  final String? propertyTitle;
+  final double? amount;
+  final String? linkId;
+  final String? crmClientId;
+  /// Auth/profile id from portal `clients.user_id` — matches `crm_clients.profile_id`.
+  final String? profileId;
+  final String? clientEmail;
+  final String? clientPhone;
+}
+
 /// Full CRM Command Center snapshot.
 class CrmCommandCenterSnapshot {
   const CrmCommandCenterSnapshot({
@@ -737,6 +799,13 @@ class CrmCommandCenterSnapshot {
     required this.aiInsights,
     required this.leadIntelligence,
     required this.relationshipGraph,
+    this.inspections = const [],
+    this.applications = const [],
+    this.callbacks = const [],
+    this.consultations = const [],
+    this.properties = const [],
+    this.payments = const [],
+    this.realtimeConnected = false,
     this.fromRemote = false,
     this.loadedAt,
   });
@@ -751,6 +820,13 @@ class CrmCommandCenterSnapshot {
   final List<CrmAiInsight> aiInsights;
   final List<String> leadIntelligence;
   final List<CrmRelationshipNode> relationshipGraph;
+  final List<SalesBridgeRow> inspections;
+  final List<SalesBridgeRow> applications;
+  final List<SalesBridgeRow> callbacks;
+  final List<SalesBridgeRow> consultations;
+  final List<SalesBridgeRow> properties;
+  final List<SalesBridgeRow> payments;
+  final bool realtimeConnected;
   final bool fromRemote;
   final DateTime? loadedAt;
 

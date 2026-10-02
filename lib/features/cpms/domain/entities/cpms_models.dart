@@ -978,6 +978,7 @@ class CpmsCommandCenterSnapshot {
     this.fromRemote = false,
     this.loadedAt,
     this.forecastDisclaimer = kConstructionForecastDisclaimer,
+    this.loadWarnings = const [],
   });
 
   final List<CpmsKpi> kpis;
@@ -1001,6 +1002,7 @@ class CpmsCommandCenterSnapshot {
   final bool fromRemote;
   final DateTime? loadedAt;
   final String forecastDisclaimer;
+  final List<String> loadWarnings;
 
   List<CpmsBudgetSummary> budgetSummaries() {
     final byProject = <String, List<CpmsBudgetLine>>{};

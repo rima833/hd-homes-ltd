@@ -83,7 +83,56 @@ void main() {
         acceptPrivacy: true,
         acceptCookies: true,
       );
-      expect(RegistrationValidator.stepIsValid(RegistrationStep.review, draft), isTrue);
+      expect(
+        RegistrationValidator.stepIsValid(RegistrationStep.review, draft),
+        isTrue,
+      );
+    });
+
+    test('staff invite can be submitted without country or account type', () {
+      const draft = RegistrationDraft(
+        invitationToken: 'invite-token',
+        firstName: 'Rishamah',
+        lastName: 'Godwin',
+        email: 'staff@example.com',
+        phone: '09066776719',
+        password: 'Secure1!pass',
+        confirmPassword: 'Secure1!pass',
+        acceptTerms: true,
+        acceptPrivacy: true,
+        acceptCookies: true,
+      );
+      expect(
+        RegistrationValidator.validateStaffAccess(
+          draft,
+        ).values.every((e) => e == null),
+        isTrue,
+      );
+      expect(
+        RegistrationValidator.stepIsValid(RegistrationStep.review, draft),
+        isTrue,
+      );
+      expect(draft.toAuthMetadata()['account_type'], 'staff');
+      expect(draft.toAuthMetadata()['invitation_token'], 'invite-token');
+    });
+
+    test('client review still requires country and state', () {
+      const draft = RegistrationDraft(
+        accountType: RegistrationAccountType.client,
+        firstName: 'Ada',
+        lastName: 'Okafor',
+        email: 'ada@example.com',
+        phone: '08012345678',
+        password: 'Secure1!pass',
+        confirmPassword: 'Secure1!pass',
+        acceptTerms: true,
+        acceptPrivacy: true,
+        acceptCookies: true,
+      );
+      expect(
+        RegistrationValidator.stepIsValid(RegistrationStep.review, draft),
+        isFalse,
+      );
     });
   });
 

@@ -35,7 +35,7 @@ void main() {
           'Open AR',
           'Open AP',
           'Overdue Invoices',
-          'Gateway Captured',
+          'Payments Captured',
           'Pending Approvals',
           'Invoice Volume',
           'Collections Health',
@@ -86,21 +86,22 @@ void main() {
   });
 
   group('FapmsService', () {
-    test('offline client returns demo command center', () async {
+    test('offline client returns empty command center', () async {
       final service = FapmsService();
       final snap = await service.loadCommandCenter();
       expect(snap.fromRemote, isFalse);
-      expect(snap.invoices, isNotEmpty);
-      expect(snap.kpis.length, greaterThanOrEqualTo(7));
+      expect(snap.invoices, isEmpty);
+      expect(snap.loadWarnings, isNotEmpty);
     });
 
     test('AI financial briefing stub includes disclaimer and KPIs', () {
       final service = FapmsService();
       final snap = FapmsDemo.snapshot();
       final briefing = service.generateFinancialBriefing(snap);
-      expect(briefing, contains('AI financial briefing'));
+      expect(briefing, contains('awaiting verification'));
       expect(briefing.toUpperCase(), contains('PROJECTION'));
       expect(briefing.toLowerCase(), contains('overdue'));
+      expect(briefing.toLowerCase(), contains('client payment'));
     });
 
     test('anomaly detection flags overdue and budget watch items', () {
@@ -119,26 +120,25 @@ void main() {
   });
 
   group('FapmsController contract', () {
-    test('tabs cover required command-center surfaces without state-in-build', () {
-      // Conceptual guard: tabs match deliverable; Notifier.build must return
-      // initial FapmsUiState without reading `state` (see fapms_controller.dart).
+    test('tabs cover focused live finance ops surfaces', () {
       expect(FapmsCommandTab.values.map((t) => t.name), containsAll([
         'overview',
-        'ledger',
-        'ar',
-        'ap',
-        'invoices',
+        'verification',
         'payments',
-        'banking',
-        'budgets',
+        'installments',
+        'invoices',
         'expenses',
-        'approvals',
-        'ai',
+        'banking',
+        'investor',
+        'leads',
+        'commissions',
+        'setup',
       ]));
+      expect(FapmsCommandTab.values.length, 11);
       const initial = FapmsUiState();
       expect(initial.selectedTab, FapmsCommandTab.overview);
-      expect(initial.tickerIndex, 0);
-      expect(initial.copyWith(tickerIndex: 1).tickerIndex, 1);
+      expect(initial.searchQuery, isEmpty);
+      expect(initial.copyWith(searchQuery: 'inv').searchQuery, 'inv');
     });
   });
 }

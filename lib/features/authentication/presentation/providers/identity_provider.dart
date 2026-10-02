@@ -38,7 +38,9 @@ final sessionServiceProvider = Provider<SessionService?>((ref) {
     ref.read(identitySessionProvider.notifier).onInactivityWarning();
   };
   service.onInactivityTimeout = () {
-    unawaited(ref.read(identitySessionProvider.notifier).signOut(reason: 'inactivity'));
+    unawaited(
+      ref.read(identitySessionProvider.notifier).signOut(reason: 'inactivity'),
+    );
   };
   ref.onDispose(service.stopMonitoring);
   return service;
@@ -57,8 +59,8 @@ final isAuthAvailableProvider = Provider<bool>((ref) {
 /// Global Identity Platform session — single source of truth for auth UI & guards.
 final identitySessionProvider =
     NotifierProvider<IdentitySessionNotifier, AuthSessionSnapshot>(
-  IdentitySessionNotifier.new,
-);
+      IdentitySessionNotifier.new,
+    );
 
 class IdentitySessionNotifier extends Notifier<AuthSessionSnapshot> {
   StreamSubscription<AuthState>? _authSub;
@@ -66,9 +68,10 @@ class IdentitySessionNotifier extends Notifier<AuthSessionSnapshot> {
 
   @override
   AuthSessionSnapshot build() {
+    final sessionService = ref.watch(sessionServiceProvider);
     ref.onDispose(() {
       _authSub?.cancel();
-      ref.read(sessionServiceProvider)?.stopMonitoring();
+      sessionService?.stopMonitoring();
     });
 
     final repository = ref.watch(authRepositoryProvider);
@@ -111,7 +114,43 @@ class IdentitySessionNotifier extends Notifier<AuthSessionSnapshot> {
       return;
     }
 
-    state = state.copyWith(status: AuthStatus.authenticating);
+    // Token refresh / user-updated / MFA verify must NOT flip to authenticating —
+    // that rebuilds the whole shell and thrashing GoRouter (dashboard blink).
+    final isSoftRefresh =
+        event.event == AuthChangeEvent.tokenRefreshed ||
+        event.event == AuthChangeEvent.userUpdated ||
+        event.event == AuthChangeEvent.mfaChallengeVerified;
+    final authConfirmed = session.user.emailConfirmedAt != null;
+    if (isSoftRefresh &&
+        authConfirmed &&
+        !state.emailConfirmed &&
+        state.profile != null) {
+      final profile = await repository.fetchCurrentProfile();
+      state = _snapshotFromProfile(
+        profile,
+        permissions: repository.currentPermissions,
+        session: session,
+      );
+      ref.read(sessionServiceProvider)?.startMonitoring();
+      return;
+    }
+
+    if (isSoftRefresh && state.isAuthenticated && state.profile != null) {
+      final expiresAt = session.expiresAt == null
+          ? state.accessTokenExpiresAt
+          : DateTime.fromMillisecondsSinceEpoch(session.expiresAt! * 1000);
+      // Patch token metadata only when expiry actually moves — avoid shell rebuilds.
+      if (state.accessTokenExpiresAt != expiresAt) {
+        state = state.copyWith(accessTokenExpiresAt: expiresAt);
+      }
+      ref.read(sessionServiceProvider)?.startMonitoring();
+      return;
+    }
+
+    final needsFullResolve = !state.isAuthenticated || state.profile == null;
+    if (needsFullResolve) {
+      state = state.copyWith(status: AuthStatus.authenticating);
+    }
     final profile = await repository.fetchCurrentProfile();
     state = _snapshotFromProfile(
       profile,
@@ -128,11 +167,14 @@ class IdentitySessionNotifier extends Notifier<AuthSessionSnapshot> {
   }) {
     final engine = ref.read(permissionEngineProvider);
     final hasSession = profile != null;
+    final emailConfirmed =
+        (session?.user.emailConfirmedAt != null) ||
+        (profile?.emailConfirmed ?? false);
     final status = resolveAuthStatus(
       hasSession: hasSession,
       isLoading: false,
       accountStatus: profile?.accountStatus,
-      emailConfirmed: profile?.emailConfirmed ?? true,
+      emailConfirmed: emailConfirmed,
     );
 
     final expiresAt = session?.expiresAt == null
@@ -143,7 +185,7 @@ class IdentitySessionNotifier extends Notifier<AuthSessionSnapshot> {
       status: status,
       userId: profile?.id,
       email: profile?.email,
-      emailConfirmed: profile?.emailConfirmed ?? false,
+      emailConfirmed: emailConfirmed,
       profile: profile,
       permissions: permissions,
       accessTokenExpiresAt: expiresAt,
@@ -179,10 +221,9 @@ class IdentitySessionNotifier extends Notifier<AuthSessionSnapshot> {
     final repository = ref.read(authRepositoryProvider);
     if (repository == null || state.profile == null) return;
     final perms = await repository.refreshPermissions();
-    state = ref.read(permissionEngineProvider).attachPermissions(
-          state,
-          fromServer: perms,
-        );
+    state = ref
+        .read(permissionEngineProvider)
+        .attachPermissions(state, fromServer: perms);
   }
 
   /// Reloads business profile from PostgreSQL (e.g. after Profile Center edits).
@@ -196,6 +237,22 @@ class IdentitySessionNotifier extends Notifier<AuthSessionSnapshot> {
         permissions: repository.currentPermissions,
       );
     } catch (_) {}
+  }
+
+  /// Refreshes Auth user (`email_confirmed_at`) then reloads the profile.
+  Future<bool> confirmEmailVerifiedFromServer() async {
+    final repository = ref.read(authRepositoryProvider);
+    if (repository == null) return false;
+    try {
+      final profile = await repository.refreshEmailVerificationStatus();
+      state = _snapshotFromProfile(
+        profile,
+        permissions: repository.currentPermissions,
+      );
+      return profile?.emailConfirmed == true || state.emailConfirmed;
+    } catch (_) {
+      return state.emailConfirmed;
+    }
   }
 
   Future<void> refreshSessionIfNeeded() async {

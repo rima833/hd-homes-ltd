@@ -114,7 +114,9 @@ enum NotificationCategory {
   announcements,
   system,
   aiAssistant,
-  kyc;
+  kyc,
+  construction,
+  documents;
 
   String get slug => switch (this) {
         NotificationCategory.aiAssistant => 'ai_assistant',
@@ -135,6 +137,8 @@ enum NotificationCategory {
         NotificationCategory.system => 'System',
         NotificationCategory.aiAssistant => 'AI Assistant',
         NotificationCategory.kyc => 'KYC',
+        NotificationCategory.construction => 'Construction',
+        NotificationCategory.documents => 'Documents',
       };
 
   static NotificationCategory fromSlug(String? raw) {
@@ -228,6 +232,7 @@ abstract final class NotificationTemplateCatalog {
         'Congratulations {{first_name}} — your KYC is approved. Status: {{verification_status}}.',
     category: NotificationCategory.kyc,
     type: NotificationType.success,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
   );
 
   static const securityAlert = NotificationTemplate(
@@ -250,6 +255,7 @@ abstract final class NotificationTemplateCatalog {
         'Your booking {{booking_reference}} for {{property_name}} is confirmed.',
     category: NotificationCategory.bookings,
     type: NotificationType.success,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
   );
 
   static const paymentSuccessful = NotificationTemplate(
@@ -258,6 +264,7 @@ abstract final class NotificationTemplateCatalog {
     bodyTemplate: 'We received {{payment_amount}} for {{property_name}}.',
     category: NotificationCategory.payments,
     type: NotificationType.success,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
   );
 
   static const announcement = NotificationTemplate(
@@ -266,6 +273,156 @@ abstract final class NotificationTemplateCatalog {
     bodyTemplate: '{{body}}',
     category: NotificationCategory.announcements,
     type: NotificationType.announcement,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const paymentSubmitted = NotificationTemplate(
+    slug: 'payment_submitted',
+    titleTemplate: 'Payment submitted',
+    bodyTemplate:
+        'We received your payment of {{payment_amount}} for {{property_name}}.',
+    category: NotificationCategory.payments,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const paymentVerified = NotificationTemplate(
+    slug: 'payment_verified',
+    titleTemplate: 'Payment verified',
+    bodyTemplate:
+        'Your payment of {{payment_amount}} for {{property_name}} is verified.',
+    category: NotificationCategory.payments,
+    type: NotificationType.success,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const paymentRejected = NotificationTemplate(
+    slug: 'payment_rejected',
+    titleTemplate: 'Payment update',
+    bodyTemplate:
+        'Your payment for {{property_name}} needs attention: {{message}}',
+    category: NotificationCategory.payments,
+    type: NotificationType.warning,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const inspectionConfirmed = NotificationTemplate(
+    slug: 'inspection_confirmed',
+    titleTemplate: 'Inspection confirmed',
+    bodyTemplate:
+        'Inspection for {{property_name}} is confirmed for {{scheduled_at}}.',
+    category: NotificationCategory.bookings,
+    type: NotificationType.success,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const inspectionReminder = NotificationTemplate(
+    slug: 'inspection_reminder',
+    titleTemplate: 'Inspection reminder',
+    bodyTemplate:
+        'Reminder: inspection for {{property_name}} on {{scheduled_at}}.',
+    category: NotificationCategory.bookings,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const supportTicketCreated = NotificationTemplate(
+    slug: 'support_ticket_created',
+    titleTemplate: 'Support request received',
+    bodyTemplate: 'Ticket {{ticket_reference}} was created.',
+    category: NotificationCategory.support,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const supportTicketUpdated = NotificationTemplate(
+    slug: 'support_ticket_updated',
+    titleTemplate: 'Support update',
+    bodyTemplate: 'Ticket {{ticket_reference}}: {{message}}',
+    category: NotificationCategory.support,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const supportTicketResolved = NotificationTemplate(
+    slug: 'support_ticket_resolved',
+    titleTemplate: 'Support ticket resolved',
+    bodyTemplate: 'Ticket {{ticket_reference}} was resolved.',
+    category: NotificationCategory.support,
+    type: NotificationType.success,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const constructionUpdate = NotificationTemplate(
+    slug: 'construction_update',
+    titleTemplate: 'Construction update',
+    bodyTemplate: '{{message}}',
+    category: NotificationCategory.construction,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const documentPublished = NotificationTemplate(
+    slug: 'document_published',
+    titleTemplate: 'New document',
+    bodyTemplate: '{{document_title}} is available in your portal.',
+    category: NotificationCategory.documents,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const investorKycUpdate = NotificationTemplate(
+    slug: 'investor_kyc_update',
+    titleTemplate: 'Verification update',
+    bodyTemplate: 'Status: {{verification_status}}. {{message}}',
+    category: NotificationCategory.kyc,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const investorPaymentUpdate = NotificationTemplate(
+    slug: 'investor_payment_update',
+    titleTemplate: 'Investment payment',
+    bodyTemplate: 'Payment {{payment_amount}} is {{status}}.',
+    category: NotificationCategory.payments,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const staffInvite = NotificationTemplate(
+    slug: 'staff_invite',
+    titleTemplate: 'Staff invitation',
+    bodyTemplate: 'You have been invited to HD Homes Admin.',
+    category: NotificationCategory.account,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.email],
+  );
+
+  static const portalInvite = NotificationTemplate(
+    slug: 'portal_invite',
+    titleTemplate: 'Portal invitation',
+    bodyTemplate: 'You have been invited to the HD Homes portal.',
+    category: NotificationCategory.account,
+    type: NotificationType.information,
+    defaultChannels: [NotificationChannel.email],
+  );
+
+  static const passwordChanged = NotificationTemplate(
+    slug: 'password_changed',
+    titleTemplate: 'Password changed',
+    bodyTemplate: 'Your HD Homes password was changed.',
+    category: NotificationCategory.security,
+    type: NotificationType.critical,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
+  );
+
+  static const emailChanged = NotificationTemplate(
+    slug: 'email_changed',
+    titleTemplate: 'Email changed',
+    bodyTemplate: 'Your HD Homes email address was changed.',
+    category: NotificationCategory.security,
+    type: NotificationType.critical,
+    defaultChannels: [NotificationChannel.inApp, NotificationChannel.email],
   );
 
   static NotificationTemplate? bySlug(String slug) {
@@ -275,6 +432,22 @@ abstract final class NotificationTemplateCatalog {
       securityAlert,
       bookingConfirmed,
       paymentSuccessful,
+      paymentSubmitted,
+      paymentVerified,
+      paymentRejected,
+      inspectionConfirmed,
+      inspectionReminder,
+      supportTicketCreated,
+      supportTicketUpdated,
+      supportTicketResolved,
+      constructionUpdate,
+      documentPublished,
+      investorKycUpdate,
+      investorPaymentUpdate,
+      staffInvite,
+      portalInvite,
+      passwordChanged,
+      emailChanged,
       announcement,
     ];
     for (final t in all) {
@@ -557,6 +730,9 @@ class AnnouncementPost {
     this.targetAudience = 'everyone',
     this.published = false,
     this.publishedAt,
+    this.recipientCount = 0,
+    this.surfacesPublicSite = false,
+    this.metadata = const {},
   });
 
   final String id;
@@ -566,8 +742,25 @@ class AnnouncementPost {
   final String targetAudience;
   final bool published;
   final DateTime? publishedAt;
+  final int recipientCount;
+  final bool surfacesPublicSite;
+  final Map<String, dynamic> metadata;
+
+  int get inAppCount => (metadata['in_app_count'] as num?)?.toInt() ?? recipientCount;
+  int get investorInboxCount =>
+      (metadata['investor_inbox_count'] as num?)?.toInt() ?? 0;
+  int get emailQueuedCount =>
+      (metadata['email_queued_count'] as num?)?.toInt() ?? 0;
+
+  String get audienceLabel => switch (targetAudience) {
+        'clients' => 'Clients',
+        'investors' => 'Investors',
+        'staff' => 'Staff',
+        _ => 'Everyone',
+      };
 
   factory AnnouncementPost.fromJson(Map<String, dynamic> json) {
+    final meta = json['metadata'];
     return AnnouncementPost(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -578,8 +771,57 @@ class AnnouncementPost {
       publishedAt: json['published_at'] != null
           ? DateTime.tryParse(json['published_at'] as String)
           : null,
+      recipientCount: (json['recipient_count'] as num?)?.toInt() ?? 0,
+      surfacesPublicSite: json['surfaces_public_site'] as bool? ?? false,
+      metadata: meta is Map
+          ? Map<String, dynamic>.from(meta)
+          : const {},
     );
   }
+}
+
+class AnnouncementPublishResult {
+  const AnnouncementPublishResult({
+    required this.announcementId,
+    required this.targetAudience,
+    required this.recipientCount,
+    required this.inAppCount,
+    required this.investorInboxCount,
+    required this.emailQueuedCount,
+    required this.surfacesPublicSite,
+  });
+
+  final String announcementId;
+  final String targetAudience;
+  final int recipientCount;
+  final int inAppCount;
+  final int investorInboxCount;
+  final int emailQueuedCount;
+  final bool surfacesPublicSite;
+
+  factory AnnouncementPublishResult.fromJson(Map<String, dynamic> json) {
+    return AnnouncementPublishResult(
+      announcementId: json['announcement_id'] as String,
+      targetAudience: json['target_audience'] as String? ?? 'everyone',
+      recipientCount: (json['recipient_count'] as num?)?.toInt() ?? 0,
+      inAppCount: (json['in_app_count'] as num?)?.toInt() ?? 0,
+      investorInboxCount: (json['investor_inbox_count'] as num?)?.toInt() ?? 0,
+      emailQueuedCount: (json['email_queued_count'] as num?)?.toInt() ?? 0,
+      surfacesPublicSite: json['surfaces_public_site'] as bool? ?? false,
+    );
+  }
+}
+
+class CommunicationAdminStats {
+  const CommunicationAdminStats({
+    this.publishedCount = 0,
+    this.totalRecipients = 0,
+    this.lastPublishedAt,
+  });
+
+  final int publishedCount;
+  final int totalRecipients;
+  final DateTime? lastPublishedAt;
 }
 
 class CommunicationDispatchRequest {

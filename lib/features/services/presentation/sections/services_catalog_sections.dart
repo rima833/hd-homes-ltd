@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/website/components/animated_section_title.dart';
-import 'package:hdhomesproject/core/website/components/page_container.dart';
 import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
 import 'package:hdhomesproject/features/services/data/models/service_models.dart';
 import 'package:hdhomesproject/features/services/data/providers/services_catalog_provider.dart';
+import 'package:hdhomesproject/features/services/presentation/widgets/featured_services_carousel.dart';
 import 'package:hdhomesproject/features/services/presentation/widgets/service_card.dart';
 import 'package:hdhomesproject/features/services/presentation/widgets/service_icons.dart';
 
@@ -39,8 +39,7 @@ class ServicesCatalogSections extends ConsumerWidget {
         KeyedSubtree(
           key: categoriesKey,
           child: SectionWrapper(
-            child: PageContainer(
-              child: Column(
+            child: Column(
                 children: [
                   const AnimatedSectionTitle(
                     overline: 'CATEGORIES',
@@ -75,42 +74,27 @@ class ServicesCatalogSections extends ConsumerWidget {
                   ),
                 ],
               ),
-            ),
           ),
         ),
         if (featured.isNotEmpty)
           SectionWrapper(
             backgroundColor: AppColors.charcoal,
-            child: PageContainer(
-              child: Column(
+            child: Column(
                 children: [
                   const AnimatedSectionTitle(
                     overline: 'FEATURED',
                     title: 'Featured services',
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  SizedBox(
-                    height: 320,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: featured.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.base),
-                      itemBuilder: (context, index) => SizedBox(
-                        width: context.isMobile ? 280 : 320,
-                        child: ServiceCard(service: featured[index]),
-                      ),
-                    ),
-                  ),
+                  FeaturedServicesCarousel(services: featured),
                 ],
               ),
-            ),
           ),
         KeyedSubtree(
           key: gridKey,
           child: SectionWrapper(
             backgroundColor: Theme.of(context).colorScheme.surface,
-            child: PageContainer(
-              child: Column(
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AnimatedSectionTitle(
@@ -120,6 +104,17 @@ class ServicesCatalogSections extends ConsumerWidget {
                         : '${selectedCategory!.label} services',
                     alignment: TextAlign.start,
                   ),
+                  if (selectedCategory != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: ActionChip(
+                        label: const Text('Clear filter'),
+                        avatar: const Icon(Icons.close, size: 16),
+                        onPressed: () => onCategorySelected?.call(null),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.xl),
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -136,7 +131,6 @@ class ServicesCatalogSections extends ConsumerWidget {
                   ),
                 ],
               ),
-            ),
           ),
         ),
       ],
@@ -187,7 +181,10 @@ class _CategoryCardState extends State<_CategoryCard> {
                 children: [
                   Icon(ServiceIcons.resolve(widget.category.iconName), color: AppColors.gold, size: 28),
                   const SizedBox(height: AppSpacing.base),
-                  Text(widget.category.id.label, style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    widget.category.displayName,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(widget.category.description, style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: AppSpacing.sm),

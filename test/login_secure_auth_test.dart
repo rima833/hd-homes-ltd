@@ -114,6 +114,22 @@ void main() {
         RoutePaths.clientSettings,
       );
     });
+
+    test('incomplete staff profile goes to staff onboarding', () {
+      expect(
+        SmartLoginRouter.resolve(
+          SmartLoginContext(
+            profile: profile(
+              role: AppRole.salesTeam,
+              firstName: null,
+              lastName: null,
+            ),
+            profileComplete: false,
+          ),
+        ),
+        RoutePaths.staffOnboarding,
+      );
+    });
   });
 
   group('LoginMethod', () {

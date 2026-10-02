@@ -109,6 +109,16 @@ class PropertyPricing {
     required this.reservationFee,
     required this.taxesAndFees,
     required this.mortgageEligible,
+    this.showMortgageCalculator = false,
+    this.mortgageDepositPercent = 20,
+    this.mortgageDepositMinPercent = 10,
+    this.mortgageDepositMaxPercent = 50,
+    this.mortgageInterestRate = 14,
+    this.mortgageInterestMin = 5,
+    this.mortgageInterestMax = 30,
+    this.mortgageTermYears = 20,
+    this.mortgageTermMinYears = 5,
+    this.mortgageTermMaxYears = 30,
   });
 
   final int basePrice;
@@ -116,6 +126,16 @@ class PropertyPricing {
   final int reservationFee;
   final String taxesAndFees;
   final bool mortgageEligible;
+  final bool showMortgageCalculator;
+  final double mortgageDepositPercent;
+  final double mortgageDepositMinPercent;
+  final double mortgageDepositMaxPercent;
+  final double mortgageInterestRate;
+  final double mortgageInterestMin;
+  final double mortgageInterestMax;
+  final double mortgageTermYears;
+  final double mortgageTermMinYears;
+  final double mortgageTermMaxYears;
 }
 
 class PropertyPaymentPlan {
@@ -163,6 +183,9 @@ class PropertyMediaBundle {
     required this.hasVirtualTour,
     required this.hasDroneFootage,
     required this.brochureUrl,
+    this.tour360Url,
+    this.videoTourUrl,
+    this.droneTourUrl,
   });
 
   final List<String> images;
@@ -170,6 +193,9 @@ class PropertyMediaBundle {
   final bool hasVirtualTour;
   final bool hasDroneFootage;
   final String? brochureUrl;
+  final String? tour360Url;
+  final String? videoTourUrl;
+  final String? droneTourUrl;
 }
 
 class PropertyFloorPlan {

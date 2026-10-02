@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -7,8 +8,10 @@ import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/theme/app_theme.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
 import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
+import 'package:hdhomesproject/features/authentication/domain/entities/app_role.dart';
 import 'package:hdhomesproject/features/authentication/domain/entities/verification_models.dart';
 import 'package:hdhomesproject/features/authentication/domain/services/login_validator.dart';
+import 'package:hdhomesproject/features/authentication/presentation/providers/identity_provider.dart';
 import 'package:hdhomesproject/features/authentication/presentation/providers/verification_controller.dart';
 import 'package:hdhomesproject/features/authentication/presentation/widgets/otp_code_input.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -20,13 +23,26 @@ class PhoneVerifyPage extends HookConsumerWidget {
 
   final String? initialPhone;
 
+  static String destinationAfterVerify(AppRole? role) {
+    return switch (role) {
+      AppRole.client => RoutePaths.clientSettings,
+      AppRole.investor => RoutePaths.investorSettings,
+      _ => RoutePaths.verificationCenter,
+    };
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final phoneController = useTextEditingController(text: initialPhone ?? '');
+    final session = ref.watch(identitySessionProvider);
+    final seeded = (initialPhone?.trim().isNotEmpty ?? false)
+        ? initialPhone!.trim()
+        : (session.profile?.phone?.trim() ?? '');
+    final phoneController = useTextEditingController(text: seeded);
     final ui = ref.watch(verificationControllerProvider);
     final controller = ref.read(verificationControllerProvider.notifier);
     final step = useState(0); // 0 = phone, 1 = otp
     final verifying = useState(false);
+    final returnPath = destinationAfterVerify(session.primaryRole);
 
     useEffect(() {
       final timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -57,11 +73,15 @@ class PhoneVerifyPage extends HookConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Phone verified')),
         );
-        context.go(RoutePaths.verificationCenter);
+        context.go(returnPath);
       }
     }
 
     final verified = ui.phoneLifecycle == VerificationLifecycle.verified;
+    final hint = kDebugMode
+        ? 'We send a one-time SMS code. In local development, if SMS is not '
+            'enabled yet, use code 123456.'
+        : 'We will send a one-time code via SMS to confirm this number.';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Verify phone')),
@@ -94,7 +114,7 @@ class PhoneVerifyPage extends HookConsumerWidget {
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     step.value == 0
-                        ? 'We will send a one-time code via SMS. Mock provider accepts 123456 in development.'
+                        ? hint
                         : 'Enter the 6-digit code sent to ${phoneController.text.trim()}.',
                     textAlign: TextAlign.center,
                   ),
@@ -148,9 +168,9 @@ class PhoneVerifyPage extends HookConsumerWidget {
                   ],
                   if (verified)
                     PrimaryButton(
-                      label: 'Open Verification Center',
+                      label: 'Continue',
                       expand: true,
-                      onPressed: () => context.go(RoutePaths.verificationCenter),
+                      onPressed: () => context.go(returnPath),
                     ),
                 ],
               ),

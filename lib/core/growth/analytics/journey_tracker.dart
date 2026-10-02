@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hdhomesproject/core/growth/analytics/analytics_events.dart';
 import 'package:hdhomesproject/core/growth/analytics/analytics_service.dart';
 import 'package:hdhomesproject/core/growth/lead_scoring/smart_lead_scoring.dart';
 import 'package:hdhomesproject/core/growth/models/growth_models.dart';
 import 'package:hdhomesproject/core/growth/personalization/visitor_profile.dart';
+import 'package:hdhomesproject/core/network/supabase_provider.dart';
+import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/contact/data/models/contact_content.dart';
 import 'package:hdhomesproject/features/contact/data/providers/lead_routing_provider.dart';
 
@@ -35,6 +39,9 @@ void trackGrowthPageView(WidgetRef ref, String path, {Map<String, String>? utm})
 void trackGrowthPropertyView(WidgetRef ref, String propertyId) {
   ref.read(visitorProfileProvider.notifier).recordPropertyView(propertyId);
   ref.read(analyticsProvider.notifier).trackPropertyView(propertyId);
+  if (ref.read(supabaseConfiguredProvider)) {
+    unawaited(ref.read(cmsServiceProvider).recordPropertyView(propertyId));
+  }
 }
 
 void trackGrowthSearch(WidgetRef ref, String query, {Map<String, dynamic>? filters}) {

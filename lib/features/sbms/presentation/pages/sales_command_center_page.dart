@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hdhomesproject/core/config/ai_features.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/core/widgets/offline_updates_note.dart';
 import 'package:hdhomesproject/features/sbms/domain/entities/sbms_models.dart';
 import 'package:hdhomesproject/features/sbms/domain/services/sbms_service.dart';
 import 'package:hdhomesproject/features/sbms/presentation/providers/sbms_controller.dart';
@@ -245,17 +247,18 @@ class SalesCommandCenterPage extends ConsumerWidget {
         ];
       case SbmsCommandTab.ai:
         return [
-          ContainedPadding(
-            child: _SectionCard(
-              title: 'AI Sales Assistant™',
-              icon: LucideIcons.sparkles,
-              child: _AiAssistantPanel(
-                insights: snap.aiInsights,
-                deals: snap.deals,
-                service: ref.read(sbmsServiceProvider),
+          if (kAiFeaturesEnabled)
+            ContainedPadding(
+              child: _SectionCard(
+                title: 'AI Sales Assistant™',
+                icon: LucideIcons.sparkles,
+                child: _AiAssistantPanel(
+                  insights: snap.aiInsights,
+                  deals: snap.deals,
+                  service: ref.read(sbmsServiceProvider),
+                ),
               ),
             ),
-          ),
           ContainedPadding(
             child: _SectionCard(
               title: 'Smart Deal Intelligence™',
@@ -355,23 +358,8 @@ class _SbmsHeader extends StatelessWidget {
                       color: AppColors.white,
                     ),
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold.withValues(alpha: 0.15),
-                      borderRadius: AppRadius.cardBorder,
-                    ),
-                    child: Text(
-                      fromRemote ? 'LIVE' : 'DEMO',
-                      style: TextStyle(
-                        color:
-                            fromRemote ? Colors.greenAccent : AppColors.gold,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
+                  if (!fromRemote)
+                    const OfflineUpdatesNote(color: Colors.white70),
                 ],
               );
               if (narrow) {
@@ -570,12 +558,15 @@ class _TabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleTabs = kAiFeaturesEnabled
+        ? SbmsCommandTab.values
+        : SbmsCommandTab.values.where((t) => t.name != 'ai').toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: SbmsCommandTab.values.map((tab) {
+          children: visibleTabs.map((tab) {
             final isSelected = tab == selected;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -1115,6 +1106,7 @@ class _LeaderboardList extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _AiAssistantPanel extends StatelessWidget {
   const _AiAssistantPanel({
     required this.insights,

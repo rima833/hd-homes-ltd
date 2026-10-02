@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
@@ -29,22 +31,69 @@ class ResetPasswordPage extends HookConsumerWidget {
     final role = ref.watch(identitySessionProvider).primaryRole;
     final policy = PasswordPolicy.forRole(role);
     final recoveryReady = useState(false);
+    final recovering = useState(true);
+    final recoverError = useState<String?>(null);
 
     useEffect(() {
-      if (!ref.read(supabaseConfiguredProvider)) return null;
+      if (!ref.read(supabaseConfiguredProvider)) {
+        recovering.value = false;
+        recoverError.value =
+            'Authentication is not configured. Restart with Supabase env.';
+        return null;
+      }
       final client = ref.read(supabaseClientProvider);
-      // Already have a session from deep link.
+      var cancelled = false;
+
+      Future<void> recoverFromUrl() async {
+        recoverError.value = null;
+        try {
+          final uri = Uri.base;
+          final code = uri.queryParameters['code'];
+          if (code != null && code.isNotEmpty) {
+            await client.auth.exchangeCodeForSession(code);
+          } else {
+            // Implicit / recovery hash tokens (#access_token&type=recovery).
+            try {
+              await client.auth.getSessionFromUrl(uri);
+            } catch (_) {
+              // detectSessionInUrl may already have consumed the hash.
+            }
+          }
+        } catch (e) {
+          if (!cancelled) {
+            recoverError.value =
+                'This reset link is invalid or expired. Request a new one.';
+          }
+        }
+
+        if (cancelled) return;
+        if (client.auth.currentSession != null) {
+          recoveryReady.value = true;
+          controller.markRecoveryReady(true);
+        }
+        recovering.value = false;
+      }
+
       if (client.auth.currentSession != null) {
         recoveryReady.value = true;
         controller.markRecoveryReady(true);
+        recovering.value = false;
+      } else {
+        unawaited(recoverFromUrl());
       }
+
       final sub = client.auth.onAuthStateChange.listen((data) {
         if (isPasswordRecoveryEvent(data.event) || data.session != null) {
           recoveryReady.value = true;
           controller.markRecoveryReady(true);
+          recovering.value = false;
+          recoverError.value = null;
         }
       });
-      return sub.cancel;
+      return () {
+        cancelled = true;
+        sub.cancel();
+      };
     }, const []);
 
     useEffect(() {
@@ -52,6 +101,8 @@ class ResetPasswordPage extends HookConsumerWidget {
       passwordController.addListener(listener);
       return () => passwordController.removeListener(listener);
     }, [passwordController]);
+
+    final ready = recoveryReady.value || ui.recoveryReady;
 
     return Scaffold(
       body: SafeArea(
@@ -76,18 +127,36 @@ class ResetPasswordPage extends HookConsumerWidget {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      recoveryReady.value || ui.recoveryReady
-                          ? 'Choose a strong password. All other sessions will be signed out.'
-                          : 'Open the reset link from your email to continue. If you already did, your session may still be loading…',
+                      recovering.value
+                          ? 'Confirming your reset link…'
+                          : ready
+                              ? 'Choose a strong password. All other sessions will be signed out.'
+                              : 'Open the reset link from your email in this same browser (where HD Homes is running).',
                       textAlign: TextAlign.center,
                     ),
+                    if (recoverError.value != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        recoverError.value!,
+                        style: const TextStyle(color: AppColors.error),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                     if (ui.error != null) ...[
                       const SizedBox(height: AppSpacing.md),
-                      Text(ui.error!, style: const TextStyle(color: AppColors.error)),
+                      Text(
+                        ui.error!,
+                        style: const TextStyle(color: AppColors.error),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                     if (ui.message != null) ...[
                       const SizedBox(height: AppSpacing.md),
-                      Text(ui.message!, style: const TextStyle(color: AppColors.success)),
+                      Text(
+                        ui.message!,
+                        style: const TextStyle(color: AppColors.success),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                     const SizedBox(height: AppSpacing.xl),
                     AuthPasswordField(
@@ -104,18 +173,24 @@ class ResetPasswordPage extends HookConsumerWidget {
                       label: 'Confirm password',
                       autofillHints: const [AutofillHints.newPassword],
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Please confirm your password';
-                        if (v != passwordController.text) return 'Passwords do not match';
+                        if (v == null || v.isEmpty) {
+                          return 'Please confirm your password';
+                        }
+                        if (v != passwordController.text) {
+                          return 'Passwords do not match';
+                        }
                         return null;
                       },
                     ),
                     const SizedBox(height: AppSpacing.xl),
                     PrimaryButton(
-                      label: 'Save new password',
+                      label: recovering.value
+                          ? 'Preparing…'
+                          : 'Save new password',
                       expand: true,
                       icon: LucideIcons.check,
-                      isLoading: ui.isSubmitting,
-                      onPressed: ui.isSubmitting
+                      isLoading: ui.isSubmitting || recovering.value,
+                      onPressed: (!ready || ui.isSubmitting || recovering.value)
                           ? null
                           : () async {
                               if (!formKey.currentState!.validate()) return;
@@ -128,6 +203,16 @@ class ResetPasswordPage extends HookConsumerWidget {
                               }
                             },
                     ),
+                    if (!ready && !recovering.value) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      PrimaryButton(
+                        label: 'Request a new reset link',
+                        variant: ButtonVariant.secondary,
+                        expand: true,
+                        onPressed: () =>
+                            context.go(RoutePaths.forgotPassword),
+                      ),
+                    ],
                     TextButton(
                       onPressed: () => context.go(RoutePaths.login),
                       child: const Text('Back to Login'),
@@ -142,3 +227,4 @@ class ResetPasswordPage extends HookConsumerWidget {
     );
   }
 }
+

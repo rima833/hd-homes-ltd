@@ -13,6 +13,7 @@ class PrimaryButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.isLoading = false,
+    this.loadingLabel,
     this.icon,
     this.expand = false,
     this.variant = ButtonVariant.primary,
@@ -22,6 +23,9 @@ class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final bool isLoading;
+
+  /// Optional label shown while [isLoading] (defaults to [label]).
+  final String? loadingLabel;
   final IconData? icon;
   final bool expand;
   final ButtonVariant variant;
@@ -29,18 +33,48 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null && !isLoading;
+    final canTap = onPressed != null && !isLoading;
+    // Keep primary buttons visually “active” while loading so the spinner
+    // stays readable (disabled gold was washing out white indicators).
+    final visuallyEnabled = canTap || isLoading;
+    final busyLabel = loadingLabel ?? label;
+    final indicatorColor = switch (variant) {
+      ButtonVariant.primary => AppColors.charcoal,
+      _ => AppColors.gold,
+    };
+    final labelColor = switch (variant) {
+      ButtonVariant.primary => AppColors.charcoal,
+      ButtonVariant.secondary => AppColors.gold,
+      ButtonVariant.ghost || ButtonVariant.text => AppColors.gold,
+    };
+
+    Widget labelText({required String text, required Color color}) {
+      final child = Text(
+        text,
+        textAlign: TextAlign.center,
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
+      );
+      return expand ? Flexible(child: child) : child;
+    }
 
     Widget child = isLoading
-        ? SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: variant == ButtonVariant.primary
-                  ? AppColors.white
-                  : AppColors.gold,
-            ),
+        ? Row(
+            mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  valueColor: AlwaysStoppedAnimation<Color>(indicatorColor),
+                ),
+              ),
+              SizedBox(width: context.spacing.sm),
+              labelText(text: busyLabel, color: labelColor),
+            ],
           )
         : Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
@@ -50,29 +84,24 @@ class PrimaryButton extends StatelessWidget {
                 Icon(icon, size: AppIcons.sm),
                 SizedBox(width: context.spacing.sm),
               ],
-              Flexible(
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
+              labelText(text: label, color: labelColor),
             ],
           );
 
     final button = switch (variant) {
       ButtonVariant.primary => _PrimaryGradientButton(
-          onPressed: enabled ? onPressed : null,
+          onPressed: canTap ? onPressed : null,
           useGradient: useGradient,
+          activeLook: visuallyEnabled,
+          expand: expand,
           child: child,
         ),
       ButtonVariant.secondary => OutlinedButton(
-          onPressed: enabled ? onPressed : null,
+          onPressed: canTap ? onPressed : null,
           child: child,
         ),
       ButtonVariant.ghost => TextButton(
-          onPressed: enabled ? onPressed : null,
+          onPressed: canTap ? onPressed : null,
           style: TextButton.styleFrom(
             foregroundColor: AppColors.gold,
             padding: const EdgeInsets.symmetric(
@@ -83,17 +112,18 @@ class PrimaryButton extends StatelessWidget {
           child: child,
         ),
       ButtonVariant.text => TextButton(
-          onPressed: enabled ? onPressed : null,
+          onPressed: canTap ? onPressed : null,
           child: child,
         ),
     };
 
-    final wrapped = expand ? SizedBox(width: double.infinity, child: button) : button;
+    final wrapped =
+        expand ? SizedBox(width: double.infinity, child: button) : button;
 
     if (kIsWeb) return wrapped;
 
     return wrapped
-        .animate(target: enabled ? 1 : 0)
+        .animate(target: canTap ? 1 : 0)
         .scale(
           begin: const Offset(1, 1),
           end: const Offset(0.98, 0.98),
@@ -108,11 +138,15 @@ class _PrimaryGradientButton extends StatelessWidget {
     required this.onPressed,
     required this.child,
     required this.useGradient,
+    required this.activeLook,
+    required this.expand,
   });
 
   final VoidCallback? onPressed;
   final Widget child;
   final bool useGradient;
+  final bool activeLook;
+  final bool expand;
 
   @override
   Widget build(BuildContext context) {
@@ -124,24 +158,32 @@ class _PrimaryGradientButton extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: AppRadius.buttonBorder,
-            gradient: useGradient && onPressed != null
-                ? AppColors.goldGradient
-                : null,
-            color: onPressed == null
+            gradient: useGradient && activeLook ? AppColors.goldGradient : null,
+            color: !activeLook
                 ? AppColors.gold.withValues(alpha: 0.4)
                 : (useGradient ? null : AppColors.gold),
-            boxShadow: onPressed != null ? AppShadows.goldGlow : null,
+            boxShadow: activeLook ? AppShadows.goldGlow : null,
           ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xl,
-              vertical: AppSpacing.base,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: 48,
+              minWidth: expand ? double.infinity : 0,
             ),
-            child: DefaultTextStyle(
-              style: Theme.of(context).textTheme.labelLarge!.copyWith(
-                    color: AppColors.white,
-                  ),
-              child: child,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xl,
+                vertical: AppSpacing.base,
+              ),
+              child: DefaultTextStyle(
+                style: Theme.of(context).textTheme.labelLarge!.copyWith(
+                      color: AppColors.charcoal,
+                      fontWeight: FontWeight.w700,
+                    ),
+                child: IconTheme(
+                  data: const IconThemeData(color: AppColors.charcoal),
+                  child: child,
+                ),
+              ),
             ),
           ),
         ),
@@ -158,12 +200,14 @@ class SecondaryButton extends StatelessWidget {
     required this.onPressed,
     this.icon,
     this.expand = false,
+    this.isLoading = false,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
   final bool expand;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +216,7 @@ class SecondaryButton extends StatelessWidget {
       onPressed: onPressed,
       icon: icon,
       expand: expand,
+      isLoading: isLoading,
       variant: ButtonVariant.secondary,
       useGradient: false,
     );

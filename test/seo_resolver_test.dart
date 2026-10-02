@@ -9,7 +9,7 @@ void main() {
       final seo = SeoResolver.resolvePath('/');
       expect(seo, isNotNull);
       expect(seo!.title, SeoMetadata.home.title);
-      expect(seo.canonicalUrl, 'https://hdhomes.ng/');
+      expect(seo.canonicalUrl, 'https://hdhomesltd.com/');
     });
 
     test('resolves static public pages', () {
@@ -30,9 +30,9 @@ void main() {
     });
 
     test('withCanonical preserves metadata fields', () {
-      final enriched = SeoMetadata.servicesHub.withCanonical('https://hdhomes.ng/services');
+      final enriched = SeoMetadata.servicesHub.withCanonical('https://hdhomesltd.com/services');
       expect(enriched.title, SeoMetadata.servicesHub.title);
-      expect(enriched.canonicalUrl, 'https://hdhomes.ng/services');
+      expect(enriched.canonicalUrl, 'https://hdhomesltd.com/services');
       expect(enriched.structuredData, SeoMetadata.servicesHub.structuredData);
     });
   });

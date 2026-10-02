@@ -88,14 +88,38 @@ class AboutIntroContent {
     required this.geographicPresence,
     required this.achievements,
     required this.philosophy,
+    this.imageUrl,
   });
 
   final String description;
   final int yearsOperating;
-  final List<String> specializations;
+  final List<AboutIntroTag> specializations;
   final List<String> geographicPresence;
-  final List<String> achievements;
+  final List<AboutIntroStat> achievements;
   final String philosophy;
+  final String? imageUrl;
+}
+
+class AboutIntroTag {
+  const AboutIntroTag({
+    required this.label,
+    this.iconName = 'home',
+  });
+
+  final String label;
+  final String iconName;
+}
+
+class AboutIntroStat {
+  const AboutIntroStat({
+    required this.value,
+    required this.label,
+    this.iconName = 'building',
+  });
+
+  final String value;
+  final String label;
+  final String iconName;
 }
 
 class AboutStoryChapter {
@@ -103,11 +127,48 @@ class AboutStoryChapter {
     required this.year,
     required this.title,
     required this.body,
+    this.summary,
+    this.imageUrl,
+    this.highlights = const [],
+    this.features = const [],
   });
 
   final String year;
   final String title;
   final String body;
+  final String? summary;
+  final String? imageUrl;
+  final List<String> highlights;
+  final List<AboutStoryFeature> features;
+
+  /// Prefer structured features; fall back to highlight labels.
+  List<AboutStoryFeature> get displayFeatures {
+    if (features.isNotEmpty) return features;
+    return [
+      for (var i = 0; i < highlights.length; i++)
+        AboutStoryFeature(
+          title: highlights[i],
+          description: '',
+          iconName: switch (i % 3) {
+            0 => 'building',
+            1 => 'leaf',
+            _ => 'cpu',
+          },
+        ),
+    ];
+  }
+}
+
+class AboutStoryFeature {
+  const AboutStoryFeature({
+    required this.title,
+    required this.description,
+    required this.iconName,
+  });
+
+  final String title;
+  final String description;
+  final String iconName;
 }
 
 class AboutValueItem {
@@ -115,9 +176,11 @@ class AboutValueItem {
     required this.title,
     required this.description,
     required this.iconName,
+    this.subtitle,
   });
 
   final String title;
+  final String? subtitle;
   final String description;
   final String iconName;
 }
@@ -206,10 +269,16 @@ class AboutPartnerItem {
   const AboutPartnerItem({
     required this.name,
     required this.category,
+    this.tagline = '',
+    this.logoUrl,
+    this.iconName = 'building',
   });
 
   final String name;
   final String category;
+  final String tagline;
+  final String? logoUrl;
+  final String iconName;
 }
 
 class AboutCsrContent {
@@ -265,15 +334,24 @@ class AboutStatItem {
     required this.value,
     required this.label,
     this.suffix,
+    this.description = '',
+    this.iconName = 'barChart',
+    this.logoUrl,
+    this.placement = 'orbit',
   });
 
   final int value;
   final String label;
   final String? suffix;
+  final String description;
+  final String iconName;
+  final String? logoUrl;
+  final String placement;
 }
 
 class AboutOfficeLocation {
   const AboutOfficeLocation({
+    this.id,
     required this.name,
     required this.type,
     required this.address,
@@ -281,8 +359,12 @@ class AboutOfficeLocation {
     required this.email,
     required this.hours,
     required this.mapUrl,
+    this.appointmentPath = '/book-inspection',
+    this.mapLabel = 'View Map',
+    this.appointmentLabel = 'Book Appointment',
   });
 
+  final String? id;
   final String name;
   final String type;
   final String address;
@@ -290,6 +372,9 @@ class AboutOfficeLocation {
   final String email;
   final String hours;
   final String mapUrl;
+  final String appointmentPath;
+  final String mapLabel;
+  final String appointmentLabel;
 }
 
 class AboutCareersPreview {
@@ -318,6 +403,7 @@ class AboutTestimonialItem {
     required this.rating,
     required this.verified,
     required this.type,
+    this.avatarUrl,
   });
 
   final String name;
@@ -326,6 +412,7 @@ class AboutTestimonialItem {
   final double rating;
   final bool verified;
   final String type;
+  final String? avatarUrl;
 }
 
 class AboutExecutiveVideo {
@@ -362,16 +449,66 @@ class AboutMilestoneMarker {
 
 class AboutCompanyProfile {
   const AboutCompanyProfile({
+    this.overline = 'COMPANY PROFILE',
     required this.title,
     required this.description,
+    this.cardTitle = 'Interactive Company Profile',
+    this.cardDescription =
+        'Explore HD Homes through an interactive digital experience — from our founding story to current projects and investment opportunities.',
+    this.features = const [
+      'Company History',
+      'Investment Portfolio',
+      'Completed Projects',
+      'Certifications',
+      'Executive Leadership',
+      'Core Values',
+    ],
+    this.ctaLabel = 'View Digital Profile',
     required this.downloadUrl,
     required this.viewUrl,
+    this.mockupImageUrl,
+    this.pdfLabel = 'Download PDF',
+    this.pdfMeta = '18 MB | Updated May 20, 2025',
+    this.brochureLabel = 'Download Brochure',
+    this.brochureUrl = '#',
+    this.brochureMeta = '12 MB | Updated May 20, 2025',
+    this.trustMessage =
+        'Trusted by thousands of clients and investors across Nigeria and beyond.',
+    this.trustStats = const [
+      AboutProfileTrustStat(value: '15+', label: 'Years Experience'),
+      AboutProfileTrustStat(value: '3200+', label: 'Homes Delivered'),
+      AboutProfileTrustStat(value: '12000+', label: 'Happy Clients'),
+      AboutProfileTrustStat(value: '48', label: 'Projects Completed'),
+    ],
   });
 
+  final String overline;
   final String title;
   final String description;
+  final String cardTitle;
+  final String cardDescription;
+  final List<String> features;
+  final String ctaLabel;
   final String downloadUrl;
   final String viewUrl;
+  final String? mockupImageUrl;
+  final String pdfLabel;
+  final String pdfMeta;
+  final String brochureLabel;
+  final String brochureUrl;
+  final String brochureMeta;
+  final String trustMessage;
+  final List<AboutProfileTrustStat> trustStats;
+}
+
+class AboutProfileTrustStat {
+  const AboutProfileTrustStat({
+    required this.value,
+    required this.label,
+  });
+
+  final String value;
+  final String label;
 }
 
 class AboutTrustItem {
@@ -403,9 +540,13 @@ class AboutCtaAction {
     required this.label,
     required this.path,
     required this.isPrimary,
+    this.description = '',
+    this.iconName,
   });
 
   final String label;
   final String path;
   final bool isPrimary;
+  final String description;
+  final String? iconName;
 }

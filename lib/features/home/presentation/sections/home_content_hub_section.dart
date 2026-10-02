@@ -1,177 +1,243 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
+import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
-import 'package:hdhomesproject/core/website/components/animated_section_title.dart';
 import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
-import 'package:hdhomesproject/core/widgets/buttons/primary_button.dart';
+import 'package:hdhomesproject/features/blog/data/models/blog_content.dart';
+import 'package:hdhomesproject/features/blog/data/providers/blog_catalog_provider.dart';
+import 'package:hdhomesproject/features/blog/presentation/widgets/featured_articles_carousel.dart';
 import 'package:hdhomesproject/features/home/data/models/home_cms_content.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
-/// Sections 21–24 — Blog, market insights, events, FAQ.
-class HomeContentHubSection extends StatelessWidget {
+/// Blog carousel + FAQ — homepage content band.
+class HomeContentHubSection extends ConsumerWidget {
   const HomeContentHubSection({
     super.key,
     required this.blogPosts,
-    required this.insights,
-    required this.events,
     required this.faqs,
   });
 
   final List<HomeBlogItem> blogPosts;
-  final List<HomeMarketInsightItem> insights;
-  final List<HomeEventItem> events;
   final List<HomeFaqItem> faqs;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SectionWrapper(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final featured = ref.watch(featuredArticlesProvider);
+    final catalog = ref.watch(blogCatalogProvider);
+    final articles = featured.isNotEmpty
+        ? featured
+        : catalog.isNotEmpty
+            ? catalog.take(6).toList()
+            : _articlesFromHomePosts(blogPosts);
+
+    final cards = <Widget>[];
+
+    if (articles.isNotEmpty) {
+      cards.add(
+        _HubCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AnimatedSectionTitle(
-                overline: 'INSIGHTS',
-                title: 'Latest articles',
-                alignment: TextAlign.start,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final header = const _HubHeader(
+                    overline: 'INSIGHTS',
+                    title: 'Featured stories',
+                  );
+                  final viewAll = TextButton(
+                    onPressed: () => context.go(RoutePaths.blog),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.white,
+                      side: BorderSide(
+                        color: AppColors.gold.withValues(alpha: 0.55),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('View all articles'),
+                        SizedBox(width: 6),
+                        Icon(
+                          LucideIcons.arrowRight,
+                          size: 16,
+                          color: AppColors.gold,
+                        ),
+                      ],
+                    ),
+                  );
+                  if (constraints.maxWidth < 520) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        header,
+                        const SizedBox(height: 8),
+                        viewAll,
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(child: header),
+                      viewAll,
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Editor-curated insights from HD Homes.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondaryDark,
+                    ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              for (final post in blogPosts)
-                _BlogTile(post: post),
-              Align(
-                alignment: Alignment.centerRight,
-                child: PrimaryButton(
-                  label: 'View Blog',
-                  variant: ButtonVariant.ghost,
-                  onPressed: () => context.go(RoutePaths.blog),
+              FeaturedArticlesCarousel(articles: articles),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (faqs.isNotEmpty) {
+      cards.add(
+        _HubCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _HubHeader(
+                overline: 'FAQ',
+                title: 'Frequently asked questions',
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              for (final faq in faqs)
+                _FaqTile(question: faq.question, answer: faq.answer),
+              const SizedBox(height: AppSpacing.md),
+              TextButton(
+                onPressed: () => context.go(RoutePaths.contact),
+                style: TextButton.styleFrom(foregroundColor: AppColors.gold),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'View All FAQs',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(LucideIcons.arrowRight, size: 16),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-        SectionWrapper(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AnimatedSectionTitle(
-                overline: 'MARKET DATA',
-                title: 'Market insights',
-                alignment: TextAlign.start,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              for (final insight in insights)
-                _InsightCard(insight: insight),
-            ],
-          ),
-        ),
-        SectionWrapper(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AnimatedSectionTitle(
-                overline: 'EVENTS',
-                title: 'Upcoming events',
-                alignment: TextAlign.start,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              for (final event in events) _EventTile(event: event),
-            ],
-          ),
-        ),
-        SectionWrapper(
-          backgroundColor: AppColors.charcoal,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AnimatedSectionTitle(
-                overline: 'FAQ',
-                title: 'Frequently asked questions',
-                alignment: TextAlign.start,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              for (final faq in faqs)
-                _FaqTile(question: faq.question, answer: faq.answer),
-              PrimaryButton(
-                label: 'View All FAQs',
-                variant: ButtonVariant.ghost,
-                onPressed: () => context.go(RoutePaths.contact),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
+      );
+    }
 
-class _BlogTile extends StatelessWidget {
-  const _BlogTile({required this.post});
+    if (cards.isEmpty) return const SizedBox.shrink();
 
-  final HomeBlogItem post;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(post.title),
-      subtitle: Text('${post.category} · ${post.date}\n${post.excerpt}'),
-      isThreeLine: true,
-      trailing: const Icon(Icons.arrow_forward_rounded),
-      onTap: () => context.go(post.route),
-    );
-  }
-}
-
-class _InsightCard extends StatelessWidget {
-  const _InsightCard({required this.insight});
-
-  final HomeMarketInsightItem insight;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.base),
-      padding: const EdgeInsets.all(AppSpacing.base),
-      decoration: BoxDecoration(
-        borderRadius: AppRadius.cardBorder,
-        border: Border.all(color: AppColors.neutral200),
-      ),
-      child: Row(
+    return SectionWrapper(
+      backgroundColor: AppColors.deepBlack,
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(insight.title, style: Theme.of(context).textTheme.titleSmall),
-                Text(insight.summary, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
-          Column(
-            children: [
-              Text(insight.change, style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w700)),
-              Text(insight.trend, style: Theme.of(context).textTheme.labelSmall),
-            ],
-          ),
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) const SizedBox(height: AppSpacing.lg),
+            cards[i],
+          ],
         ],
       ),
     );
   }
 }
 
-class _EventTile extends StatelessWidget {
-  const _EventTile({required this.event});
+List<BlogArticleSummary> _articlesFromHomePosts(List<HomeBlogItem> posts) {
+  return [
+    for (var i = 0; i < posts.length; i++)
+      BlogArticleSummary(
+        id: 'home-blog-$i',
+        slug: _slugFromRoute(posts[i].route),
+        title: posts[i].title,
+        excerpt: posts[i].excerpt,
+        categoryId: posts[i].category,
+        categoryName: posts[i].category,
+        authorId: 'editorial',
+        authorName: 'HD Homes Editorial',
+        coverImageUrl: posts[i].coverImageUrl,
+        publishedAt: DateTime.tryParse(posts[i].date) ?? DateTime.now(),
+        readMinutes: 5,
+        isFeatured: posts[i].featured,
+      ),
+  ];
+}
 
-  final HomeEventItem event;
+String _slugFromRoute(String route) {
+  const prefix = '/blog/';
+  if (route.startsWith(prefix) && route.length > prefix.length) {
+    return route.substring(prefix.length);
+  }
+  return route.replaceFirst(RegExp(r'^/'), '');
+}
+
+class _HubCard extends StatelessWidget {
+  const _HubCard({required this.child});
+
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const CircleAvatar(child: Icon(Icons.event_rounded)),
-      title: Text(event.title),
-      subtitle: Text('${event.date} · ${event.location} · ${event.type}'),
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(context.isMobile ? AppSpacing.lg : AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: AppColors.white.withValues(alpha: 0.1)),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _HubHeader extends StatelessWidget {
+  const _HubHeader({
+    required this.overline,
+    required this.title,
+  });
+
+  final String overline;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          overline,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.gold,
+                letterSpacing: 2.2,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          title,
+          style: GoogleFonts.playfairDisplay(
+            fontSize: context.isMobile ? 26 : 32,
+            fontWeight: FontWeight.w700,
+            color: AppColors.white,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -184,15 +250,35 @@ class _FaqTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ExpansionTile(
-      tilePadding: EdgeInsets.zero,
-      title: Text(question, style: const TextStyle(color: AppColors.white)),
-      children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(answer, style: const TextStyle(color: AppColors.textSecondaryDark)),
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        collapsedIconColor: AppColors.gold,
+        iconColor: AppColors.gold,
+        title: Text(
+          question,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.w600,
+              ),
         ),
-      ],
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Text(
+                answer,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondaryDark,
+                      height: 1.5,
+                    ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

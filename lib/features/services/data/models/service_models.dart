@@ -33,11 +33,19 @@ class ServiceCategory {
     required this.id,
     required this.description,
     required this.iconName,
+    this.name,
   });
 
   final ServiceCategoryId id;
   final String description;
   final String iconName;
+
+  /// CMS display name when present; otherwise [id.label].
+  final String? name;
+
+  String get displayName => (name != null && name!.trim().isNotEmpty)
+      ? name!.trim()
+      : id.label;
 }
 
 class ServiceSummary {
@@ -51,6 +59,8 @@ class ServiceSummary {
     this.badges = const [],
     this.keyBenefits = const [],
     this.isFeatured = false,
+    this.ctaLabel = 'Learn More',
+    this.ctaHref,
   });
 
   final String id;
@@ -62,12 +72,33 @@ class ServiceSummary {
   final List<ServiceBadge> badges;
   final List<String> keyBenefits;
   final bool isFeatured;
+
+  /// Card button label (admin-controllable).
+  final String ctaLabel;
+
+  /// Optional override for Learn More. Empty/null → `/services/{slug}`.
+  /// Accepts internal paths (`/contact`) or absolute URLs (`https://…`).
+  final String? ctaHref;
+
+  /// Resolved destination for the public Learn More action.
+  String get resolvedCtaHref {
+    final override = ctaHref?.trim();
+    if (override != null && override.isNotEmpty) return override;
+    final clean = slug.trim();
+    if (clean.isEmpty) return '/services';
+    return '/services/$clean';
+  }
 }
 
 class ServicesPageCms {
   const ServicesPageCms({
     required this.heroHeadline,
     required this.heroSubheadline,
+    this.primaryCtaLabel = 'Explore Services',
+    this.secondaryCtaLabel = 'Book Consultation',
+    this.tertiaryCtaLabel = 'Request Proposal',
+    this.backgroundImageUrl,
+    this.backgroundVideoUrl,
     required this.categories,
     required this.whyChoose,
     required this.processSteps,
@@ -82,6 +113,11 @@ class ServicesPageCms {
 
   final String heroHeadline;
   final String heroSubheadline;
+  final String primaryCtaLabel;
+  final String secondaryCtaLabel;
+  final String tertiaryCtaLabel;
+  final String? backgroundImageUrl;
+  final String? backgroundVideoUrl;
   final List<ServiceCategory> categories;
   final List<ServiceWhyChooseItem> whyChoose;
   final List<String> processSteps;

@@ -20,7 +20,7 @@ void main() {
 
     expect(find.textContaining('Find Your Perfect Property'), findsOneWidget);
     expect(find.text('One-click discovery'), findsOneWidget);
-    expect(find.text('AI Smart Search'), findsOneWidget);
+    expect(find.text('Smart Search'), findsOneWidget);
 
     addTearDown(() => tester.binding.setSurfaceSize(null));
   });

@@ -93,6 +93,7 @@ class RoleDefinition {
     this.lifecycle = RoleLifecycle.active,
     this.permissionSlugs = const {},
     this.memberCount = 0,
+    this.parentRoleId,
   });
 
   final String id;
@@ -103,6 +104,7 @@ class RoleDefinition {
   final RoleLifecycle lifecycle;
   final Set<String> permissionSlugs;
   final int memberCount;
+  final String? parentRoleId;
 
   bool get isSuperAdmin => slug == AppRole.superAdmin.slug;
 
@@ -121,6 +123,7 @@ class RoleDefinition {
       ),
       permissionSlugs: permissions,
       memberCount: (row['member_count'] as num?)?.toInt() ?? 0,
+      parentRoleId: row['parent_role_id'] as String?,
     );
   }
 }
@@ -190,6 +193,73 @@ class ApprovalPolicy {
       enabled: row['enabled'] as bool? ?? true,
       thresholdAmount: (row['threshold_amount'] as num?)?.toDouble(),
       description: row['description'] as String?,
+    );
+  }
+}
+
+class AccessRequest {
+  const AccessRequest({
+    required this.id,
+    required this.requesterId,
+    required this.reason,
+    this.permissionSlug,
+    this.roleSlug,
+    this.status = 'pending',
+    this.requesterName,
+    this.requesterEmail,
+    this.reviewedBy,
+    this.reviewedAt,
+    this.createdAt,
+  });
+
+  final String id;
+  final String requesterId;
+  final String? requesterName;
+  final String? requesterEmail;
+  final String? permissionSlug;
+  final String? roleSlug;
+  final String reason;
+  final String status;
+  final String? reviewedBy;
+  final DateTime? reviewedAt;
+  final DateTime? createdAt;
+
+  bool get isPending => status == 'pending';
+
+  String get targetLabel {
+    if (roleSlug != null && roleSlug!.isNotEmpty) return 'Role · $roleSlug';
+    if (permissionSlug != null && permissionSlug!.isNotEmpty) {
+      return 'Permission · $permissionSlug';
+    }
+    return 'Access request';
+  }
+
+  factory AccessRequest.fromRow(Map<String, dynamic> row) {
+    final requester = row['requester'];
+    String? name;
+    String? email;
+    if (requester is Map) {
+      final preferred = '${requester['preferred_name'] ?? ''}'.trim();
+      final first = '${requester['first_name'] ?? ''}'.trim();
+      final last = '${requester['last_name'] ?? ''}'.trim();
+      final combined = '$first $last'.trim();
+      name = preferred.isNotEmpty
+          ? preferred
+          : (combined.isNotEmpty ? combined : requester['full_name'] as String?);
+      email = requester['email'] as String?;
+    }
+    return AccessRequest(
+      id: row['id'] as String? ?? '',
+      requesterId: row['requester_id'] as String? ?? '',
+      requesterName: name,
+      requesterEmail: email,
+      permissionSlug: row['permission_slug'] as String?,
+      roleSlug: row['role_slug'] as String?,
+      reason: row['reason'] as String? ?? '',
+      status: row['status'] as String? ?? 'pending',
+      reviewedBy: row['reviewed_by'] as String?,
+      reviewedAt: DateTime.tryParse(row['reviewed_at'] as String? ?? ''),
+      createdAt: DateTime.tryParse(row['created_at'] as String? ?? ''),
     );
   }
 }
@@ -278,6 +348,7 @@ class RbacAnalytics {
     required this.accessDeniedEvents,
     required this.openApprovals,
     required this.breakGlassSessions,
+    this.membersWithRoles = 0,
   });
 
   final int rolesInUse;
@@ -288,6 +359,7 @@ class RbacAnalytics {
   final int accessDeniedEvents;
   final int openApprovals;
   final int breakGlassSessions;
+  final int membersWithRoles;
 }
 
 class RbacSnapshot {
@@ -297,6 +369,7 @@ class RbacSnapshot {
     required this.groups,
     required this.matrix,
     required this.policies,
+    required this.accessRequests,
     required this.analytics,
   });
 
@@ -305,6 +378,7 @@ class RbacSnapshot {
   final List<PermissionGroup> groups;
   final PermissionMatrix matrix;
   final List<ApprovalPolicy> policies;
+  final List<AccessRequest> accessRequests;
   final RbacAnalytics analytics;
 }
 
@@ -686,4 +760,46 @@ abstract final class PermissionCatalog {
       perms: ['manage_tickets'],
     ),
   ];
+}
+
+/// High-risk permission slugs that require confirmation before matrix grant/revoke.
+abstract final class SensitivePermissions {
+  static const slugs = <String>{
+    'manage_roles',
+    'configure_permissions',
+    'manage_users',
+    'create_users',
+    'delete_users',
+    'break_glass',
+    'view_audit_logs',
+    'export_audit_logs',
+    'manage_payments',
+    'manage_refunds',
+  };
+
+  static bool isSensitive(String slug) {
+    final n = PermissionCatalog.normalize(slug);
+    return slugs.contains(n) || slugs.contains(slug);
+  }
+}
+
+/// Collects permission slugs inherited via [RoleDefinition.parentRoleId].
+Set<String> roleInheritedPermissionSlugs(
+  RoleDefinition role,
+  List<RoleDefinition> roles,
+) {
+  final byId = {for (final r in roles) r.id: r};
+  final out = <String>{};
+  final seen = <String>{};
+  var current = role.parentRoleId;
+  var depth = 0;
+  while (current != null && depth < 12) {
+    if (!seen.add(current)) break;
+    final parent = byId[current];
+    if (parent == null) break;
+    out.addAll(parent.permissionSlugs);
+    current = parent.parentRoleId;
+    depth++;
+  }
+  return out;
 }

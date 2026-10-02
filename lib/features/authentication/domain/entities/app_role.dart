@@ -43,7 +43,6 @@ enum AppRole {
 
   bool get canAccessInvestorPortal => switch (this) {
         AppRole.investor ||
-        AppRole.client ||
         AppRole.superAdmin ||
         AppRole.admin ||
         AppRole.finance =>
@@ -53,7 +52,6 @@ enum AppRole {
 
   bool get canAccessClientPortal => switch (this) {
         AppRole.client ||
-        AppRole.investor ||
         AppRole.superAdmin ||
         AppRole.admin ||
         AppRole.salesTeam =>
@@ -63,11 +61,10 @@ enum AppRole {
 
   String get defaultRoute => switch (this) {
         AppRole.superAdmin || AppRole.admin => '/dashboard',
-        AppRole.finance ||
-        AppRole.salesTeam ||
-        AppRole.marketing ||
-        AppRole.constructionManager =>
-          '/dashboard',
+        AppRole.salesTeam => '/dashboard/crm',
+        AppRole.finance => '/dashboard/finance',
+        AppRole.marketing => '/dashboard/marketing',
+        AppRole.constructionManager => '/dashboard/construction',
         AppRole.investor => '/investor',
         AppRole.client => '/client',
       };

@@ -36,7 +36,9 @@ class UserProfile {
     this.address,
     this.preferredLanguage,
     this.lastLoginAt,
+    this.employeeId,
     this.emailConfirmed = true,
+    this.phoneVerified = false,
   });
 
   final String id;
@@ -52,7 +54,10 @@ class UserProfile {
   final String? address;
   final String? preferredLanguage;
   final DateTime? lastLoginAt;
+  /// Linked `employees.id`, used by Attendance/HCM and staff-owned module rows.
+  final String? employeeId;
   final bool emailConfirmed;
+  final bool phoneVerified;
 
   AccountStatus get status => AccountStatus.fromSlug(accountStatus);
 
@@ -71,5 +76,6 @@ class UserProfile {
         email: email,
         phone: phone,
         emailConfirmed: emailConfirmed,
+        phoneConfirmed: phoneVerified,
       );
 }

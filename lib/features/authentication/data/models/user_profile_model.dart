@@ -16,7 +16,9 @@ class UserProfileModel extends UserProfile {
     super.address,
     super.preferredLanguage,
     super.lastLoginAt,
+    super.employeeId,
     super.emailConfirmed = true,
+    super.phoneVerified = false,
   });
 
   factory UserProfileModel.fromJson(
@@ -54,9 +56,11 @@ class UserProfileModel extends UserProfile {
       address: json['address'] as String?,
       preferredLanguage: json['preferred_language'] as String?,
       lastLoginAt: lastLogin,
+      employeeId: json['employee_id'] as String?,
       roles: roles,
       primaryRole: primaryRole ?? (roles.isNotEmpty ? roles.first : null),
       emailConfirmed: emailConfirmed,
+      phoneVerified: json['phone_verified'] as bool? ?? false,
     );
   }
 }

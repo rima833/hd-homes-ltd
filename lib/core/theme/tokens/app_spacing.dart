@@ -12,7 +12,7 @@ abstract final class AppSpacing {
   static const double massive = 48;
   static const double giant = 64;
   static const double colossal = 72;
-  static const double section = 72;
+  static const double section = 56;
   static const double page = 96;
 
   // Aliases matching 8pt grid spec

@@ -34,27 +34,23 @@ class _InvestmentHubPageState extends ConsumerState<InvestmentHubPage> {
   Widget build(BuildContext context) {
     final cms = ref.watch(investmentHubCmsProvider);
 
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: InvestmentHeroSection(
-            headline: cms.heroHeadline,
-            subheadline: cms.heroSubheadline,
-            onExploreOpportunities: () => _scrollTo(_opportunitiesKey),
-            onCalculateRoi: () => _scrollTo(_calculatorKey),
-          ),
+    return Column(
+      children: [
+        InvestmentHeroSection(
+          headline: cms.heroHeadline,
+          subheadline: cms.heroSubheadline,
+          backgroundImageUrl: cms.backgroundImageUrl,
+          backgroundVideoUrl: cms.backgroundVideoUrl,
+          onExploreOpportunities: () => _scrollTo(_opportunitiesKey),
+          onCalculateRoi: () => _scrollTo(_calculatorKey),
         ),
-        SliverToBoxAdapter(
-          child: InvestmentHubSections(
-            opportunitiesKey: _opportunitiesKey,
-            processKey: _processKey,
-          ),
+        InvestmentHubSections(
+          opportunitiesKey: _opportunitiesKey,
+          processKey: _processKey,
         ),
-        SliverToBoxAdapter(
-          child: InvestmentClosingSections(
-            calculatorKey: _calculatorKey,
-            faqKey: _faqKey,
-          ),
+        InvestmentClosingSections(
+          calculatorKey: _calculatorKey,
+          faqKey: _faqKey,
         ),
       ],
     );
