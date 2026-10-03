@@ -24,7 +24,6 @@ abstract final class SeoResolver {
       RoutePaths.bookConsultation => SeoMetadata.contactHub,
       RoutePaths.search => SeoMetadata.searchHub,
       RoutePaths.gallery => SeoMetadata.mediaHub,
-      RoutePaths.trust => SeoMetadata.trustHub,
       RoutePaths.investment => SeoMetadata.investmentHub,
       RoutePaths.careers => SeoMetadata.careersHub,
       RoutePaths.register => SeoMetadata.register,

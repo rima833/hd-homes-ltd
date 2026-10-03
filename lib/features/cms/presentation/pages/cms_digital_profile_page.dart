@@ -25,7 +25,7 @@ class CmsDigitalProfilePage extends ConsumerWidget {
           const AdminSectionHeader(
             title: 'Digital company profile',
             subtitle:
-                'About page profile card, PDF/brochure downloads, and trust KPIs — also used on Trust.',
+                'About page profile card, PDF/brochure downloads, and trust KPIs.',
           ),
           const SizedBox(height: 8),
           Expanded(

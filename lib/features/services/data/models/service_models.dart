@@ -76,17 +76,14 @@ class ServiceSummary {
   /// Card button label (admin-controllable).
   final String ctaLabel;
 
-  /// Optional override for Learn More. Empty/null → `/services/{slug}`.
-  /// Accepts internal paths (`/contact`) or absolute URLs (`https://…`).
+  /// Link the admin saved. Empty means the card has no button.
   final String? ctaHref;
 
-  /// Resolved destination for the public Learn More action.
+  /// Admin-entered destination. Empty means the card has no button.
   String get resolvedCtaHref {
     final override = ctaHref?.trim();
-    if (override != null && override.isNotEmpty) return override;
-    final clean = slug.trim();
-    if (clean.isEmpty) return '/services';
-    return '/services/$clean';
+    if (override == null || override.isEmpty) return '';
+    return override;
   }
 }
 

@@ -74,6 +74,13 @@ class _CmsColumns extends StatelessWidget {
     final visible = <Widget>[];
     for (final column in columns) {
       final links = cmsLinksFromContent(column.content).where((link) {
+        final url = link.url.trim().toLowerCase();
+        final label = link.label.trim().toLowerCase();
+        if (url == RoutePaths.trust ||
+            url.endsWith(RoutePaths.trust) ||
+            label.contains('trust center')) {
+          return false;
+        }
         if (settings == null) return true;
         return settings!.allowsPublicPath(link.url) &&
             settings!.allowsFooterLabel(link.label);

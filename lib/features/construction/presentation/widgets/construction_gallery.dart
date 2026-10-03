@@ -8,10 +8,14 @@ class ConstructionGallery extends StatefulWidget {
     super.key,
     required this.imageUrls,
     this.initialIndex = 0,
+    this.showAll = false,
   });
 
   final List<String> imageUrls;
   final int initialIndex;
+
+  /// Lays every photo out in a grid instead of a single thumbnail strip.
+  final bool showAll;
 
   @override
   State<ConstructionGallery> createState() => _ConstructionGalleryState();
@@ -49,7 +53,17 @@ class _ConstructionGalleryState extends State<ConstructionGallery> {
             ),
           ),
         ),
-        if (urls.length > 1) ...[
+        if (urls.length > 1 && widget.showAll) ...[
+          const SizedBox(height: 12),
+          _AllPhotosGrid(
+            urls: urls,
+            selected: _selected,
+            onSelect: (i) {
+              setState(() => _selected = i);
+              _openLightbox(context, urls, i);
+            },
+          ),
+        ] else if (urls.length > 1) ...[
           const SizedBox(height: 12),
           SizedBox(
             height: 72,
@@ -88,6 +102,58 @@ class _ConstructionGalleryState extends State<ConstructionGallery> {
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.92),
       builder: (ctx) => _LightboxDialog(urls: urls, initialIndex: start),
+    );
+  }
+}
+
+class _AllPhotosGrid extends StatelessWidget {
+  const _AllPhotosGrid({
+    required this.urls,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<String> urls;
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final cols = width >= 980 ? 3 : (width >= 640 ? 2 : 1);
+        const gap = 12.0;
+        final tile = (width - gap * (cols - 1)) / cols;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (var i = 0; i < urls.length; i++)
+              SizedBox(
+                width: tile,
+                child: GestureDetector(
+                  onTap: () => onSelect(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: i == selected ? AppColors.gold : AppColors.charcoal,
+                        width: i == selected ? 2 : 1,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: AspectRatio(
+                      aspectRatio: 4 / 3,
+                      child: _GalleryImage(url: urls[i], fit: BoxFit.cover),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

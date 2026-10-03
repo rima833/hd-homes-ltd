@@ -101,7 +101,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ? HomePartnersSection(partners: content.partners)
             : null;
       case 'homepage_trust':
-        return vis(key) ? const HomeTrustCenterSection() : null;
+        return null;
       case 'homepage_awards':
         return vis(key) ? HomeAwardsSection(awards: content.awards) : null;
 

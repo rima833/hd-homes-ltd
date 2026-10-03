@@ -48,6 +48,9 @@ extension PublicWebsiteGates on PlatformSettingsBundle {
     if (path == RoutePaths.contact) {
       return allowContactForms;
     }
+    if (path == RoutePaths.trust || path.startsWith('${RoutePaths.trust}/')) {
+      return false;
+    }
     return true;
   }
 
@@ -65,6 +68,7 @@ extension PublicWebsiteGates on PlatformSettingsBundle {
     if (normalized == 'investment' || normalized.startsWith('invest ')) {
       return allowInvestment;
     }
+    if (normalized.contains('trust center')) return false;
     return true;
   }
 

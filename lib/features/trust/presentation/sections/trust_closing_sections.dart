@@ -52,10 +52,7 @@ class TrustClosingSections extends ConsumerWidget {
             ],
           ),
         ),
-        PublishedFaqSection(
-          sectionKey: faqKey,
-          subtitle: 'The same published questions from Admin → Website → FAQ.',
-        ),
+        PublishedFaqSection(sectionKey: faqKey),
         SectionWrapper(
           child: Column(
             children: [

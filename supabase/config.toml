@@ -231,17 +231,37 @@ otp_expiry = 3600
 # Use a production-ready SMTP server
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
+# host = "smtp.resend.com"
 # port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# user = "resend"
+# pass = "env(RESEND_API_KEY)"
+# admin_email = "no-reply@hdhomes.ng"
+# sender_name = "HD Homes Limited"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Local Auth templates (hosted project: run scripts/apply_auth_email_templates.py or paste in Dashboard)
+[auth.email.template.invite]
+subject = "You are invited to HD Homes"
+content_path = "./templates/invite.html"
+
+[auth.email.template.confirmation]
+subject = "Confirm your HD Homes email"
+content_path = "./templates/confirm_signup.html"
+
+[auth.email.template.recovery]
+subject = "Reset your HD Homes password"
+content_path = "./templates/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "Your HD Homes sign-in link"
+content_path = "./templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new HD Homes email"
+content_path = "./templates/email_change.html"
+
+[auth.email.template.reauthentication]
+subject = "Confirm it is you — HD Homes"
+content_path = "./templates/reauthentication.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]

@@ -1135,9 +1135,6 @@ class _CinematicMenuItemState extends State<_CinematicMenuItem> {
     if (path == RoutePaths.careers) {
       return 'Join the HD Homes team';
     }
-    if (path == RoutePaths.trust) {
-      return 'Security & compliance';
-    }
     if (path == RoutePaths.contact) {
       return 'Talk to our specialists';
     }

@@ -35,9 +35,9 @@ void main() {
     expect(smart.temperature, isNot(LeadTemperature.cold));
   });
 
-  test('SeoEngine generates sitemap with trust route', () {
+  test('SeoEngine sitemap omits the retired trust page', () {
     final xml = SeoEngine.sitemapXml();
-    expect(xml, contains('/trust'));
+    expect(xml, isNot(contains('/trust')));
     expect(xml, contains('<?xml'));
   });
 

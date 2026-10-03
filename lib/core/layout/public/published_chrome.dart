@@ -82,6 +82,7 @@ List<NavItem> withPublicDropdowns(List<NavItem> items) {
   for (final item in items) {
     final path = _navPath(item.path);
     if (path.isEmpty || !seen.add(path)) continue;
+    if (path == RoutePaths.trust) continue;
     if (path == RoutePaths.discover) hasDiscover = true;
     if (path != RoutePaths.discover && insideDiscover.contains(path)) continue;
     folded.add(item.path == path ? item : item.copyWith(path: path));
@@ -109,6 +110,7 @@ NavItem _dropdownFor(NavItem item, NavItem? fallback, Set<String> topLevel) {
   for (final child in [...fallback.children, ...item.children]) {
     final path = _navPath(child.path);
     if (path.isEmpty || !seen.add(path)) continue;
+    if (path == RoutePaths.trust) continue;
     if (path != item.path && topLevel.contains(path)) continue;
     children.add(child.path == path ? child : child.copyWith(path: path));
   }

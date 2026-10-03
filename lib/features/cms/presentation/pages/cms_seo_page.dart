@@ -27,7 +27,6 @@ const _publicPages = <({String path, String label})>[
   (path: RoutePaths.bookInspection, label: 'Book inspection'),
   (path: RoutePaths.bookConsultation, label: 'Book consultation'),
   (path: RoutePaths.search, label: 'Search'),
-  (path: RoutePaths.trust, label: 'Trust'),
   (path: RoutePaths.investment, label: 'Investment'),
   (path: RoutePaths.careers, label: 'Careers'),
 ];

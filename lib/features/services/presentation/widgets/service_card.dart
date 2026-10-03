@@ -108,15 +108,15 @@ class _ServiceCardState extends State<ServiceCard> {
                         ),
                       ),
                 ],
-                const SizedBox(height: AppSpacing.base),
-                // Button is the only gesture target — avoids nested InkWell
-                // + button double-navigation freezes on Flutter web.
-                PrimaryButton(
-                  label: ctaLabel,
-                  expand: true,
-                  isLoading: _navigating,
-                  onPressed: _navigating ? null : _open,
-                ),
+                if (s.resolvedCtaHref.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.base),
+                  PrimaryButton(
+                    label: ctaLabel,
+                    expand: true,
+                    isLoading: _navigating,
+                    onPressed: _navigating ? null : _open,
+                  ),
+                ],
               ],
             ),
           );

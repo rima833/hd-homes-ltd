@@ -69,9 +69,7 @@ class MarketplaceClosingSection extends HookConsumerWidget {
             ],
           ),
         ),
-        const PublishedFaqSection(
-          backgroundColor: AppColors.charcoal,
-        ),
+        const PublishedFaqSection(),
         Padding(
           padding: EdgeInsets.symmetric(
             horizontal: context.pagePadding,

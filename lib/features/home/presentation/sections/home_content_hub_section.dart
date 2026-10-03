@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/extensions/context_extensions.dart';
 import 'package:hdhomesproject/core/theme/tokens/design_tokens.dart';
+import 'package:hdhomesproject/core/website/components/published_faq_section.dart';
 import 'package:hdhomesproject/core/website/components/section_wrapper.dart';
 import 'package:hdhomesproject/features/blog/data/models/blog_content.dart';
 import 'package:hdhomesproject/features/blog/data/providers/blog_catalog_provider.dart';
@@ -109,35 +110,11 @@ class HomeContentHubSection extends ConsumerWidget {
 
     if (faqs.isNotEmpty) {
       cards.add(
-        _HubCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _HubHeader(
-                overline: 'FAQ',
-                title: 'Frequently asked questions',
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              for (final faq in faqs)
-                _FaqTile(question: faq.question, answer: faq.answer),
-              const SizedBox(height: AppSpacing.md),
-              TextButton(
-                onPressed: () => context.go(RoutePaths.contact),
-                style: TextButton.styleFrom(foregroundColor: AppColors.gold),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'View All FAQs',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    SizedBox(width: 6),
-                    Icon(LucideIcons.arrowRight, size: 16),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        HomeFaqCard(
+          items: [
+            for (final faq in faqs)
+              (question: faq.question, answer: faq.answer),
+          ],
         ),
       );
     }
@@ -238,47 +215,6 @@ class _HubHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _FaqTile extends StatelessWidget {
-  const _FaqTile({required this.question, required this.answer});
-
-  final String question;
-  final String answer;
-
-  @override
-  Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        collapsedIconColor: AppColors.gold,
-        iconColor: AppColors.gold,
-        title: Text(
-          question,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: AppColors.white,
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Text(
-                answer,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondaryDark,
-                      height: 1.5,
-                    ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

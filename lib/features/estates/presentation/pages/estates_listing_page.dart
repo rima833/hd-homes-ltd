@@ -15,9 +15,10 @@ class EstatesListingPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final estates = ref.watch(estateListingsProvider);
+    final listings = ref.watch(estateListingsAsyncProvider);
     final cms = ref.watch(estatesHubCmsProvider);
     final columns = context.gridColumns.clamp(1, 3);
+    final estates = listings.valueOrNull ?? const [];
 
     return Column(
       children: [
@@ -91,13 +92,17 @@ class EstatesListingPage extends ConsumerWidget {
                             color: AppColors.textSecondaryDark,
                           ),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      '${estates.length} estates across Nigeria',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondaryDark,
-                          ),
-                    ),
+                    if (estates.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        estates.length == 1
+                            ? '1 published estate'
+                            : '${estates.length} published estates',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondaryDark,
+                            ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -105,27 +110,85 @@ class EstatesListingPage extends ConsumerWidget {
           ),
         ),
         SectionWrapper(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final w =
-                  (constraints.maxWidth - (columns - 1) * AppSpacing.base) /
-                      columns;
-              return Wrap(
-                spacing: AppSpacing.base,
-                runSpacing: AppSpacing.base,
-                children: estates
-                    .map(
-                      (e) => SizedBox(
-                        width: w,
-                        child: EstateSummaryCard(estate: e),
-                      ),
-                    )
-                    .toList(),
-              );
-            },
+          child: listings.when(
+            loading: () => const _EstateNotice(
+              title: 'Loading estates',
+              message: 'Published estates will appear here in a moment.',
+            ),
+            error: (_, _) => const _EstateNotice(
+              title: 'Estates are unavailable right now',
+              message: 'Please refresh the page and try again.',
+            ),
+            data: (estates) => estates.isEmpty
+                ? const _EstateNotice(
+                    title: 'No estates published yet',
+                    message:
+                        'New communities will show here as soon as they are published.',
+                  )
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final w = (constraints.maxWidth -
+                              (columns - 1) * AppSpacing.base) /
+                          columns;
+                      return Wrap(
+                        spacing: AppSpacing.base,
+                        runSpacing: AppSpacing.base,
+                        children: estates
+                            .map(
+                              (e) => SizedBox(
+                                width: w,
+                                child: EstateSummaryCard(estate: e),
+                              ),
+                            )
+                            .toList(),
+                      );
+                    },
+                  ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EstateNotice extends StatelessWidget {
+  const _EstateNotice({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+      child: Column(
+        children: [
+          Icon(
+            LucideIcons.building2,
+            size: 40,
+            color: AppColors.gold.withValues(alpha: 0.7),
+          ),
+          const SizedBox(height: AppSpacing.base),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondaryDark,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

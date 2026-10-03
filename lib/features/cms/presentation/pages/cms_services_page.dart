@@ -653,9 +653,8 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Text(
-            'Leave link empty to open /services/{slug}. '
-            'Or set an internal path (/contact, /book-consultation) '
-            'or full URL (https://…).',
+            'Set an internal path (/contact, /book-consultation) '
+            'or a full URL (https://…). Leave this empty and the card has no button.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.slate500,
                 ),

@@ -928,7 +928,7 @@ class _PageEditDialogState extends ConsumerState<_PageEditDialog> {
                 const SizedBox(height: 8),
                 Text(
                   'For hubs, use slug properties / estates / services / contact / '
-                  'gallery / trust / investment / careers / search / about.',
+                  'gallery / investment / careers / search / about.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.slate500,
                       ),

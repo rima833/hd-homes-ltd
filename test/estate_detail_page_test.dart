@@ -21,8 +21,9 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('Flagship developments'), findsOneWidget);
-    expect(find.text('Horizon Gardens'), findsOneWidget);
-    expect(find.text('Emerald Heights'), findsOneWidget);
+    expect(find.text('No estates published yet'), findsOneWidget);
+    expect(find.text('Horizon Gardens'), findsNothing);
+    expect(find.text('Emerald Heights'), findsNothing);
 
     addTearDown(() => tester.binding.setSurfaceSize(null));
   });
@@ -45,15 +46,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(seconds: 2));
 
-    expect(find.textContaining('Horizon Gardens'), findsWidgets);
-    expect(find.text('Estate overview'), findsOneWidget);
-    expect(find.text('Master plan'), findsOneWidget);
-    expect(find.text('Available properties'), findsOneWidget);
-    expect(find.text('Construction Time Machine'), findsNothing);
-    expect(find.text('Progress over time'), findsOneWidget);
-    expect(find.text('Live Estate Dashboard'), findsNothing);
-    expect(find.text('Estate availability & progress'), findsOneWidget);
-    expect(find.text('Investment potential'), findsOneWidget);
+    expect(find.text('Estate not found'), findsOneWidget);
+    expect(find.text('Browse estates'), findsOneWidget);
+    expect(find.text('Estate overview'), findsNothing);
 
     addTearDown(() => tester.binding.setSurfaceSize(null));
   });

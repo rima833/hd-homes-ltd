@@ -45,13 +45,6 @@ class InvestmentClosingSections extends ConsumerWidget {
                 cms.protectionSummary,
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
-              const SizedBox(height: AppSpacing.lg),
-              PrimaryButton(
-                label: 'View Trust Center',
-                icon: LucideIcons.shield,
-                variant: ButtonVariant.secondary,
-                onPressed: () => context.go(RoutePaths.trust),
-              ),
             ],
           ),
         ),
@@ -61,12 +54,7 @@ class InvestmentClosingSections extends ConsumerWidget {
           subtitle:
               'Verified experiences from portfolio partners and diaspora investors.',
         ),
-        PublishedFaqSection(
-          sectionKey: faqKey,
-          title: 'Frequently asked questions',
-          subtitle:
-              'Answers published from the website FAQ desk.',
-        ),
+        PublishedFaqSection(sectionKey: faqKey),
         const InvestorPortalCtaSection(),
         SectionWrapper(
           child: Container(

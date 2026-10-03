@@ -12,7 +12,6 @@ abstract final class SeoEngine {
     RoutePaths.services,
     RoutePaths.blog,
     RoutePaths.gallery,
-    RoutePaths.trust,
     RoutePaths.contact,
     RoutePaths.bookInspection,
     RoutePaths.search,

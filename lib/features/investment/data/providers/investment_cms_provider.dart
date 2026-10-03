@@ -157,7 +157,7 @@ final _cms = InvestmentHubCms(
   ],
   protectionSummary:
       'HD Homes investor protection includes due diligence, segregated escrow accounts, contractual investor rights, '
-      'quarterly transparency reporting, and dispute resolution. Full details in our Trust Center.',
+      'quarterly transparency reporting, and dispute resolution.',
   faqs: const [
     InvestmentFaq(
       question: 'What is the minimum investment amount?',
@@ -167,7 +167,7 @@ final _cms = InvestmentHubCms(
     InvestmentFaq(
       question: 'How are my funds protected?',
       answer:
-          'Payments flow through regulated escrow accounts with milestone-based release. See our Trust Center for full safeguards.',
+          'Payments flow through regulated escrow accounts with milestone-based release.',
     ),
     InvestmentFaq(
       question: 'Can diaspora investors participate?',

@@ -65,12 +65,6 @@ class InvestorPortalCtaSection extends StatelessWidget {
                   '${RoutePaths.login}?redirect=${Uri.encodeComponent(RoutePaths.investor)}',
                 ),
               ),
-              PrimaryButton(
-                label: 'Trust Center',
-                variant: ButtonVariant.ghost,
-                icon: LucideIcons.shield,
-                onPressed: () => context.go(RoutePaths.trust),
-              ),
             ],
           ),
         ],

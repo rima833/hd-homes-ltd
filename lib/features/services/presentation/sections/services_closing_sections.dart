@@ -136,10 +136,7 @@ class ServicesClosingSections extends ConsumerWidget {
           subtitle:
               'Verified feedback across advisory, construction, and property services.',
         ),
-        const PublishedFaqSection(
-          title: 'Frequently asked questions',
-          subtitle: 'Answers published from the website FAQ desk.',
-        ),
+        const PublishedFaqSection(),
         KeyedSubtree(
           key: consultationKey,
           child: SectionWrapper(
@@ -312,18 +309,16 @@ class _CaseStudyCard extends ConsumerWidget {
           _meta('Challenge', study.challenge),
           _meta('Solution', study.solution),
           _meta('Results', study.results, emphasize: true),
-          const SizedBox(height: AppSpacing.sm),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: target == null
-                  ? null
-                  : () => openServiceLearnMore(context, target),
-              child: Text(
-                target == null ? 'Service unavailable' : 'View service →',
+          if (target != null && target.resolvedCtaHref.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => openServiceLearnMore(context, target),
+                child: Text('${target.ctaLabel} →'),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -51,9 +51,9 @@ class WelcomePage extends StatelessWidget {
                   RoutePaths.investment,
                 ),
                 (
-                  LucideIcons.shield,
-                  'Review Trust Center safeguards',
-                  RoutePaths.trust,
+                  LucideIcons.mail,
+                  'Contact investor relations',
+                  RoutePaths.contact,
                 ),
               ]
             : const [

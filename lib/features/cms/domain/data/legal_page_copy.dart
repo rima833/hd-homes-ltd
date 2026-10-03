@@ -46,7 +46,7 @@ Acceptable use
 Do not attempt to access another person's account, interfere with the site, or submit false applications, tickets, or payment proofs.
 
 Contact
-Questions about these terms can be sent through the Trust Center legal form or to the address published on the Contact page.
+Questions about these terms can be sent through the Contact page.
 ''',
   );
 
@@ -69,7 +69,7 @@ Sharing
 Payment details are shared with the finance team that confirms transfers. Identity documents are shared with the reviewers assigned to KYC. HD Homes does not sell personal information.
 
 Retention and your requests
-Records are kept for as long as the enquiry, contract, payment, or legal duty requires. To ask for access or a correction, use the Contact page or the Trust Center legal form and include the email on your account.
+Records are kept for as long as the enquiry, contract, payment, or legal duty requires. To ask for access or a correction, use the Contact page and include the email on your account.
 
 Security
 Access to portals is limited by role. Payment proofs and identity documents are stored in private storage, not on public pages.
@@ -107,7 +107,7 @@ After a transfer is submitted
 Finance reviews the proof of payment. If a transfer cannot be matched, HD Homes will tell you what is missing. Do not send a second transfer for the same instalment unless staff ask you to.
 
 Refund requests
-Write through the Trust Center legal form or the Contact page. Include your name, the email on the account, the contract or property reference, the amount, the date, and the transfer reference. HD Homes will reply with the outcome the agreement allows.
+Write through the Contact page. Include your name, the email on the account, the contract or property reference, the amount, the date, and the transfer reference. HD Homes will reply with the outcome the agreement allows.
 
 Timing
 Where a refund is due, it is paid back to the account the agreement names, or to the account that sent the transfer when the agreement does not name one. Bank processing time is outside HD Homes' control.

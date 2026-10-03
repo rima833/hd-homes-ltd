@@ -85,11 +85,6 @@ abstract final class NavigationConfig {
           icon: Icons.work_outline_rounded,
         ),
         NavItem(
-          label: 'Trust Center',
-          path: RoutePaths.trust,
-          icon: LucideIcons.shieldCheck,
-        ),
-        NavItem(
           label: 'Contact',
           path: RoutePaths.contact,
           icon: Icons.mail_outline_rounded,

@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/features/services/data/models/service_models.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Opens a service CTA without freezing the public shell.
+/// Opens the link the admin saved on this service.
 ///
-/// Default destination is `/services/{slug}`. Admin can override via
-/// [ServiceSummary.ctaHref] (internal path or absolute URL).
+/// No link means there is nothing to open. The catalog does not invent a
+/// service detail page.
 Future<void> openServiceLearnMore(
   BuildContext context,
   ServiceSummary service,
@@ -27,15 +26,6 @@ Future<void> openServiceLearnMore(
 
   if (!context.mounted) return;
 
-  // Prefer go_router path navigation. Use go (not push) so /services/:slug
-  // replaces the catalog cleanly inside PublicShell without stacking shells.
   final path = href.startsWith('/') ? href : '/$href';
-  try {
-    context.go(path);
-  } catch (_) {
-    // Fallback to the canonical detail route when a custom path is invalid.
-    if (context.mounted) {
-      context.go(RoutePaths.serviceDetail(service.slug));
-    }
-  }
+  context.go(path);
 }

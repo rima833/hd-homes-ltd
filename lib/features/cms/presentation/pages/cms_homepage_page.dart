@@ -26,7 +26,6 @@ const _deskOrder = <String>[
   'homepage_featured_properties',
   'homepage_testimonials',
   'homepage_partners',
-  'homepage_trust',
   'homepage_awards',
   'homepage_content_hub',
   'homepage_blog',

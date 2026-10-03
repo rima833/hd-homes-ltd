@@ -358,10 +358,7 @@ class ServiceDetailSections extends HookConsumerWidget {
               ],
             ),
         ),
-        const PublishedFaqSection(
-          title: 'Frequently asked questions',
-          subtitle: 'Answers published from the website FAQ desk.',
-        ),
+        const PublishedFaqSection(),
         if (related.isNotEmpty)
           SectionWrapper(
             child: Column(
