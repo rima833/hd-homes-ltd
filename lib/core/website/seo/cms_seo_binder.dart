@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hdhomesproject/core/growth/seo/seo_engine.dart';
+import 'package:hdhomesproject/core/website/seo/public_seo_policy.dart';
 import 'package:hdhomesproject/core/website/seo/seo_binder.dart';
 import 'package:hdhomesproject/core/website/seo/seo_config.dart';
 import 'package:hdhomesproject/core/website/seo/seo_metadata.dart';
@@ -102,6 +104,9 @@ class CmsSeoBinder extends ConsumerWidget {
     }
 
     if (merged == null) return child;
+    if (PublicSeoPolicy.shouldNoIndex(path)) {
+      merged = merged.withRobots(PublicSeoPolicy.robotsForPath(path));
+    }
     return SeoBinder(metadata: merged, child: child);
   }
 }

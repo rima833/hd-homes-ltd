@@ -28,7 +28,10 @@ void applySeoHead(SeoMetadata metadata) {
 
   if (metadata.canonicalUrl != null) {
     _setLink('canonical', metadata.canonicalUrl!);
+    _setMetaProperty('og:url', metadata.canonicalUrl!);
   }
+
+  _setMetaProperty('og:site_name', 'HD Homes Limited');
 
   _setJsonLd(metadata.structuredData);
 }

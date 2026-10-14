@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://hdhomesltd.com/</loc>
+    <loc>https://hdhomesltd.com</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://hdhomesltd.com/about</loc>
     <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://hdhomesltd.com/properties</loc>
@@ -16,17 +16,12 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://hdhomesltd.com/properties/payment-calculator</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://hdhomesltd.com/estates</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://hdhomesltd.com/construction</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://hdhomesltd.com/investment</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
@@ -43,51 +38,61 @@
   <url>
     <loc>https://hdhomesltd.com/gallery</loc>
     <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://hdhomesltd.com/trust</loc>
-    <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://hdhomesltd.com/contact</loc>
-    <changefreq>monthly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://hdhomesltd.com/careers</loc>
+    <loc>https://hdhomesltd.com/book-inspection</loc>
     <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://hdhomesltd.com/search</loc>
     <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://hdhomesltd.com/book-inspection</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <loc>https://hdhomesltd.com/investment</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://hdhomesltd.com/investment/roi-calculator</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://hdhomesltd.com/careers</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://hdhomesltd.com/construction</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://hdhomesltd.com/pages/privacy</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://hdhomesltd.com/pages/terms</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://hdhomesltd.com/pages/cookies</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.4</priority>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://hdhomesltd.com/pages/refund-policy</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.4</priority>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
 </urlset>

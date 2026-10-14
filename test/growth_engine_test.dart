@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hdhomesproject/core/growth/ai/investment_advisor.dart';
 import 'package:hdhomesproject/core/growth/lead_scoring/smart_lead_scoring.dart';
 import 'package:hdhomesproject/core/growth/models/growth_models.dart';
-import 'package:hdhomesproject/core/growth/personalization/visitor_profile.dart';
 import 'package:hdhomesproject/core/growth/seo/seo_engine.dart';
 import 'package:hdhomesproject/features/contact/data/models/contact_content.dart';
 import 'package:hdhomesproject/features/search/data/providers/search_intelligence_provider.dart';
@@ -39,6 +38,7 @@ void main() {
     final xml = SeoEngine.sitemapXml();
     expect(xml, isNot(contains('/trust')));
     expect(xml, contains('<?xml'));
+    expect(xml, contains('/investment'));
   });
 
   test('generateContentDrafts returns pending approval drafts', () {

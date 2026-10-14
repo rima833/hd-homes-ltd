@@ -23,10 +23,13 @@ class _SeoBinderState extends State<SeoBinder> {
   @override
   void didUpdateWidget(SeoBinder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.metadata.title != widget.metadata.title ||
-        oldWidget.metadata.description != widget.metadata.description ||
-        oldWidget.metadata.canonicalUrl != widget.metadata.canonicalUrl ||
-        oldWidget.metadata.robots != widget.metadata.robots) {
+    final a = oldWidget.metadata;
+    final b = widget.metadata;
+    if (a.title != b.title ||
+        a.description != b.description ||
+        a.canonicalUrl != b.canonicalUrl ||
+        a.robots != b.robots ||
+        a.ogImageUrl != b.ogImageUrl) {
       SeoHead.apply(widget.metadata);
     }
   }

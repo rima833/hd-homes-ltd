@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/website/components/breadcrumbs.dart';
 import 'package:hdhomesproject/core/website/components/page_container.dart';
+import 'package:hdhomesproject/core/growth/seo/seo_engine.dart';
 import 'package:hdhomesproject/core/website/seo/seo_binder.dart';
 import 'package:hdhomesproject/core/website/seo/seo_config.dart';
 import 'package:hdhomesproject/core/website/seo/seo_metadata.dart';
-import 'package:hdhomesproject/core/website/seo/seo_resolver.dart';
 import 'package:hdhomesproject/core/widgets/feedback/empty_state.dart';
 import 'package:hdhomesproject/features/blog/data/providers/blog_article_provider.dart';
 import 'package:hdhomesproject/features/blog/presentation/sections/blog_article_sections.dart';
@@ -32,12 +32,19 @@ class BlogArticlePage extends ConsumerWidget {
           child: Center(child: CircularProgressIndicator()),
         );
       }
-      return EmptyState(
-        title: 'Article not found',
-        message: 'This article may have been unpublished or moved.',
-        icon: Icons.article_outlined,
-        actionLabel: 'Browse articles',
-        onAction: () => context.go(RoutePaths.blog),
+      return SeoBinder(
+        metadata: const SeoMetadata(
+          title: 'Article not found | HD Homes',
+          description: 'This article is not available.',
+          robots: 'noindex, nofollow',
+        ),
+        child: EmptyState(
+          title: 'Article not found',
+          message: 'This article may have been unpublished or moved.',
+          icon: Icons.article_outlined,
+          actionLabel: 'Browse articles',
+          onAction: () => context.go(RoutePaths.blog),
+        ),
       );
     }
 
@@ -47,10 +54,21 @@ class BlogArticlePage extends ConsumerWidget {
       tags: detail.summary.tags,
       authorName: detail.author.name,
       publishedAt: detail.summary.publishedAt,
-    ).withCanonical(SeoConfig.canonicalFor('/blog/${detail.summary.slug}'));
+    )
+        .copyWithOgImage(detail.summary.coverImageUrl)
+        .withRobots('index, follow');
+    final withCanonical = SeoMetadata(
+      title: seo.title,
+      description: seo.description,
+      canonicalUrl: SeoConfig.canonicalFor('/blog/${detail.summary.slug}'),
+      ogImageUrl: seo.ogImageUrl,
+      keywords: seo.keywords,
+      robots: seo.robots,
+      structuredData: seo.structuredData,
+    );
 
     return SeoBinder(
-      metadata: seo,
+      metadata: withCanonical,
       child: Column(
         children: [
           PageContainer(

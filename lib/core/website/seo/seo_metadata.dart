@@ -19,11 +19,35 @@ class SeoMetadata {
   final Map<String, dynamic>? structuredData;
 
   static const home = SeoMetadata(
-    title: 'HD Homes Limited | Making Quality Housing Accessible',
+    title: 'HD Homes Limited | Properties & Real Estate Investment in Nigeria',
     description:
         'Premium real estate and property development in Nigeria. '
-        'Discover luxury homes, estates, and investment opportunities with HD Homes.',
+        'Browse published homes and estates, explore investment opportunities, '
+        'and book inspections with HD Homes Limited.',
     keywords: ['real estate', 'property', 'Nigeria', 'HD Homes', 'estates'],
+    structuredData: {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'Organization',
+          'name': 'HD Homes Limited',
+          'url': 'https://hdhomesltd.com',
+          'logo': 'https://hdhomesltd.com/icons/Icon-512.png',
+          'description':
+              'Nigerian property developer offering homes, estates, and investment products.',
+        },
+        {
+          '@type': 'WebSite',
+          'name': 'HD Homes Limited',
+          'url': 'https://hdhomesltd.com',
+          'potentialAction': {
+            '@type': 'SearchAction',
+            'target': 'https://hdhomesltd.com/search?q={search_term_string}',
+            'query-input': 'required name=search_term_string',
+          },
+        },
+      ],
+    },
   );
 
   static const about = SeoMetadata(
@@ -360,7 +384,7 @@ class SeoMetadata {
     },
   );
 
-  // Auth surfaces — indexable register; transactional handoffs stay noindex.
+  // Auth surfaces — not primary SEO landing pages.
   static const register = SeoMetadata(
     title: 'Create Your HD Homes Account | Client & Investor Registration',
     description:
@@ -372,7 +396,7 @@ class SeoMetadata {
       'investor registration Nigeria',
       'property client signup',
     ],
-    robots: 'index, follow',
+    robots: 'noindex, nofollow',
   );
 
   static const login = SeoMetadata(

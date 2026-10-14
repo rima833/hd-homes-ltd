@@ -4,9 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
 import 'package:hdhomesproject/core/growth/analytics/journey_tracker.dart';
 import 'package:hdhomesproject/core/website/seo/seo_binder.dart';
-import 'package:hdhomesproject/core/website/seo/seo_config.dart';
 import 'package:hdhomesproject/core/website/seo/seo_metadata.dart';
-import 'package:hdhomesproject/core/website/seo/seo_resolver.dart';
+import 'package:hdhomesproject/core/website/seo/seo_page_helpers.dart';
 import 'package:hdhomesproject/core/widgets/feedback/empty_state.dart';
 import 'package:hdhomesproject/features/cms/presentation/providers/cms_providers.dart';
 import 'package:hdhomesproject/features/properties/data/providers/property_detail_provider.dart';
@@ -51,19 +50,23 @@ class _PropertyDetailPageState extends ConsumerState<PropertyDetailPage> {
     }
 
     if (detail == null) {
-      return EmptyState(
-        title: 'Property not found',
-        message: 'This listing may have been removed or is no longer available.',
-        icon: Icons.home_work_outlined,
-        actionLabel: 'Browse properties',
-        onAction: () => context.go(RoutePaths.properties),
+      return SeoBinder(
+        metadata: const SeoMetadata(
+          title: 'Property not found | HD Homes',
+          description: 'This listing is not available.',
+          robots: 'noindex, nofollow',
+        ),
+        child: EmptyState(
+          title: 'Property not found',
+          message: 'This listing may have been removed or is no longer available.',
+          icon: Icons.home_work_outlined,
+          actionLabel: 'Browse properties',
+          onAction: () => context.go(RoutePaths.properties),
+        ),
       );
     }
 
-    final seo = SeoMetadata.propertyDetail(
-      detail.listing.title,
-      detail.overview.summary,
-    ).withCanonical(SeoConfig.canonicalFor('/properties/${detail.listing.id}'));
+    final seo = SeoPageHelpers.propertyDetail(detail.listing);
 
     return SeoBinder(
       metadata: seo,
