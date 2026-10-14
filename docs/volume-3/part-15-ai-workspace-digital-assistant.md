@@ -1,16 +1,23 @@
 # Volume 3 — Part 15: AI Workspace & Digital Assistant Foundation
 
+> **AI capabilities have been intentionally deferred until Phase 2 (Post-Launch
+> AI Upgrade).** See [`docs/ai-deferment.md`](../ai-deferment.md). The
+> `/account/ai` workspace route, AI Gateway, and related UI are gated by
+> `kAiFeaturesEnabled = false`. Workspace infrastructure tables were removed by
+> `ai_deferment_phase2` (**APPLIED** 2026-07-21). Code remains in-tree so Phase 2
+> can re-enable without a redesign.
+
 Centralized, permission-aware AI layer: AI Gateway, Digital Assistant, copilots, Knowledge Hub, prompt library, and governance — provider-independent.
 
 ## Status
 
 | Layer | Status |
 |-------|--------|
-| Domain (safety, knowledge, prompts, response foundation) | Done |
-| `AiGateway` + `LocalFoundationProvider` | Done |
-| AI Workspace UI | Done |
-| AI Governance Dashboard | Done |
-| SQL + realtime | **Applied** as `ai_workspace_digital_assistant` (2026-07-13) |
+| Domain (safety, knowledge, prompts, response foundation) | Done (dormant — Phase 2) |
+| `AiGateway` + `LocalFoundationProvider` | Done (dormant — Phase 2) |
+| AI Workspace UI | **Deferred** — route/nav hidden via `kAiFeaturesEnabled` |
+| AI Governance Dashboard | **Deferred** (superseded by Part 17; both gated) |
+| SQL + realtime | Applied 2026-07-13 · **dropped** by `ai_deferment_phase2` (2026-07-21) |
 
 Local file: `supabase/migrations/20260713500000_ai_workspace_digital_assistant.sql`
 

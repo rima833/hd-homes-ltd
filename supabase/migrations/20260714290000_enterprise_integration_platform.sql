@@ -1,7 +1,7 @@
--- LOCAL ONLY — await approve
+-- APPLIED remotely 2026-07-21 (chunked enterprise_integration_platform_p1–p3)
 -- Volume 4 Part 18 -- Enterprise Integration Platform, API Gateway,
 -- Workflow Orchestration & Event-Driven Architecture (EIP)
--- Status: LOCAL ONLY — do NOT apply remotely until approved.
+-- Status: APPLIED remotely 2026-07-21.
 --
 -- Approach:
 --   • Route: /dashboard/integrations → Integration Command Center.

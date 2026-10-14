@@ -33,10 +33,12 @@ No feature should hardcode authorization — call `RbacService.authorize` or wra
 
 ## Console tabs
 
-1. **Matrix** — edit role × permission cells (Super Admin locked full)
-2. **Roles** — Smart Permission Builder™ (create / clone / archive)
-3. **Groups** — Sales / Finance / Support bundles
-4. **Approvals** — delete property, large refund, role change + break-glass / access review stubs
+1. **Roles** — create / clone / archive; assign members
+2. **Matrix** — grant/revoke role × permission cells (live RPC)
+3. **Groups** — apply permission bundles to a target role
+4. **Approvals** — enable/disable approval policies; submit and review access requests (role/permission grants on approve)
+
+Break-glass sessions and scheduled access reviews remain deferred until write RLS/RPCs exist for those tables.
 
 ## Permission naming
 

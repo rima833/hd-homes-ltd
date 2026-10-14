@@ -1,5 +1,12 @@
 # Volume 4 — Part 17: Enterprise AI Intelligence Hub, Machine Learning & Decision Support (EAIH)
 
+> **AI capabilities have been intentionally deferred until Phase 2 (Post-Launch
+> AI Upgrade).** See [`docs/ai-deferment.md`](../ai-deferment.md). The platform
+> architecture remains fully AI-ready — `lib/features/eaih/` and the hub
+> schema are preserved as dormant code; the UI is gated by
+> `kAiFeaturesEnabled = false`. AI infrastructure tables were removed by
+> `ai_deferment_phase2` (**APPLIED** 2026-07-21).
+
 AI Command Center for HD Homes admins — enterprise copilots, model registry, predictions, recommendations, AI search/RAG, knowledge graph stubs, automation, decision intelligence, governance/trust, and observability.
 
 Admin feature lives under `lib/features/eaih/`.
@@ -8,11 +15,11 @@ Admin feature lives under `lib/features/eaih/`.
 
 | Layer | Status |
 |-------|--------|
-| Domain models + demo dataset | Done |
-| EaihService (Supabase selects + demo fallback) | Done |
-| Riverpod snapshot / Realtime / UI controller | Done |
-| `/dashboard/ai` AI Command Center | Done |
-| SQL + RLS + new hub tables + Volume 3 enrich | **APPLIED** remotely 2026-07-21 |
+| Domain models + demo dataset | Done (dormant — Phase 2) |
+| EaihService (Supabase selects + demo fallback) | Done (dormant — Phase 2) |
+| Riverpod snapshot / Realtime / UI controller | Done (dormant — Phase 2) |
+| `/dashboard/ai` AI Command Center | **Deferred** — route/nav hidden via `kAiFeaturesEnabled` |
+| SQL + RLS + new hub tables + Volume 3 enrich | Applied then **dropped** by `ai_deferment_phase2` (2026-07-21) |
 | Full ML Ops / vector production / multi-provider routing | Phase 2 |
 
 Canonical migration:

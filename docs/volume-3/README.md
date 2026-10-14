@@ -20,9 +20,10 @@ Enterprise identity platform for **HD Homes Ltd**. Volume 3 builds on Volume 1 a
 | 12 | [RBAC & Permission Engine](./part-12-rbac-permission-engine.md) | Phase 1 complete (SQL applied) |
 | 13 | [User Preferences & Personalization Engine](./part-13-user-preferences-personalization.md) | Phase 1 complete (SQL applied) |
 | 14 | [Enterprise Search & Global Command Center](./part-14-enterprise-search-command-center.md) | Phase 1 complete (SQL applied) |
-| 15 | [AI Workspace & Digital Assistant Foundation](./part-15-ai-workspace-digital-assistant.md) | Phase 1 complete (SQL applied) |
+| 15 | [AI Workspace & Digital Assistant Foundation](./part-15-ai-workspace-digital-assistant.md) | Built · **AI deferred to Phase 2** (see [`docs/ai-deferment.md`](../ai-deferment.md)) |
+| 16 | [Client Portal (Production)](./part-16-client-portal.md) | **Complete** · SQL **APPLIED** (2026-07-22) |
 
-**Volume 3 complete.** Volume 4 (Admin Dashboard & Business Management) can start when ready.
+**Volume 3 complete** (Parts 1–16). Next: Investor Portal (Step 2), then Enterprise Admin Dashboard polish.
 
 ## Implementation rules
 
@@ -36,4 +37,7 @@ Enterprise identity platform for **HD Homes Ltd**. Volume 3 builds on Volume 1 a
 - Authorization must go through the Permission / Policy Engine (Part 12) — never hardcode grants in features.
 - User experience customization must go through the Preference / Personalization Engine (Part 13).
 - Platform-wide find / navigate / command actions must go through the Enterprise Search & Command Center (Part 14).
-- AI assistance must go through the AI Gateway (Part 15) — never call providers from feature modules.
+- AI is deferred until Phase 2 — do not call LLM providers from feature modules.
+  When re-enabled, all AI assistance must go through the AI Gateway (Part 15)
+  and the extension points in `lib/core/engines/engines.dart`. See
+  [`docs/ai-deferment.md`](../ai-deferment.md).

@@ -1,5 +1,13 @@
 # Volume 2 — Part 15: AI, SEO & Growth Engine
 
+> **AI capabilities have been intentionally deferred until Phase 2 (Post-Launch
+> AI Upgrade).** See [`docs/ai-deferment.md`](../ai-deferment.md). The floating
+> AI Concierge is gated by `kAiFeaturesEnabled = false`. Public-site labels that
+> previously said "AI Recommend / AI Search / AI Matching" now use neutral
+> enterprise wording (Recommended, Smart Search, Featured). Rule-based
+> personalization, recommendations, lead scoring, SEO, and analytics remain
+> active. Architecture stays AI-ready via `lib/core/engines/engines.dart`.
+
 Phase 1 implementation of the invisible intelligence layer powering the HD Homes public website.
 
 > **No public route** — this module is infrastructure under `lib/core/growth/`.

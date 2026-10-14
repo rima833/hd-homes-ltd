@@ -12,16 +12,16 @@ Admin feature lives under `lib/features/eip/`.
 | EipService (Supabase selects + demo fallback) | Done |
 | Riverpod snapshot / Realtime / UI controller | Done |
 | `/dashboard/integrations` Integration Command Center | Done |
-| SQL + RLS + new tables + EOC workflow enrich | **LOCAL ONLY — await approve** |
+| SQL + RLS + new tables + EOC workflow enrich | **APPLIED** remotely 2026-07-21 |
 | Full production gateway / broker / secret vault | Phase 2 |
 
 Canonical migration:
 
 `supabase/migrations/20260714290000_enterprise_integration_platform.sql`
 
-Header: **LOCAL ONLY — await approve**. Do **not** apply remotely until approved.
+Header: **APPLIED** remotely (chunked `enterprise_integration_platform_p1–p3`). Ready for Part 19.
 
-Part 17 EAIH SQL is **APPLIED**. Volume 4 continues Parts 19–25 — wait for approve before Part 19.
+Part 17 EAIH SQL is **APPLIED**. Volume 4 continues Parts 19–25.
 
 ## Architecture
 

@@ -20,7 +20,7 @@ Enterprise public website for **HD Homes Ltd**. Volume 2 defines the visitor exp
 | 12 | [Careers Hub](./part-12-careers.md) | Phase 1 implemented |
 | 13 | [Media Center & Virtual Experiences](./part-13-media-center.md) | Phase 1 implemented |
 | 14 | [Trust, Legal & Corporate Information](./part-14-trust-legal-corporate.md) | Phase 1 implemented |
-| 15 | [AI, SEO & Growth Engine](./part-15-ai-seo-growth-engine.md) | Phase 1 implemented |
+| 15 | [AI, SEO & Growth Engine](./part-15-ai-seo-growth-engine.md) | Growth engine active · **AI deferred to Phase 2** (see [`docs/ai-deferment.md`](../ai-deferment.md)) |
 
 > **Volume 2 is complete** (Parts 1–15). Next: Volume 3 — Authentication & User Ecosystem.
 >
