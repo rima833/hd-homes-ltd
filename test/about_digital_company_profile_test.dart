@@ -46,9 +46,9 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Digital company profile'), findsOneWidget);
     expect(find.text('Interactive Company Profile'), findsOneWidget);
-    expect(find.text('Download PDF'), findsOneWidget);
-    expect(find.text('Download Brochure'), findsOneWidget);
-    expect(find.text('OR'), findsOneWidget);
+    expect(find.text('Download PDF'), findsNothing);
+    expect(find.text('Download Brochure'), findsNothing);
+    expect(find.text('OR'), findsNothing);
     expect(find.text('15+'), findsOneWidget);
     expect(find.text('Happy Clients'), findsOneWidget);
     expect(find.text('Projects Completed'), findsOneWidget);

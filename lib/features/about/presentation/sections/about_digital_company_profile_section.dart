@@ -18,6 +18,14 @@ const _cardBg = Color(0xFF151821);
 const _cardBgHover = Color(0xFF1A1D26);
 const _iconWell = Color(0xFF10131A);
 
+bool _isLaunchableDownloadUrl(String raw) {
+  final value = raw.trim();
+  if (value.isEmpty || value == '#') return false;
+  final uri = Uri.tryParse(value);
+  if (uri == null || !uri.hasScheme) return false;
+  return uri.scheme == 'http' || uri.scheme == 'https';
+}
+
 /// Premium Digital Company Profile — CMS-backed with seeded fallbacks.
 ///
 /// Trust KPIs prefer live `company_statistics` (Admin → Website → Statistics)
@@ -143,11 +151,21 @@ class _AboutDigitalCompanyProfileSectionState
   }
 
   Future<void> _open(String raw) async {
-    final value = raw.trim();
-    if (value.isEmpty || value == '#') return;
-    final uri = Uri.tryParse(value);
-    if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!_isLaunchableDownloadUrl(raw)) return;
+    final uri = Uri.parse(raw.trim());
+    if (!await canLaunchUrl(uri)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this link.')),
+      );
+      return;
+    }
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open this link.')),
+      );
+    }
   }
 
   Animation<double> _interval(double begin, double end) => CurvedAnimation(
@@ -175,6 +193,9 @@ class _AboutDigitalCompanyProfileSectionState
             const <CmsCompanyStat>[];
     final profile = _resolve(cms, liveStats);
     final mobile = context.isMobile;
+    final showPdf = _isLaunchableDownloadUrl(profile.downloadUrl);
+    final showBrochure = _isLaunchableDownloadUrl(profile.brochureUrl);
+    final showDownloads = showPdf || showBrochure;
 
     return SectionWrapper(
       backgroundColor: _profileBg,
@@ -209,22 +230,26 @@ class _AboutDigitalCompanyProfileSectionState
                   ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.xxl),
-              FadeTransition(
-                opacity: _interval(0.35, 0.75),
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.05),
-                    end: Offset.zero,
-                  ).animate(_interval(0.35, 0.75)),
-                  child: _DownloadsRow(
-                    profile: profile,
-                    mobile: mobile,
-                    onPdf: () => _open(profile.downloadUrl),
-                    onBrochure: () => _open(profile.brochureUrl),
+              if (showDownloads) ...[
+                const SizedBox(height: AppSpacing.xxl),
+                FadeTransition(
+                  opacity: _interval(0.35, 0.75),
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.05),
+                      end: Offset.zero,
+                    ).animate(_interval(0.35, 0.75)),
+                    child: _DownloadsRow(
+                      profile: profile,
+                      mobile: mobile,
+                      showPdf: showPdf,
+                      showBrochure: showBrochure,
+                      onPdf: () => _open(profile.downloadUrl),
+                      onBrochure: () => _open(profile.brochureUrl),
+                    ),
                   ),
                 ),
-              ),
+              ],
               const SizedBox(height: AppSpacing.xxl),
               FadeTransition(
                 opacity: _interval(0.5, 1.0),
@@ -840,52 +865,65 @@ class _DownloadsRow extends StatelessWidget {
   const _DownloadsRow({
     required this.profile,
     required this.mobile,
+    required this.showPdf,
+    required this.showBrochure,
     required this.onPdf,
     required this.onBrochure,
   });
 
   final AboutCompanyProfile profile;
   final bool mobile;
+  final bool showPdf;
+  final bool showBrochure;
   final VoidCallback onPdf;
   final VoidCallback onBrochure;
 
   @override
   Widget build(BuildContext context) {
-    final pdf = _DownloadCard(
-      title: profile.pdfLabel,
-      meta: profile.pdfMeta,
-      icon: LucideIcons.fileText,
-      onTap: onPdf,
-    );
-    final brochure = _DownloadCard(
-      title: profile.brochureLabel,
-      meta: profile.brochureMeta,
-      icon: LucideIcons.bookOpen,
-      onTap: onBrochure,
-    );
+    final pdf = showPdf
+        ? _DownloadCard(
+            title: profile.pdfLabel,
+            meta: profile.pdfMeta,
+            icon: LucideIcons.fileText,
+            onTap: onPdf,
+          )
+        : null;
+    final brochure = showBrochure
+        ? _DownloadCard(
+            title: profile.brochureLabel,
+            meta: profile.brochureMeta,
+            icon: LucideIcons.bookOpen,
+            onTap: onBrochure,
+          )
+        : null;
 
-    if (mobile) {
-      return Column(
+    if (pdf != null && brochure != null) {
+      if (mobile) {
+        return Column(
+          children: [
+            pdf,
+            const SizedBox(height: AppSpacing.md),
+            const _OrBadge(),
+            const SizedBox(height: AppSpacing.md),
+            brochure,
+          ],
+        );
+      }
+      return Row(
         children: [
-          pdf,
-          const SizedBox(height: AppSpacing.md),
-          const _OrBadge(),
-          const SizedBox(height: AppSpacing.md),
-          brochure,
+          Expanded(child: pdf),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14),
+            child: _OrBadge(),
+          ),
+          Expanded(child: brochure),
         ],
       );
     }
 
-    return Row(
-      children: [
-        Expanded(child: pdf),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14),
-          child: _OrBadge(),
-        ),
-        Expanded(child: brochure),
-      ],
-    );
+    final single = pdf ?? brochure!;
+    if (mobile) return single;
+    return Row(children: [Expanded(child: single)]);
   }
 }
 
