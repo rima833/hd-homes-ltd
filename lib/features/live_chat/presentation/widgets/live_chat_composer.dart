@@ -51,11 +51,13 @@ class LiveChatComposer extends ConsumerStatefulWidget {
     required this.controller,
     this.compact = false,
     this.showSendLabel = false,
+    this.scrollIntoViewOnFocus = false,
   });
 
   final TextEditingController controller;
   final bool compact;
   final bool showSendLabel;
+  final bool scrollIntoViewOnFocus;
 
   @override
   ConsumerState<LiveChatComposer> createState() => _LiveChatComposerState();
@@ -63,6 +65,33 @@ class LiveChatComposer extends ConsumerStatefulWidget {
 
 class _LiveChatComposerState extends ConsumerState<LiveChatComposer> {
   bool _emojiOpen = false;
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChange() {
+    if (!widget.scrollIntoViewOnFocus || !_focusNode.hasFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Scrollable.ensureVisible(
+        context,
+        alignment: 1,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    });
+  }
 
   Future<void> _pickFiles() async {
     try {
@@ -204,6 +233,7 @@ class _LiveChatComposerState extends ConsumerState<LiveChatComposer> {
             const SizedBox(width: 6),
             Expanded(
               child: TextField(
+                focusNode: _focusNode,
                 controller: widget.controller,
                 style: TextStyle(
                   color: Colors.white,

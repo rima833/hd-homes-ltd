@@ -195,6 +195,12 @@ class PublicFloatingActions extends ConsumerWidget {
     final onContactHub = path == RoutePaths.contact;
 
     final chatOpen = ref.watch(liveChatPanelOpenProvider);
+    final isMobile = context.isMobile;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final fabBottom = keyboardInset > 0
+        ? keyboardInset + AppSpacing.xs
+        : safeBottom + AppSpacing.base;
     // Contact Hub already has QuickRail + Live Chat section — never show the
     // yellow/charcoal FAB stack there (it freezes taps over embedded wizards).
     // Still allow the floating panel when an in-page CTA opens chat.
@@ -212,14 +218,18 @@ class PublicFloatingActions extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+    final useMobileSheet = isMobile && chatOpen;
+
     return Positioned(
       right: AppSpacing.base,
-      bottom: AppSpacing.base,
+      bottom: fabBottom,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (chatOpen && (settings?.showLiveChatFab ?? true)) ...[
+          if (chatOpen &&
+              (settings?.showLiveChatFab ?? true) &&
+              !useMobileSheet) ...[
             const PublicLiveChatPanel(),
             if (showLiveChatFab) const SizedBox(height: AppSpacing.sm),
           ],
@@ -253,7 +263,7 @@ class PublicFloatingActions extends ConsumerWidget {
               ),
             ),
           ],
-          if (context.isMobile) ...[
+          if (isMobile && !(useMobileSheet && chatOpen)) ...[
             if (showCall) ...[
               const SizedBox(height: AppSpacing.sm),
               FloatingActionButton.small(

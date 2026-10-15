@@ -28,7 +28,10 @@ const _bg = Color(0xFF0A0A0A);
 
 /// Compact Concierge live-chat panel opened from the sitewide chat FAB.
 class PublicLiveChatPanel extends ConsumerStatefulWidget {
-  const PublicLiveChatPanel({super.key});
+  const PublicLiveChatPanel({super.key, this.sheetLayout = false});
+
+  /// Phone/tablet sheet: fill parent bounds (keyboard-aware overlay).
+  final bool sheetLayout;
 
   @override
   ConsumerState<PublicLiveChatPanel> createState() =>
@@ -107,32 +110,28 @@ class _PublicLiveChatPanelState extends ConsumerState<PublicLiveChatPanel> {
 
     final width = MediaQuery.sizeOf(context).width;
     final media = MediaQuery.of(context);
-    final panelWidth = width < 420 ? (width - 32).clamp(280.0, 420.0) : 380.0;
+    final sheet = widget.sheetLayout;
+    final panelWidth = sheet
+        ? width
+        : (width < 420 ? (width - 32).clamp(280.0, 420.0) : 380.0);
     // Match Contact Hub chat panel (`minHeight: 520`), shrink only on short viewports.
     const contactHubHeight = 520.0;
     final reservedTop = media.padding.top + 82; // public nav under extendBodyBehindAppBar
     final reservedBottom = media.padding.bottom + 72; // FABs below panel
     final available = media.size.height - reservedTop - reservedBottom;
-    final panelHeight = available >= contactHubHeight
-        ? contactHubHeight
-        : available.clamp(400.0, contactHubHeight);
+    final panelHeight = sheet
+        ? null
+        : (available >= contactHubHeight
+            ? contactHubHeight
+            : available.clamp(400.0, contactHubHeight));
     final presence = ref.watch(liveChatSupportPresenceProvider).valueOrNull;
     final online = presence?.online == true;
     final agentsPresent = presence?.agentsPresent ?? 0;
 
-    return Material(
-      elevation: 16,
-      borderRadius: BorderRadius.circular(18),
-      color: _panel,
-      child: Container(
-        width: panelWidth,
-        height: panelHeight,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _border),
-        ),
-        child: Column(
-          children: [
+    final radius = BorderRadius.circular(sheet ? 16 : 18);
+
+    final panelBody = Column(
+      children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 8, 12),
               child: Row(
@@ -406,14 +405,49 @@ class _PublicLiveChatPanelState extends ConsumerState<PublicLiveChatPanel> {
               )
             else
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+                padding: EdgeInsets.fromLTRB(
+                  10,
+                  0,
+                  10,
+                  sheet ? 8 : 12,
+                ),
                 child: LiveChatComposer(
                   controller: _messageController,
                   compact: true,
+                  scrollIntoViewOnFocus: sheet,
                 ),
               ),
-          ],
+      ],
+    );
+
+    if (sheet) {
+      return Material(
+        elevation: 20,
+        borderRadius: radius,
+        color: _panel,
+        clipBehavior: Clip.antiAlias,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(color: _border),
+            borderRadius: radius,
+          ),
+          child: SizedBox(width: panelWidth, child: panelBody),
         ),
+      );
+    }
+
+    return Material(
+      elevation: 16,
+      borderRadius: radius,
+      color: _panel,
+      child: Container(
+        width: panelWidth,
+        height: panelHeight,
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(color: _border),
+        ),
+        child: panelBody,
       ),
     );
   }

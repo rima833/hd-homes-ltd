@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hdhomesproject/core/constants/route_paths.dart';
+import 'package:hdhomesproject/core/extensions/context_extensions.dart';
+import 'package:hdhomesproject/features/live_chat/presentation/providers/live_chat_providers.dart';
+import 'package:hdhomesproject/features/live_chat/presentation/widgets/public_live_chat_mobile_overlay.dart';
 import 'package:hdhomesproject/core/layout/public/public_drawer.dart';
 import 'package:hdhomesproject/core/layout/public/public_footer.dart';
 import 'package:hdhomesproject/core/layout/public/public_nav_bar.dart';
@@ -159,6 +162,9 @@ class _PublicShellState extends ConsumerState<PublicShell> {
     ref.watch(footerRealtimeProvider);
 
     final location = GoRouterState.of(context).uri.path;
+    final chatOpen = ref.watch(liveChatPanelOpenProvider);
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final useMobileChatOverlay = context.isMobile && chatOpen;
     final showBanner = _showSiteBanner(location);
     final bannersAsync = ref.watch(publishedActiveBannersProvider);
     final banner = showBanner && bannersAsync.valueOrNull?.isNotEmpty == true
@@ -180,6 +186,7 @@ class _PublicShellState extends ConsumerState<PublicShell> {
           child: Scaffold(
             key: _scaffoldKey,
             extendBodyBehindAppBar: true,
+            resizeToAvoidBottomInset: true,
             drawer: const PublicDrawer(),
             appBar: PreferredSize(
               preferredSize: const Size.fromHeight(74),
@@ -203,12 +210,17 @@ class _PublicShellState extends ConsumerState<PublicShell> {
               children: [
                 SingleChildScrollView(
                   controller: _scrollController,
+                  padding: EdgeInsets.only(bottom: keyboardInset),
                   child: Column(children: [widget.child, const PublicFooter()]),
                 ),
+                if (useMobileChatOverlay)
+                  PublicLiveChatMobileOverlay(
+                    topInset: MediaQuery.paddingOf(context).top + 74,
+                  ),
                 const PublicFloatingActions(),
                 Positioned(
                   right: 16,
-                  bottom: 88,
+                  bottom: 88 + keyboardInset,
                   child: ScrollToTopButton(
                     visible: _showScrollTop,
                     onPressed: _scrollToTop,
